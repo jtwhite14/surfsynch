@@ -152,8 +152,9 @@ export default function OnboardingPage() {
         const res = await fetch(`/api/upload-sessions?id=${sessionId}`);
         if (res.ok) {
           const data = await res.json();
-          if (data.photos && data.photos.length > photos.length) {
-            setPhotos(data.photos);
+          const sessionPhotos = data.uploadSession?.photos || data.photos;
+          if (sessionPhotos && sessionPhotos.length > photos.length) {
+            setPhotos(sessionPhotos);
           }
         }
       } catch {
@@ -203,7 +204,7 @@ export default function OnboardingPage() {
       const res = await fetch(`/api/upload-sessions?id=${sessionId}`);
       if (res.ok) {
         const data = await res.json();
-        setPhotos(data.photos || []);
+        setPhotos(data.uploadSession?.photos || data.photos || []);
       }
     } catch {
       // ignore
