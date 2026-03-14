@@ -136,6 +136,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   surfSessions: many(surfSessions),
   accounts: many(accounts),
   sessions: many(sessions),
+  uploadSessions: many(uploadSessions),
 }));
 
 export const accountsRelations = relations(accounts, ({ one }) => ({
@@ -190,6 +191,44 @@ export const spotForecastsRelations = relations(spotForecasts, ({ one }) => ({
   }),
 }));
 
+// Upload Sessions table (for QR code photo upload flow)
+export const uploadSessions = pgTable("upload_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  token: varchar("token", { length: 255 }).notNull().unique(),
+  status: varchar("status", { length: 50 }).notNull().default("pending"), // pending | uploading | completed | expired
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Upload Photos table (photos uploaded via mobile during onboarding)
+export const uploadPhotos = pgTable("upload_photos", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  uploadSessionId: uuid("upload_session_id")
+    .notNull()
+    .references(() => uploadSessions.id, { onDelete: "cascade" }),
+  photoUrl: text("photo_url").notNull(),
+  exifData: jsonb("exif_data"), // { dateTime, latitude, longitude }
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const uploadSessionsRelations = relations(uploadSessions, ({ one, many }) => ({
+  user: one(users, {
+    fields: [uploadSessions.userId],
+    references: [users.id],
+  }),
+  photos: many(uploadPhotos),
+}));
+
+export const uploadPhotosRelations = relations(uploadPhotos, ({ one }) => ({
+  uploadSession: one(uploadSessions, {
+    fields: [uploadPhotos.uploadSessionId],
+    references: [uploadSessions.id],
+  }),
+}));
+
 // Type exports
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -201,3 +240,7 @@ export type SessionCondition = typeof sessionConditions.$inferSelect;
 export type NewSessionCondition = typeof sessionConditions.$inferInsert;
 export type SpotForecast = typeof spotForecasts.$inferSelect;
 export type NewSpotForecast = typeof spotForecasts.$inferInsert;
+export type UploadSession = typeof uploadSessions.$inferSelect;
+export type NewUploadSession = typeof uploadSessions.$inferInsert;
+export type UploadPhoto = typeof uploadPhotos.$inferSelect;
+export type NewUploadPhoto = typeof uploadPhotos.$inferInsert;

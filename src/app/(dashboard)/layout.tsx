@@ -3,7 +3,7 @@
 import { useSession, signOut } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -29,6 +29,7 @@ export default function DashboardLayout({
   const { data: session, status } = useSession();
   const router = useRouter();
   const pathname = usePathname();
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -36,7 +37,29 @@ export default function DashboardLayout({
     }
   }, [status, router]);
 
-  if (status === "loading") {
+  useEffect(() => {
+    if (status !== "authenticated" || onboardingChecked) return;
+
+    async function checkOnboarding() {
+      try {
+        const res = await fetch("/api/onboarding/check");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.needsOnboarding && pathname !== "/onboarding") {
+            router.push("/onboarding");
+          }
+        }
+      } catch {
+        // If the check fails, proceed normally
+      } finally {
+        setOnboardingChecked(true);
+      }
+    }
+
+    checkOnboarding();
+  }, [status, onboardingChecked, pathname, router]);
+
+  if (status === "loading" || (status === "authenticated" && !onboardingChecked)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-pulse text-muted-foreground">Loading...</div>

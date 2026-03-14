@@ -1,0 +1,156 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import {
+  db,
+  uploadSessions,
+  surfSessions,
+  sessionConditions,
+  surfSpots,
+} from "@/lib/db";
+import { eq, and } from "drizzle-orm";
+import { z } from "zod";
+import { fetchHistoricalConditions } from "@/lib/api/open-meteo";
+
+const completeSchema = z.object({
+  uploadSessionId: z.string().uuid(),
+  sessions: z.array(
+    z.object({
+      photoUrl: z.string().url(),
+      spotId: z.string().uuid(),
+      date: z.string().datetime(),
+      startTime: z.string().datetime(),
+      rating: z.number().min(1).max(5),
+      notes: z.string().optional(),
+    })
+  ),
+});
+
+export async function POST(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const validated = completeSchema.parse(body);
+
+    // Verify upload session belongs to user
+    const uploadSession = await db.query.uploadSessions.findFirst({
+      where: and(
+        eq(uploadSessions.id, validated.uploadSessionId),
+        eq(uploadSessions.userId, session.user.id)
+      ),
+    });
+
+    if (!uploadSession) {
+      return NextResponse.json(
+        { error: "Upload session not found" },
+        { status: 404 }
+      );
+    }
+
+    const sessionIds: string[] = [];
+
+    // Create each surf session
+    for (const s of validated.sessions) {
+      // Verify spot belongs to user
+      const spot = await db.query.surfSpots.findFirst({
+        where: and(
+          eq(surfSpots.id, s.spotId),
+          eq(surfSpots.userId, session.user.id)
+        ),
+      });
+
+      if (!spot) {
+        return NextResponse.json(
+          { error: `Spot not found: ${s.spotId}` },
+          { status: 404 }
+        );
+      }
+
+      const [newSession] = await db
+        .insert(surfSessions)
+        .values({
+          spotId: s.spotId,
+          userId: session.user.id,
+          date: new Date(s.date),
+          startTime: new Date(s.startTime),
+          rating: s.rating,
+          notes: s.notes || null,
+          photoUrl: s.photoUrl,
+        })
+        .returning();
+
+      sessionIds.push(newSession.id);
+
+      // Try to fetch historical conditions
+      const conditionsPromises = [
+        fetchHistoricalConditions(
+          parseFloat(spot.latitude),
+          parseFloat(spot.longitude),
+          new Date(s.startTime)
+        ),
+      ];
+
+      const results = await Promise.allSettled(conditionsPromises);
+      const conditionResult = results[0];
+
+      if (
+        conditionResult.status === "fulfilled" &&
+        conditionResult.value
+      ) {
+        const conditions = conditionResult.value;
+        await db.insert(sessionConditions).values({
+          sessionId: newSession.id,
+          waveHeight: conditions.waveHeight?.toString() || null,
+          wavePeriod: conditions.wavePeriod?.toString() || null,
+          waveDirection: conditions.waveDirection?.toString() || null,
+          primarySwellHeight:
+            conditions.primarySwellHeight?.toString() || null,
+          primarySwellPeriod:
+            conditions.primarySwellPeriod?.toString() || null,
+          primarySwellDirection:
+            conditions.primarySwellDirection?.toString() || null,
+          secondarySwellHeight:
+            conditions.secondarySwellHeight?.toString() || null,
+          secondarySwellPeriod:
+            conditions.secondarySwellPeriod?.toString() || null,
+          secondarySwellDirection:
+            conditions.secondarySwellDirection?.toString() || null,
+          windSpeed: conditions.windSpeed?.toString() || null,
+          windDirection: conditions.windDirection?.toString() || null,
+          seaSurfaceTemp: conditions.seaSurfaceTemp?.toString() || null,
+          timestamp: conditions.timestamp,
+        });
+      }
+    }
+
+    // Mark upload session as completed
+    await db
+      .update(uploadSessions)
+      .set({ status: "completed" })
+      .where(eq(uploadSessions.id, validated.uploadSessionId));
+
+    return NextResponse.json(
+      {
+        created: sessionIds.length,
+        sessionIds,
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error("Error completing upload session:", error);
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Invalid data", details: error.issues },
+        { status: 400 }
+      );
+    }
+    return NextResponse.json(
+      { error: "Failed to complete upload session" },
+      { status: 500 }
+    );
+  }
+}
