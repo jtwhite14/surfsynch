@@ -1,0 +1,10 @@
+ALTER TABLE "session_conditions" ADD COLUMN "wind_wave_height" numeric(5, 2);
+ALTER TABLE "session_conditions" ADD COLUMN "wind_wave_period" numeric(5, 2);
+ALTER TABLE "session_conditions" ADD COLUMN "wind_wave_direction" numeric(5, 2);
+ALTER TABLE "session_conditions" ADD COLUMN "wind_gust" numeric(5, 2);
+ALTER TABLE "session_conditions" ADD COLUMN "air_temp" numeric(5, 2);
+ALTER TABLE "session_conditions" ADD COLUMN "humidity" numeric(5, 2);
+ALTER TABLE "session_conditions" ADD COLUMN "precipitation" numeric(5, 2);
+ALTER TABLE "session_conditions" ADD COLUMN "pressure_msl" numeric(7, 2);
+ALTER TABLE "session_conditions" ADD COLUMN "cloud_cover" numeric(5, 2);
+ALTER TABLE "session_conditions" ADD COLUMN "visibility" numeric(8, 2);

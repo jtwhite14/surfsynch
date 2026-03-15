@@ -119,9 +119,19 @@ export async function POST(request: NextRequest) {
             conditions.secondarySwellPeriod?.toString() || null,
           secondarySwellDirection:
             conditions.secondarySwellDirection?.toString() || null,
+          windWaveHeight: conditions.windWaveHeight?.toString() || null,
+          windWavePeriod: conditions.windWavePeriod?.toString() || null,
+          windWaveDirection: conditions.windWaveDirection?.toString() || null,
           windSpeed: conditions.windSpeed?.toString() || null,
           windDirection: conditions.windDirection?.toString() || null,
+          windGust: conditions.windGust?.toString() || null,
+          airTemp: conditions.airTemp?.toString() || null,
           seaSurfaceTemp: conditions.seaSurfaceTemp?.toString() || null,
+          humidity: conditions.humidity?.toString() || null,
+          precipitation: conditions.precipitation?.toString() || null,
+          pressureMsl: conditions.pressureMsl?.toString() || null,
+          cloudCover: conditions.cloudCover?.toString() || null,
+          visibility: conditions.visibility?.toString() || null,
           timestamp: conditions.timestamp,
         });
       }

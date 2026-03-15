@@ -9,9 +9,19 @@ export interface MarineConditions {
   secondarySwellHeight: number | null;
   secondarySwellPeriod: number | null;
   secondarySwellDirection: number | null;
+  windWaveHeight: number | null;
+  windWavePeriod: number | null;
+  windWaveDirection: number | null;
   windSpeed: number | null;
   windDirection: number | null;
+  windGust: number | null;
+  airTemp: number | null;
   seaSurfaceTemp: number | null;
+  humidity: number | null;
+  precipitation: number | null;
+  pressureMsl: number | null;
+  cloudCover: number | null;
+  visibility: number | null;
   timestamp: Date;
 }
 
@@ -134,9 +144,19 @@ export interface SurfSessionWithConditions {
     secondarySwellHeight: string | null;
     secondarySwellPeriod: string | null;
     secondarySwellDirection: string | null;
+    windWaveHeight: string | null;
+    windWavePeriod: string | null;
+    windWaveDirection: string | null;
     windSpeed: string | null;
     windDirection: string | null;
+    windGust: string | null;
+    airTemp: string | null;
     seaSurfaceTemp: string | null;
+    humidity: string | null;
+    precipitation: string | null;
+    pressureMsl: string | null;
+    cloudCover: string | null;
+    visibility: string | null;
     timestamp: Date;
   } | null;
   spot?: {

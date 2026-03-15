@@ -22,6 +22,13 @@ const MARINE_PARAMS = [
 const WEATHER_PARAMS = [
   "wind_speed_10m",
   "wind_direction_10m",
+  "wind_gusts_10m",
+  "temperature_2m",
+  "relative_humidity_2m",
+  "precipitation",
+  "pressure_msl",
+  "cloud_cover",
+  "visibility",
 ].join(",");
 
 interface OpenMeteoMarineResponse {
@@ -51,7 +58,14 @@ interface OpenMeteoWeatherResponse {
     time: string[];
     wind_speed_10m?: number[];
     wind_direction_10m?: number[];
+    wind_gusts_10m?: number[];
+    temperature_2m?: number[];
     sea_surface_temperature?: number[];
+    relative_humidity_2m?: number[];
+    precipitation?: number[];
+    pressure_msl?: number[];
+    cloud_cover?: number[];
+    visibility?: number[];
   };
 }
 
@@ -121,7 +135,14 @@ export async function fetchHistoricalConditions(
       "wave_direction",
       "wind_speed_10m",
       "wind_direction_10m",
+      "wind_gusts_10m",
+      "temperature_2m",
       "sea_surface_temperature",
+      "relative_humidity_2m",
+      "precipitation",
+      "pressure_msl",
+      "cloud_cover",
+      "visibility",
     ].join(","),
     timezone: "auto",
   });
@@ -163,9 +184,19 @@ export async function fetchHistoricalConditions(
       secondarySwellHeight: null,
       secondarySwellPeriod: null,
       secondarySwellDirection: null,
+      windWaveHeight: null,
+      windWavePeriod: null,
+      windWaveDirection: null,
       windSpeed: data.hourly?.wind_speed_10m?.[closestIndex] ?? null,
       windDirection: data.hourly?.wind_direction_10m?.[closestIndex] ?? null,
+      windGust: data.hourly?.wind_gusts_10m?.[closestIndex] ?? null,
+      airTemp: data.hourly?.temperature_2m?.[closestIndex] ?? null,
       seaSurfaceTemp: data.hourly?.sea_surface_temperature?.[closestIndex] ?? null,
+      humidity: data.hourly?.relative_humidity_2m?.[closestIndex] ?? null,
+      precipitation: data.hourly?.precipitation?.[closestIndex] ?? null,
+      pressureMsl: data.hourly?.pressure_msl?.[closestIndex] ?? null,
+      cloudCover: data.hourly?.cloud_cover?.[closestIndex] ?? null,
+      visibility: data.hourly?.visibility?.[closestIndex] ?? null,
       timestamp: new Date(times[closestIndex]),
     };
   } catch (error) {
@@ -221,9 +252,19 @@ function transformForecastResponse(
     secondarySwellHeight: marineData.hourly.secondary_swell_wave_height?.[index] ?? null,
     secondarySwellPeriod: marineData.hourly.secondary_swell_wave_period?.[index] ?? null,
     secondarySwellDirection: marineData.hourly.secondary_swell_wave_direction?.[index] ?? null,
+    windWaveHeight: marineData.hourly.wind_wave_height?.[index] ?? null,
+    windWavePeriod: marineData.hourly.wind_wave_period?.[index] ?? null,
+    windWaveDirection: marineData.hourly.wind_wave_direction?.[index] ?? null,
     windSpeed: weatherData?.hourly?.wind_speed_10m?.[index] ?? null,
     windDirection: weatherData?.hourly?.wind_direction_10m?.[index] ?? null,
+    windGust: weatherData?.hourly?.wind_gusts_10m?.[index] ?? null,
+    airTemp: weatherData?.hourly?.temperature_2m?.[index] ?? null,
     seaSurfaceTemp: weatherData?.hourly?.sea_surface_temperature?.[index] ?? null,
+    humidity: weatherData?.hourly?.relative_humidity_2m?.[index] ?? null,
+    precipitation: weatherData?.hourly?.precipitation?.[index] ?? null,
+    pressureMsl: weatherData?.hourly?.pressure_msl?.[index] ?? null,
+    cloudCover: weatherData?.hourly?.cloud_cover?.[index] ?? null,
+    visibility: weatherData?.hourly?.visibility?.[index] ?? null,
   }));
 
   return {

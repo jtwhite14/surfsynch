@@ -38,75 +38,154 @@ export function ConditionsDisplay({ conditions, compact = false }: ConditionsDis
   }
 
   return (
-    <div className="grid grid-cols-2 gap-4">
-      {/* Wave Height */}
-      <div className="space-y-1">
-        <div className="text-sm text-muted-foreground">Wave Height</div>
-        <div className="text-lg font-semibold">{formatWaveHeight(conditions.waveHeight)}</div>
-      </div>
-
-      {/* Wave Period */}
-      <div className="space-y-1">
-        <div className="text-sm text-muted-foreground">Wave Period</div>
-        <div className="text-lg font-semibold">{formatWavePeriod(conditions.wavePeriod)}</div>
-      </div>
-
-      {/* Primary Swell */}
-      {conditions.primarySwellHeight !== null && (
-        <>
-          <div className="space-y-1">
-            <div className="text-sm text-muted-foreground">Primary Swell</div>
-            <div className="text-lg font-semibold">
-              {formatWaveHeight(conditions.primarySwellHeight)} @ {formatWavePeriod(conditions.primarySwellPeriod)}
-            </div>
-          </div>
-          <div className="space-y-1">
-            <div className="text-sm text-muted-foreground">Swell Direction</div>
-            <div className="text-lg font-semibold flex items-center gap-2">
-              <DirectionArrow degrees={conditions.primarySwellDirection} />
-              {getDirectionText(conditions.primarySwellDirection)}
-              {conditions.primarySwellDirection !== null && (
-                <span className="text-sm text-muted-foreground">({conditions.primarySwellDirection.toFixed(0)}°)</span>
-              )}
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Secondary Swell */}
-      {conditions.secondarySwellHeight !== null && conditions.secondarySwellHeight > 0 && (
-        <div className="col-span-2 space-y-1">
-          <div className="text-sm text-muted-foreground">Secondary Swell</div>
-          <div className="text-lg font-semibold">
-            {formatWaveHeight(conditions.secondarySwellHeight)} @ {formatWavePeriod(conditions.secondarySwellPeriod)}{" "}
-            from {getDirectionText(conditions.secondarySwellDirection)}
-          </div>
+    <div className="space-y-6">
+      {/* Waves Section */}
+      <div>
+        <h4 className="text-sm font-medium text-muted-foreground mb-3">Waves</h4>
+        <div className="grid grid-cols-2 gap-4">
+          <ConditionItem label="Sig. Wave Height" value={formatWaveHeight(conditions.waveHeight)} />
+          <ConditionItem label="Wave Period" value={formatWavePeriod(conditions.wavePeriod)} />
+          <ConditionItem
+            label="Wave Direction"
+            value={
+              conditions.waveDirection !== null ? (
+                <span className="flex items-center gap-2">
+                  <DirectionArrow degrees={conditions.waveDirection} />
+                  {getDirectionText(conditions.waveDirection)}
+                  <span className="text-sm text-muted-foreground">({conditions.waveDirection.toFixed(0)}°)</span>
+                </span>
+              ) : "N/A"
+            }
+          />
         </div>
-      )}
+      </div>
 
-      {/* Wind */}
-      <div className="space-y-1">
-        <div className="text-sm text-muted-foreground">Wind</div>
-        <div className="text-lg font-semibold flex items-center gap-2">
-          {formatWindSpeed(conditions.windSpeed)}
-          {conditions.windDirection !== null && (
-            <>
-              <DirectionArrow degrees={conditions.windDirection} />
-              <span className="text-sm text-muted-foreground">
-                {getDirectionText(conditions.windDirection)}
-              </span>
-            </>
+      {/* Swell Section */}
+      <div>
+        <h4 className="text-sm font-medium text-muted-foreground mb-3">Swell</h4>
+        <div className="grid grid-cols-2 gap-4">
+          <ConditionItem label="Swell Height" value={formatWaveHeight(conditions.primarySwellHeight)} />
+          <ConditionItem label="Swell Period" value={formatWavePeriod(conditions.primarySwellPeriod)} />
+          <ConditionItem
+            label="Swell Direction"
+            value={
+              conditions.primarySwellDirection !== null ? (
+                <span className="flex items-center gap-2">
+                  <DirectionArrow degrees={conditions.primarySwellDirection} />
+                  {getDirectionText(conditions.primarySwellDirection)}
+                  <span className="text-sm text-muted-foreground">({conditions.primarySwellDirection.toFixed(0)}°)</span>
+                </span>
+              ) : "N/A"
+            }
+          />
+          {conditions.secondarySwellHeight !== null && conditions.secondarySwellHeight > 0 && (
+            <ConditionItem
+              label="Secondary Swell"
+              value={`${formatWaveHeight(conditions.secondarySwellHeight)} @ ${formatWavePeriod(conditions.secondarySwellPeriod)} from ${getDirectionText(conditions.secondarySwellDirection)}`}
+            />
           )}
         </div>
       </div>
 
-      {/* Water Temp */}
-      {conditions.seaSurfaceTemp !== null && (
-        <div className="space-y-1">
-          <div className="text-sm text-muted-foreground">Water Temp</div>
-          <div className="text-lg font-semibold">{formatTemperature(conditions.seaSurfaceTemp)}</div>
+      {/* Wind Waves Section */}
+      {conditions.windWaveHeight !== null && (
+        <div>
+          <h4 className="text-sm font-medium text-muted-foreground mb-3">Wind Waves</h4>
+          <div className="grid grid-cols-2 gap-4">
+            <ConditionItem label="Wind Wave Height" value={formatWaveHeight(conditions.windWaveHeight)} />
+            <ConditionItem label="Wind Wave Period" value={formatWavePeriod(conditions.windWavePeriod)} />
+            <ConditionItem
+              label="Wind Wave Direction"
+              value={
+                conditions.windWaveDirection !== null ? (
+                  <span className="flex items-center gap-2">
+                    <DirectionArrow degrees={conditions.windWaveDirection} />
+                    {getDirectionText(conditions.windWaveDirection)}
+                  </span>
+                ) : "N/A"
+              }
+            />
+          </div>
         </div>
       )}
+
+      {/* Wind Section */}
+      <div>
+        <h4 className="text-sm font-medium text-muted-foreground mb-3">Wind</h4>
+        <div className="grid grid-cols-2 gap-4">
+          <ConditionItem
+            label="Wind Speed"
+            value={
+              <span className="flex items-center gap-2">
+                {formatWindSpeed(conditions.windSpeed)}
+                {conditions.windDirection !== null && (
+                  <>
+                    <DirectionArrow degrees={conditions.windDirection} />
+                    <span className="text-sm text-muted-foreground">
+                      {getDirectionText(conditions.windDirection)}
+                    </span>
+                  </>
+                )}
+              </span>
+            }
+          />
+          <ConditionItem
+            label="Wind Direction"
+            value={
+              conditions.windDirection !== null ? (
+                <span className="flex items-center gap-2">
+                  <DirectionArrow degrees={conditions.windDirection} />
+                  {getDirectionText(conditions.windDirection)}
+                  <span className="text-sm text-muted-foreground">({conditions.windDirection.toFixed(0)}°)</span>
+                </span>
+              ) : "N/A"
+            }
+          />
+          <ConditionItem label="Wind Gust" value={formatWindSpeed(conditions.windGust)} />
+        </div>
+      </div>
+
+      {/* Temperature Section */}
+      <div>
+        <h4 className="text-sm font-medium text-muted-foreground mb-3">Temperature</h4>
+        <div className="grid grid-cols-2 gap-4">
+          <ConditionItem label="Air Temp" value={formatTemperature(conditions.airTemp)} />
+          <ConditionItem label="Water Temp" value={formatTemperature(conditions.seaSurfaceTemp)} />
+        </div>
+      </div>
+
+      {/* Weather Section */}
+      {(conditions.humidity !== null || conditions.precipitation !== null || conditions.pressureMsl !== null || conditions.cloudCover !== null || conditions.visibility !== null) && (
+        <div>
+          <h4 className="text-sm font-medium text-muted-foreground mb-3">Weather</h4>
+          <div className="grid grid-cols-2 gap-4">
+            {conditions.humidity !== null && (
+              <ConditionItem label="Humidity" value={`${conditions.humidity.toFixed(0)}%`} />
+            )}
+            {conditions.precipitation !== null && (
+              <ConditionItem label="Precipitation" value={`${conditions.precipitation.toFixed(1)} mm`} />
+            )}
+            {conditions.pressureMsl !== null && (
+              <ConditionItem label="Pressure" value={`${conditions.pressureMsl.toFixed(0)} hPa`} />
+            )}
+            {conditions.cloudCover !== null && (
+              <ConditionItem label="Cloud Cover" value={`${conditions.cloudCover.toFixed(0)}%`} />
+            )}
+            {conditions.visibility !== null && (
+              <ConditionItem label="Visibility" value={`${(conditions.visibility / 1000).toFixed(1)} km`} />
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ConditionItem({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <div className="text-sm text-muted-foreground">{label}</div>
+      <div className="text-lg font-semibold">{value}</div>
     </div>
   );
 }
