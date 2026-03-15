@@ -18,6 +18,8 @@ export const users = pgTable("users", {
   name: varchar("name", { length: 255 }),
   emailVerified: timestamp("email_verified"),
   image: text("image"),
+  homeLatitude: decimal("home_latitude", { precision: 10, scale: 7 }),
+  homeLongitude: decimal("home_longitude", { precision: 10, scale: 7 }),
   googleRefreshToken: text("google_refresh_token"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

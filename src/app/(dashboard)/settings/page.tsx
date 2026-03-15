@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useSession, signIn } from "next-auth/react";
+import dynamic from "next/dynamic";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +11,9 @@ import { AvailabilityView } from "@/components/calendar/AvailabilityView";
 import { toast } from "sonner";
 import { AvailabilityWindow, CalendarEvent } from "@/types";
 import { addDays } from "date-fns";
+import { MapPin } from "lucide-react";
+
+const SpotMap = dynamic(() => import("@/components/map/SpotMap"), { ssr: false });
 
 export default function SettingsPage() {
   const { data: session } = useSession();
@@ -18,9 +22,13 @@ export default function SettingsPage() {
   const [availability, setAvailability] = useState<AvailabilityWindow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [homeLocation, setHomeLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locationLoading, setLocationLoading] = useState(true);
+  const [locationSaving, setLocationSaving] = useState(false);
 
   useEffect(() => {
     fetchCalendarData();
+    fetchHomeLocation();
   }, []);
 
   async function fetchCalendarData() {
@@ -78,6 +86,64 @@ export default function SettingsPage() {
     }
   }
 
+  async function fetchHomeLocation() {
+    try {
+      const res = await fetch("/api/user/location");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.latitude && data.longitude) {
+          setHomeLocation({ latitude: data.latitude, longitude: data.longitude });
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching home location:", error);
+    } finally {
+      setLocationLoading(false);
+    }
+  }
+
+  const handleMapClick = useCallback((lat: number, lng: number) => {
+    setHomeLocation({ latitude: lat, longitude: lng });
+  }, []);
+
+  async function handleSaveLocation() {
+    if (!homeLocation) return;
+    setLocationSaving(true);
+    try {
+      const res = await fetch("/api/user/location", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(homeLocation),
+      });
+      if (res.ok) {
+        toast.success("Home location saved");
+      } else {
+        toast.error("Failed to save location");
+      }
+    } catch {
+      toast.error("Failed to save location");
+    } finally {
+      setLocationSaving(false);
+    }
+  }
+
+  async function handleClearLocation() {
+    setLocationSaving(true);
+    try {
+      const res = await fetch("/api/user/location", { method: "DELETE" });
+      if (res.ok) {
+        setHomeLocation(null);
+        toast.success("Home location cleared");
+      } else {
+        toast.error("Failed to clear location");
+      }
+    } catch {
+      toast.error("Failed to clear location");
+    } finally {
+      setLocationSaving(false);
+    }
+  }
+
   const startDate = new Date();
   const endDate = addDays(new Date(), 7);
 
@@ -105,6 +171,58 @@ export default function SettingsPage() {
               />
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Home Location */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="size-5" />
+            Home Location
+          </CardTitle>
+          <CardDescription>
+            Set your home base to center the map within 100 miles of your location
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {locationLoading ? (
+            <div className="h-64 bg-muted rounded-lg animate-pulse" />
+          ) : (
+            <>
+              <div className="h-64 rounded-lg overflow-hidden border">
+                <SpotMap
+                  spots={[]}
+                  onMapClick={handleMapClick}
+                  interactive
+                  newSpotMarker={homeLocation ? { lat: homeLocation.latitude, lng: homeLocation.longitude } : null}
+                  initialViewState={
+                    homeLocation
+                      ? { longitude: homeLocation.longitude, latitude: homeLocation.latitude, zoom: 9 }
+                      : undefined
+                  }
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {homeLocation
+                  ? `Location: ${homeLocation.latitude.toFixed(4)}, ${homeLocation.longitude.toFixed(4)}`
+                  : "Click the map to set your home location"}
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleSaveLocation}
+                  disabled={!homeLocation || locationSaving}
+                >
+                  {locationSaving ? "Saving..." : "Save Location"}
+                </Button>
+                {homeLocation && (
+                  <Button variant="outline" onClick={handleClearLocation} disabled={locationSaving}>
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 

@@ -24,21 +24,27 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [panelOpen, setPanelOpen] = useState(true);
 
+  const [homeLocation, setHomeLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+
   useEffect(() => {
     Promise.all([
       fetch("/api/spots").then((r) => (r.ok ? r.json() : { spots: [] })),
       fetch("/api/sessions?limit=5").then((r) => (r.ok ? r.json() : { sessions: [] })),
+      fetch("/api/user/location").then((r) => (r.ok ? r.json() : { latitude: null, longitude: null })),
     ])
-      .then(([spotsData, sessionsData]) => {
+      .then(([spotsData, sessionsData, locationData]) => {
         setSpots(spotsData.spots || []);
         setSessions(sessionsData.sessions || []);
+        if (locationData.latitude && locationData.longitude) {
+          setHomeLocation({ latitude: locationData.latitude, longitude: locationData.longitude });
+        }
       })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
 
   const initialViewState = useMemo(() => {
-    if (spots.length === 0) return undefined;
+    // If user has spots, center on them
     if (spots.length === 1) {
       return {
         longitude: parseFloat(spots[0].longitude),
@@ -46,14 +52,25 @@ export default function DashboardPage() {
         zoom: 12,
       };
     }
-    const lngs = spots.map((s) => parseFloat(s.longitude));
-    const lats = spots.map((s) => parseFloat(s.latitude));
-    return {
-      longitude: (Math.min(...lngs) + Math.max(...lngs)) / 2,
-      latitude: (Math.min(...lats) + Math.max(...lats)) / 2,
-      zoom: 10,
-    };
-  }, [spots]);
+    if (spots.length > 1) {
+      const lngs = spots.map((s) => parseFloat(s.longitude));
+      const lats = spots.map((s) => parseFloat(s.latitude));
+      return {
+        longitude: (Math.min(...lngs) + Math.max(...lngs)) / 2,
+        latitude: (Math.min(...lats) + Math.max(...lats)) / 2,
+        zoom: 10,
+      };
+    }
+    // Fall back to home location (~100mi radius ≈ zoom 7)
+    if (homeLocation) {
+      return {
+        longitude: homeLocation.longitude,
+        latitude: homeLocation.latitude,
+        zoom: 7,
+      };
+    }
+    return undefined;
+  }, [spots, homeLocation]);
 
   if (loading) {
     return (
