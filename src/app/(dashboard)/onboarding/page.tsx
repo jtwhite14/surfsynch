@@ -28,6 +28,14 @@ import { findNearbySpots } from "@/lib/utils/geo";
 import { SurfSpot } from "@/lib/db/schema";
 import { extractExifData, isExifSupported } from "@/lib/utils/exif";
 import { ExifData } from "@/types";
+import dynamic from "next/dynamic";
+
+const SpotMap = dynamic(() => import("@/components/map/SpotMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-48 rounded-lg bg-muted animate-pulse" />
+  ),
+});
 
 const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB (Vercel limit)
 const MAX_DIMENSION = 2048;
@@ -687,39 +695,43 @@ export default function OnboardingPage() {
                       updateCurrentReview({ newSpotName: e.target.value })
                     }
                   />
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Latitude</Label>
-                      <Input
-                        type="number"
-                        step="any"
-                        placeholder="Latitude"
-                        value={currentReview.newSpotLat ?? ""}
-                        onChange={(e) =>
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">
+                      Click the map to adjust the location
+                    </Label>
+                    <div className="h-56 rounded-lg overflow-hidden border">
+                      <SpotMap
+                        spots={spots}
+                        interactive
+                        onMapClick={(lat, lng) =>
                           updateCurrentReview({
-                            newSpotLat: e.target.value
-                              ? parseFloat(e.target.value)
-                              : null,
+                            newSpotLat: lat,
+                            newSpotLng: lng,
                           })
                         }
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Longitude</Label>
-                      <Input
-                        type="number"
-                        step="any"
-                        placeholder="Longitude"
-                        value={currentReview.newSpotLng ?? ""}
-                        onChange={(e) =>
-                          updateCurrentReview({
-                            newSpotLng: e.target.value
-                              ? parseFloat(e.target.value)
-                              : null,
-                          })
+                        newSpotMarker={
+                          currentReview.newSpotLat !== null &&
+                          currentReview.newSpotLng !== null
+                            ? {
+                                lat: currentReview.newSpotLat,
+                                lng: currentReview.newSpotLng,
+                              }
+                            : null
                         }
+                        initialViewState={{
+                          latitude: currentReview.newSpotLat ?? 37.8,
+                          longitude: currentReview.newSpotLng ?? -122.4,
+                          zoom: currentReview.newSpotLat ? 14 : 9,
+                        }}
                       />
                     </div>
+                    {currentReview.newSpotLat !== null &&
+                      currentReview.newSpotLng !== null && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {currentReview.newSpotLat.toFixed(5)},{" "}
+                          {currentReview.newSpotLng.toFixed(5)}
+                        </p>
+                      )}
                   </div>
                   <div className="flex gap-2">
                     <Button
