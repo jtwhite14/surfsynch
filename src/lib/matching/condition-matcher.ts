@@ -34,9 +34,9 @@ function directionalSimilarity(a: number, b: number, sigma: number): number {
 const SIGMAS = {
   swellHeight: (sessionValue: number) => Math.max(0.4, 0.35 * sessionValue), // relative
   swellPeriod: 1.5,
-  swellDirection: 15,
+  swellDirection: 30,
   windSpeed: 7.5, // km/h
-  windDirection: 22.5,
+  windDirection: 45,
   tideHeight: 0.75, // feet
   waveEnergy: (sessionValue: number) => Math.max(50, 0.35 * sessionValue), // relative, kJ
 };
