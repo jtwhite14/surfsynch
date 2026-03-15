@@ -66,7 +66,7 @@ export function EditSpotDialog({ spot, open, onOpenChange, onSave }: EditSpotDia
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Spot</DialogTitle>
         </DialogHeader>

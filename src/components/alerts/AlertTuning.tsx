@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { ConditionWeights, DEFAULT_CONDITION_WEIGHTS, WEIGHT_PRESETS } from "@/types";
 
@@ -14,7 +13,6 @@ interface AlertTuningSectionProps {
 export function AlertTuningSection({ spotId, onSave }: AlertTuningSectionProps) {
   const [weights, setWeights] = useState<ConditionWeights>(DEFAULT_CONDITION_WEIGHTS);
   const [loading, setLoading] = useState(true);
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [activePreset, setActivePreset] = useState<string | null>("allAround");
 
   useEffect(() => {
@@ -113,50 +111,39 @@ export function AlertTuningSection({ spotId, onSave }: AlertTuningSectionProps) 
         </div>
       </div>
 
-      {/* Advanced customization */}
-      <div>
-        <button
-          onClick={() => setShowAdvanced(!showAdvanced)}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          Customize
-          {showAdvanced ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-        </button>
-
-        {showAdvanced && (
-          <div className="mt-3 space-y-3">
-            <WeightRow
-              label="How important is wave size?"
-              value={weightToLevel(weights.swellHeight)}
-              onChange={level => handleWeightChange("swellHeight", level)}
-            />
-            <WeightRow
-              label="How important is swell period?"
-              value={weightToLevel(weights.swellPeriod)}
-              onChange={level => handleWeightChange("swellPeriod", level)}
-            />
-            <WeightRow
-              label="How important is swell direction?"
-              value={weightToLevel(weights.swellDirection)}
-              onChange={level => handleWeightChange("swellDirection", level)}
-            />
-            <WeightRow
-              label="How important is wind?"
-              value={weightToLevel(weights.windSpeed)}
-              onChange={level => handleWeightChange("windSpeed", level)}
-            />
-            <WeightRow
-              label="How important is wind direction?"
-              value={weightToLevel(weights.windDirection)}
-              onChange={level => handleWeightChange("windDirection", level)}
-            />
-            <WeightRow
-              label="How important is tide?"
-              value={weightToLevel(weights.tideHeight)}
-              onChange={level => handleWeightChange("tideHeight", level)}
-            />
-          </div>
-        )}
+      {/* Customize weights */}
+      <div className="space-y-3">
+        <label className="text-sm font-medium block">Customize</label>
+        <WeightRow
+          label="How important is wave size?"
+          value={weightToLevel(weights.swellHeight)}
+          onChange={level => handleWeightChange("swellHeight", level)}
+        />
+        <WeightRow
+          label="How important is swell period?"
+          value={weightToLevel(weights.swellPeriod)}
+          onChange={level => handleWeightChange("swellPeriod", level)}
+        />
+        <WeightRow
+          label="How important is swell direction?"
+          value={weightToLevel(weights.swellDirection)}
+          onChange={level => handleWeightChange("swellDirection", level)}
+        />
+        <WeightRow
+          label="How important is wind?"
+          value={weightToLevel(weights.windSpeed)}
+          onChange={level => handleWeightChange("windSpeed", level)}
+        />
+        <WeightRow
+          label="How important is wind direction?"
+          value={weightToLevel(weights.windDirection)}
+          onChange={level => handleWeightChange("windDirection", level)}
+        />
+        <WeightRow
+          label="How important is tide?"
+          value={weightToLevel(weights.tideHeight)}
+          onChange={level => handleWeightChange("tideHeight", level)}
+        />
       </div>
     </div>
   );

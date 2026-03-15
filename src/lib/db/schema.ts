@@ -185,6 +185,7 @@ export const sessionConditions = pgTable("session_conditions", {
   cloudCover: decimal("cloud_cover", { precision: 5, scale: 2 }),
   visibility: decimal("visibility", { precision: 8, scale: 2 }),
   tideHeight: decimal("tide_height", { precision: 6, scale: 3 }),
+  waveEnergy: decimal("wave_energy", { precision: 10, scale: 2 }),
   timestamp: timestamp("timestamp").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

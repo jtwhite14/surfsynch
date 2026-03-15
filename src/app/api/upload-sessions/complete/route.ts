@@ -143,6 +143,7 @@ export async function POST(request: NextRequest) {
           cloudCover: conditions.cloudCover?.toString() || null,
           visibility: conditions.visibility?.toString() || null,
           tideHeight: conditions.tideHeight?.toString() || null,
+          waveEnergy: conditions.waveEnergy?.toString() || null,
           timestamp: conditions.timestamp,
         });
       }

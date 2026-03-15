@@ -258,6 +258,7 @@ export interface SurfSessionWithConditions {
     cloudCover: string | null;
     visibility: string | null;
     tideHeight: string | null;
+    waveEnergy: string | null;
     timestamp: Date;
   } | null;
   spot?: {
