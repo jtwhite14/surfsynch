@@ -145,7 +145,7 @@ async function processSpot(spot: {
 
   console.log(`[alerts] Spot "${spot.id}": ${sessionsWithConditions.length} sessions (ratings: ${sessionsWithConditions.map(s => s.rating).join(',')}), ${forecastHours.length} forecast hours, utcOffset=${utcOffsetSeconds}`);
 
-  const alerts = generateAlerts(forecastHours, sessionsForMatching, weights, 70, new Date(), utcOffsetSeconds);
+  const alerts = generateAlerts(forecastHours, sessionsForMatching, weights, 50, new Date(), utcOffsetSeconds);
 
   if (alerts.length > 0) {
     console.log(`[alerts] Spot "${spot.id}": generated ${alerts.length} alerts, top score=${alerts[0].effectiveScore.toFixed(1)}`);
@@ -153,7 +153,7 @@ async function processSpot(spot: {
     // Log the best score that didn't meet threshold for debugging
     const debugAlerts = generateAlerts(forecastHours, sessionsForMatching, weights, 0, new Date(), utcOffsetSeconds);
     const bestScore = debugAlerts.length > 0 ? debugAlerts[0].effectiveScore.toFixed(1) : 'N/A';
-    console.log(`[alerts] Spot "${spot.id}": 0 alerts (best score below threshold: ${bestScore}/70)`);
+    console.log(`[alerts] Spot "${spot.id}": 0 alerts (best score below threshold: ${bestScore}/50)`);
   }
 
   // Expire old alerts that are no longer relevant

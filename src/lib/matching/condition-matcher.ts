@@ -325,7 +325,7 @@ export function generateAlerts(
   forecastHours: ForecastHour[],
   sessions: SessionForMatching[],
   weights: ConditionWeights = DEFAULT_CONDITION_WEIGHTS,
-  threshold: number = 70,
+  threshold: number = 50,
   now: Date = new Date(),
   utcOffsetSeconds: number = 0
 ): ComputedAlert[] {
