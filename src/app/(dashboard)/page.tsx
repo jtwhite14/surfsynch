@@ -225,7 +225,7 @@ export default function DashboardPage() {
 
   // When the spot detail pane is open, pad flyTo so the spot centers in the visible area
   const flyToPadding = useMemo(
-    () => (selectedSpot ? { left: 400 } : undefined),
+    () => (selectedSpot ? { left: 464 } : undefined),
     [selectedSpot]
   );
 
@@ -252,7 +252,7 @@ export default function DashboardPage() {
 
       {/* Spot detail pane */}
       {selectedSpot && addSpotMode === "idle" && (
-        <div className="absolute top-4 left-4 bottom-4 z-20 w-[calc(100%-2rem)] sm:w-96 flex flex-col rounded-lg border bg-background/90 backdrop-blur-sm shadow-lg overflow-hidden">
+        <div className="absolute top-4 left-4 bottom-4 z-20 w-[calc(100%-2rem)] sm:w-[28rem] flex flex-col rounded-lg border bg-background/90 backdrop-blur-sm shadow-lg overflow-hidden">
           {/* Header */}
           <div className="flex items-start justify-between gap-2 px-4 pt-4 pb-3">
             <div className="min-w-0 flex-1">
