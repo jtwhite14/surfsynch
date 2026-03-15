@@ -1,11 +1,17 @@
 "use client";
 
 import {
-  AreaChart,
+  ComposedChart,
   Area,
+  Line,
   ResponsiveContainer,
-  ReferenceLine,
+  Tooltip,
 } from "recharts";
+import {
+  ChartPanel,
+  SharedXAxis,
+  SessionMarker,
+} from "./TimelineChart";
 import { HourlyForecast } from "@/types";
 import { hpaToInHg, metersToMiles, mmToInches } from "@/lib/api/open-meteo";
 
@@ -14,65 +20,56 @@ interface AtmospherePanelProps {
   sessionIndex: number;
 }
 
-const sessionColor = "oklch(0.82 0.17 90)";
+const cHumidity = "oklch(0.696 0.17 162.48)";
+const cPrecip = "oklch(0.627 0.265 303.9)";
+const cPressure = "oklch(0.645 0.246 16.439)";
+const cCloud = "oklch(0.769 0.188 70.08)";
+const cVisibility = "oklch(0.82 0.17 90)";
 
-function Sparkline({
-  data,
-  dataKey,
-  label,
-  value,
-  unit,
-  sessionIndex,
-  color,
-}: {
-  data: Record<string, unknown>[];
-  dataKey: string;
-  label: string;
-  value: string;
-  unit: string;
-  sessionIndex: number;
-  color: string;
-}) {
-  const sessionTime = data[sessionIndex]?.time as string | undefined;
+const metrics = [
+  { key: "Humidity", unit: "%", decimals: 0, color: cHumidity },
+  { key: "Precip", unit: "in", decimals: 2, color: cPrecip },
+  { key: "Pressure", unit: "inHg", decimals: 2, color: cPressure },
+  { key: "Cloud", unit: "%", decimals: 0, color: cCloud },
+  { key: "Visibility", unit: "mi", decimals: 1, color: cVisibility },
+] as const;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function AtmosphereTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+
+  const formatHour = (time: string) => {
+    const d = new Date(time);
+    const h = d.getHours();
+    if (h === 0) return "12a";
+    if (h === 12) return "12p";
+    return h > 12 ? `${h - 12}p` : `${h}a`;
+  };
+
+  // The payload items contain the normalized row as payload[0].payload
+  const row = payload[0]?.payload as Record<string, unknown> | undefined;
 
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
-      <div className="flex items-baseline justify-between mb-1">
-        <span className="text-[11px] text-white/30 font-medium tracking-wide">{label}</span>
-        <div className="flex items-baseline gap-1">
-          <span className="text-sm font-semibold text-white tabular-nums">{value}</span>
-          <span className="text-[10px] text-white/30">{unit}</span>
-        </div>
-      </div>
-      <div className="h-[40px] -mx-1">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
-            <defs>
-              <linearGradient id={`grad-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={color} stopOpacity={0.15} />
-                <stop offset="100%" stopColor={color} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            {sessionTime && (
-              <ReferenceLine
-                x={sessionTime}
-                stroke={sessionColor}
-                strokeWidth={1}
-                strokeOpacity={0.4}
-              />
-            )}
-            <Area
-              type="natural"
-              dataKey={dataKey}
-              stroke={color}
-              fill={`url(#grad-${dataKey})`}
-              strokeWidth={1.5}
-              dot={false}
-              isAnimationActive={false}
+    <div className="backdrop-blur-xl bg-black/70 border border-white/10 rounded-xl px-3.5 py-2.5 shadow-2xl">
+      <p className="text-[11px] text-white/50 mb-1.5 font-medium tracking-wide uppercase">
+        {formatHour(label)}
+      </p>
+      {metrics.map((m) => {
+        const val = row?.[`${m.key}_raw`];
+        return (
+          <div key={m.key} className="flex items-center gap-2 py-0.5">
+            <span
+              className="w-1.5 h-1.5 rounded-full shrink-0"
+              style={{ backgroundColor: m.color }}
             />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
+            <span className="text-white/60 text-xs">{m.key}</span>
+            <span className="text-white text-xs font-medium ml-auto tabular-nums">
+              {typeof val === "number" ? val.toFixed(m.decimals) : "—"}
+              <span className="text-white/40 ml-0.5">{m.unit}</span>
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -81,49 +78,135 @@ export function AtmospherePanel({ data, sessionIndex }: AtmospherePanelProps) {
   const chartData = data.map((h) => ({
     time: h.time,
     Humidity: h.humidity ?? undefined,
-    Precipitation: mmToInches(h.precipitation) ?? undefined,
+    Precip: mmToInches(h.precipitation) ?? undefined,
     Pressure: hpaToInHg(h.pressureMsl) ?? undefined,
     Cloud: h.cloudCover ?? undefined,
     Visibility: metersToMiles(h.visibility) ?? undefined,
   }));
 
-  const s = chartData[sessionIndex];
+  // Normalize all values to 0–1 for overlay display
+  const normalized = chartData.map((d) => {
+    const out: Record<string, unknown> = { time: d.time };
+    for (const m of metrics) {
+      const raw = d[m.key as keyof typeof d];
+      out[`${m.key}_raw`] = raw;
+    }
+    return out;
+  });
 
+  // Compute min/max per metric for normalization
+  const ranges: Record<string, { min: number; max: number }> = {};
+  for (const m of metrics) {
+    const vals = chartData
+      .map((d) => d[m.key as keyof typeof d])
+      .filter((v): v is number => typeof v === "number");
+    if (vals.length === 0) {
+      ranges[m.key] = { min: 0, max: 1 };
+    } else {
+      const min = Math.min(...vals);
+      const max = Math.max(...vals);
+      // Add padding so flat lines don't sit at edges
+      ranges[m.key] = { min, max: max === min ? max + 1 : max };
+    }
+  }
+
+  // Normalize values to 0–1
+  for (const row of normalized) {
+    for (const m of metrics) {
+      const raw = row[`${m.key}_raw`];
+      if (typeof raw === "number") {
+        const { min, max } = ranges[m.key];
+        row[m.key] = (raw - min) / (max - min);
+      }
+    }
+  }
+
+  const s = chartData[sessionIndex];
   const fmt = (v: unknown, decimals: number) =>
     v != null && typeof v === "number" ? v.toFixed(decimals) : "—";
 
+  // Build hero summary from session values
+  const heroparts = [
+    `${fmt(s?.Humidity, 0)}% hum`,
+    `${fmt(s?.Cloud, 0)}% cloud`,
+    `${fmt(s?.Pressure, 2)} inHg`,
+  ];
+
   return (
-    <div>
-      <h3 className="text-[13px] font-medium text-white/40 tracking-wide mb-3">
-        ATMOSPHERE
-      </h3>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-        <Sparkline
-          data={chartData} dataKey="Humidity" label="Humidity"
-          value={fmt(s?.Humidity, 0)} unit="%"
-          sessionIndex={sessionIndex} color="oklch(0.696 0.17 162.48)"
-        />
-        <Sparkline
-          data={chartData} dataKey="Precipitation" label="Precip"
-          value={fmt(s?.Precipitation, 2)} unit="in"
-          sessionIndex={sessionIndex} color="oklch(0.627 0.265 303.9)"
-        />
-        <Sparkline
-          data={chartData} dataKey="Pressure" label="Pressure"
-          value={fmt(s?.Pressure, 2)} unit="inHg"
-          sessionIndex={sessionIndex} color="oklch(0.645 0.246 16.439)"
-        />
-        <Sparkline
-          data={chartData} dataKey="Cloud" label="Cloud cover"
-          value={fmt(s?.Cloud, 0)} unit="%"
-          sessionIndex={sessionIndex} color="oklch(0.769 0.188 70.08)"
-        />
-        <Sparkline
-          data={chartData} dataKey="Visibility" label="Visibility"
-          value={fmt(s?.Visibility, 1)} unit="mi"
-          sessionIndex={sessionIndex} color="oklch(0.82 0.17 90)"
-        />
-      </div>
-    </div>
+    <ChartPanel
+      title="ATMOSPHERE"
+      heroValue={heroparts[0].split(" ")[0]}
+      heroUnit="% humidity"
+      heroSub={`${heroparts[1]} · ${heroparts[2]}`}
+      legends={metrics.map((m) => ({ label: m.key, color: m.color }))}
+    >
+      <ResponsiveContainer width="100%" height="100%">
+        <ComposedChart
+          data={normalized}
+          margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
+        >
+          <defs>
+            {metrics.map((m) => (
+              <linearGradient key={m.key} id={`grad-atm-${m.key}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={m.color} stopOpacity={0.12} />
+                <stop offset="100%" stopColor={m.color} stopOpacity={0} />
+              </linearGradient>
+            ))}
+          </defs>
+          <SharedXAxis />
+          <Tooltip content={<AtmosphereTooltip />} cursor={false} />
+          <SessionMarker data={normalized} sessionIndex={sessionIndex} />
+          {/* Humidity and Cloud as filled areas (percentage-based) */}
+          <Area
+            type="natural"
+            dataKey="Humidity"
+            stroke={cHumidity}
+            fill={`url(#grad-atm-Humidity)`}
+            strokeWidth={1.5}
+            dot={false}
+            activeDot={{ r: 3, fill: cHumidity, stroke: "none" }}
+            isAnimationActive={false}
+          />
+          <Area
+            type="natural"
+            dataKey="Cloud"
+            stroke={cCloud}
+            fill={`url(#grad-atm-Cloud)`}
+            strokeWidth={1.5}
+            dot={false}
+            activeDot={{ r: 3, fill: cCloud, stroke: "none" }}
+            isAnimationActive={false}
+          />
+          {/* Pressure, Precip, Visibility as lines */}
+          <Line
+            type="natural"
+            dataKey="Pressure"
+            stroke={cPressure}
+            strokeWidth={1.5}
+            dot={false}
+            activeDot={{ r: 3, fill: cPressure, stroke: "none" }}
+            isAnimationActive={false}
+          />
+          <Line
+            type="natural"
+            dataKey="Precip"
+            stroke={cPrecip}
+            strokeWidth={1.5}
+            dot={false}
+            activeDot={{ r: 3, fill: cPrecip, stroke: "none" }}
+            isAnimationActive={false}
+          />
+          <Line
+            type="natural"
+            dataKey="Visibility"
+            stroke={cVisibility}
+            strokeWidth={1.5}
+            dot={false}
+            activeDot={{ r: 3, fill: cVisibility, stroke: "none" }}
+            isAnimationActive={false}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </ChartPanel>
   );
 }
