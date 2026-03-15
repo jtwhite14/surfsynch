@@ -4,8 +4,18 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { formatDate } from "@/lib/utils/date";
-import { ChevronDown, ChevronUp, Plus, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Plus, Loader2, MapPin, Waves, X } from "lucide-react";
+import { toast } from "sonner";
 import type { SurfSpot } from "@/lib/db/schema";
 import type { SurfSessionWithConditions } from "@/types";
 
@@ -25,6 +35,58 @@ export default function DashboardPage() {
   const [panelOpen, setPanelOpen] = useState(true);
 
   const [homeLocation, setHomeLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+
+  // Add Spot state machine
+  const [addSpotMode, setAddSpotMode] = useState<"idle" | "picking" | "detailing">("idle");
+  const [newSpotMarker, setNewSpotMarker] = useState<{ lat: number; lng: number } | null>(null);
+  const [newSpotName, setNewSpotName] = useState("");
+  const [newSpotDescription, setNewSpotDescription] = useState("");
+  const [isSavingSpot, setIsSavingSpot] = useState(false);
+
+  const handleStartAddSpot = () => {
+    setAddSpotMode("picking");
+    setNewSpotMarker(null);
+    setNewSpotName("");
+    setNewSpotDescription("");
+  };
+
+  const handleMapClick = (lat: number, lng: number) => {
+    setNewSpotMarker({ lat, lng });
+    setAddSpotMode("detailing");
+  };
+
+  const handleCancelAddSpot = () => {
+    setAddSpotMode("idle");
+    setNewSpotMarker(null);
+    setNewSpotName("");
+    setNewSpotDescription("");
+  };
+
+  const handleSaveSpot = async () => {
+    if (!newSpotMarker || !newSpotName.trim()) return;
+    setIsSavingSpot(true);
+    try {
+      const res = await fetch("/api/spots", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newSpotName.trim(),
+          latitude: newSpotMarker.lat,
+          longitude: newSpotMarker.lng,
+          description: newSpotDescription.trim() || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to save spot");
+      const data = await res.json();
+      setSpots((prev) => [...prev, data.spot]);
+      toast.success("Spot added!");
+      handleCancelAddSpot();
+    } catch {
+      toast.error("Failed to save spot");
+    } finally {
+      setIsSavingSpot(false);
+    }
+  };
 
   useEffect(() => {
     Promise.all([
@@ -81,21 +143,104 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="relative h-full w-full">
-      <SpotMap spots={spots} interactive={false} {...(initialViewState && { initialViewState })} />
+    <div className={`relative h-full w-full${addSpotMode !== "idle" ? " cursor-crosshair" : ""}`}>
+      <SpotMap
+        spots={spots}
+        interactive={addSpotMode !== "idle"}
+        onMapClick={addSpotMode !== "idle" ? handleMapClick : undefined}
+        newSpotMarker={newSpotMarker}
+        {...(initialViewState && { initialViewState })}
+      />
 
-      {/* Log Session button */}
-      <div className="absolute top-4 right-4 z-10">
-        <Button asChild size="lg" className="shadow-lg">
-          <Link href="/sessions/new">
-            <Plus className="size-4 mr-2" />
-            Log Session
-          </Link>
-        </Button>
-      </div>
+      {/* Instruction banner (picking / detailing) */}
+      {addSpotMode !== "idle" && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20">
+          <div className="flex items-center gap-2 rounded-full bg-background/90 backdrop-blur-sm shadow-lg px-4 py-2 text-sm font-medium">
+            <span>
+              {addSpotMode === "picking"
+                ? "Tap the map to place your spot"
+                : "Tap to adjust location"}
+            </span>
+            <button
+              onClick={handleCancelAddSpot}
+              className="rounded-full p-1 hover:bg-accent transition-colors"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
-      {/* Recent Sessions panel */}
-      <div className="absolute top-4 left-4 z-10 w-[calc(100%-2rem)] sm:w-80">
+      {/* + Dropdown button (idle only) */}
+      {addSpotMode === "idle" && (
+        <div className="absolute top-4 right-4 z-10">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="lg" className="shadow-lg">
+                <Plus className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href="/sessions/new" className="flex items-center gap-2">
+                  <Waves className="size-4" />
+                  Add Session
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleStartAddSpot} className="flex items-center gap-2">
+                <MapPin className="size-4" />
+                Add Spot
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
+
+      {/* Bottom slide-up panel (detailing only) */}
+      {addSpotMode === "detailing" && newSpotMarker && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 w-[calc(100%-2rem)] sm:w-96">
+          <div className="rounded-lg border bg-background/95 backdrop-blur-sm shadow-lg p-4 space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="spot-name">Name</Label>
+              <Input
+                id="spot-name"
+                placeholder="e.g. Pipeline, Rincon…"
+                value={newSpotName}
+                onChange={(e) => setNewSpotName(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="spot-desc">Description</Label>
+              <Textarea
+                id="spot-desc"
+                placeholder="Optional notes about this spot…"
+                value={newSpotDescription}
+                onChange={(e) => setNewSpotDescription(e.target.value)}
+                rows={2}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {newSpotMarker.lat.toFixed(5)}, {newSpotMarker.lng.toFixed(5)}
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={handleCancelAddSpot}>
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={handleSaveSpot}
+                disabled={!newSpotName.trim() || isSavingSpot}
+              >
+                {isSavingSpot ? <Loader2 className="size-4 animate-spin" /> : "Save Spot"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recent Sessions panel (idle only) */}
+      {addSpotMode === "idle" && <div className="absolute top-4 left-4 z-10 w-[calc(100%-2rem)] sm:w-80">
         <div className="rounded-lg border bg-background/90 backdrop-blur-sm shadow-lg">
           <button
             onClick={() => setPanelOpen(!panelOpen)}
@@ -142,7 +287,7 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

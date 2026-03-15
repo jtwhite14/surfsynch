@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useMemo } from "react";
 import Map, { Marker, MapRef, NavigationControl, GeolocateControl, MapMouseEvent } from "react-map-gl/mapbox";
+import Supercluster from "supercluster";
 import { SurfSpot } from "@/lib/db/schema";
 import SpotMarker from "./SpotMarker";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -26,6 +27,9 @@ const DEFAULT_VIEW_STATE = {
   zoom: 9,
 };
 
+type SpotProperties = { spotId: string };
+type SpotFeature = Supercluster.PointFeature<SpotProperties>;
+
 export default function SpotMap({
   spots,
   onSpotClick,
@@ -37,6 +41,52 @@ export default function SpotMap({
 }: SpotMapProps) {
   const mapRef = useRef<MapRef>(null);
   const [viewState, setViewState] = useState(initialViewState);
+
+  const spotById = useMemo(() => {
+    const lookup: Record<string, SurfSpot> = {};
+    spots.forEach((s) => { lookup[s.id] = s; });
+    return lookup;
+  }, [spots]);
+
+  const points: SpotFeature[] = useMemo(
+    () =>
+      spots.map((spot) => ({
+        type: "Feature" as const,
+        properties: { spotId: spot.id },
+        geometry: {
+          type: "Point" as const,
+          coordinates: [parseFloat(spot.longitude), parseFloat(spot.latitude)],
+        },
+      })),
+    [spots]
+  );
+
+  const supercluster = useMemo(() => {
+    const sc = new Supercluster<SpotProperties>({
+      radius: 60,
+      maxZoom: 16,
+    });
+    sc.load(points);
+    return sc;
+  }, [points]);
+
+  const clusters = useMemo(() => {
+    const zoom = Math.floor(viewState.zoom ?? 9);
+    const map = mapRef.current?.getMap();
+    if (!map) {
+      // Before map loads, return all points unclustered
+      return points.map((p) => ({ ...p, id: p.properties.spotId }));
+    }
+    const bounds = map.getBounds();
+    if (!bounds) return [];
+    const bbox: [number, number, number, number] = [
+      bounds.getWest(),
+      bounds.getSouth(),
+      bounds.getEast(),
+      bounds.getNorth(),
+    ];
+    return supercluster.getClusters(bbox, zoom);
+  }, [supercluster, viewState.zoom, viewState.longitude, viewState.latitude, points]);
 
   const handleMapClick = useCallback(
     (event: MapMouseEvent) => {
@@ -66,6 +116,18 @@ export default function SpotMap({
     });
   }, []);
 
+  const handleClusterClick = useCallback(
+    (clusterId: number, longitude: number, latitude: number) => {
+      const zoom = supercluster.getClusterExpansionZoom(clusterId);
+      mapRef.current?.flyTo({
+        center: [longitude, latitude],
+        zoom,
+        duration: 500,
+      });
+    },
+    [supercluster]
+  );
+
   return (
     <Map
       ref={mapRef}
@@ -80,25 +142,54 @@ export default function SpotMap({
       <NavigationControl position="bottom-right" />
       <GeolocateControl position="bottom-right" trackUserLocation />
 
-      {/* Existing spots */}
-      {spots.map((spot) => (
-        <Marker
-          key={spot.id}
-          longitude={parseFloat(spot.longitude)}
-          latitude={parseFloat(spot.latitude)}
-          anchor="bottom"
-          onClick={(e) => {
-            e.originalEvent.stopPropagation();
-            handleSpotClick(e.originalEvent as unknown as React.MouseEvent, spot);
-            flyToSpot(spot);
-          }}
-        >
-          <SpotMarker
-            spot={spot}
-            isSelected={selectedSpotId === spot.id}
-          />
-        </Marker>
-      ))}
+      {/* Spots and clusters */}
+      {clusters.map((cluster) => {
+        const [longitude, latitude] = cluster.geometry.coordinates;
+        const props = cluster.properties;
+
+        if ("cluster" in props && props.cluster) {
+          const count = props.point_count;
+          const size = count < 10 ? 36 : count < 50 ? 44 : 52;
+          return (
+            <Marker
+              key={`cluster-${cluster.id}`}
+              longitude={longitude}
+              latitude={latitude}
+              anchor="center"
+              onClick={(e) => {
+                e.originalEvent.stopPropagation();
+                handleClusterClick(cluster.id as number, longitude, latitude);
+              }}
+            >
+              <div
+                className="bg-primary text-primary-foreground rounded-full flex items-center justify-center font-bold text-sm drop-shadow-lg cursor-pointer hover:scale-110 transition-transform border-2 border-white"
+                style={{ width: size, height: size }}
+              >
+                {count}
+              </div>
+            </Marker>
+          );
+        }
+
+        // Individual spot
+        const spot = spotById[(props as SpotProperties).spotId];
+        if (!spot) return null;
+        return (
+          <Marker
+            key={spot.id}
+            longitude={longitude}
+            latitude={latitude}
+            anchor="bottom"
+            onClick={(e) => {
+              e.originalEvent.stopPropagation();
+              handleSpotClick(e.originalEvent as unknown as React.MouseEvent, spot);
+              flyToSpot(spot);
+            }}
+          >
+            <SpotMarker spot={spot} isSelected={selectedSpotId === spot.id} />
+          </Marker>
+        );
+      })}
 
       {/* New spot marker (when adding) */}
       {newSpotMarker && (
