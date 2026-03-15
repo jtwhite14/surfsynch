@@ -5,12 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,8 +15,6 @@ import {
   ChevronUp,
   Plus,
   Loader2,
-  MapPin,
-  Waves,
   X,
   Pencil,
   Trash2,
@@ -187,6 +179,13 @@ export default function DashboardPage() {
       setIsDeletingSpot(false);
     }
   };
+
+  // Listen for "Add Spot" from sidebar
+  useEffect(() => {
+    const handler = () => handleStartAddSpot();
+    window.addEventListener("start-add-spot", handler);
+    return () => window.removeEventListener("start-add-spot", handler);
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -566,31 +565,6 @@ export default function DashboardPage() {
               <X className="size-4" />
             </button>
           </div>
-        </div>
-      )}
-
-      {/* + Dropdown button (idle only) */}
-      {addSpotMode === "idle" && (
-        <div className="absolute top-4 right-4 z-10">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="lg" className="shadow-lg">
-                <Plus className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <Link href="/sessions/new" className="flex items-center gap-2">
-                  <Waves className="size-4" />
-                  Add Session
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleStartAddSpot} className="flex items-center gap-2">
-                <MapPin className="size-4" />
-                Add Spot
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       )}
 

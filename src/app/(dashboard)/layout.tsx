@@ -3,7 +3,7 @@
 import { useSession, signOut } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -26,7 +26,8 @@ import {
   LogOut,
   Menu,
   X,
-  PanelLeft,
+  Plus,
+  MapPin,
 } from "lucide-react";
 
 const navigation = [
@@ -34,23 +35,6 @@ const navigation = [
   { name: "Sessions", href: "/sessions", icon: Waves },
 ];
 
-function useSidebarState() {
-  const [collapsed, setCollapsed] = useState(() => {
-    if (typeof window === "undefined") return true;
-    const stored = localStorage.getItem("sidebar-collapsed");
-    return stored === null ? true : stored === "true";
-  });
-
-  const toggle = useCallback(() => {
-    setCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem("sidebar-collapsed", String(next));
-      return next;
-    });
-  }, []);
-
-  return [collapsed, toggle] as const;
-}
 
 export default function DashboardLayout({
   children,
@@ -62,7 +46,6 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [collapsed, toggleCollapsed] = useSidebarState();
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -119,16 +102,12 @@ export default function DashboardLayout({
       <div className="flex h-screen overflow-hidden bg-background">
         {/* Sidebar — desktop */}
         <nav
-          className={`hidden lg:flex shrink-0 flex-col border-r bg-sidebar h-full transition-[width] duration-200 ease-in-out ${
-            collapsed ? "w-[60px]" : "w-[240px]"
-          }`}
+          className="hidden lg:flex shrink-0 flex-col border-r bg-sidebar h-full w-[60px]"
         >
           <SidebarContent
             session={session}
             pathname={pathname}
             isActive={isActive}
-            collapsed={collapsed}
-            onToggle={toggleCollapsed}
           />
         </nav>
 
@@ -158,8 +137,7 @@ export default function DashboardLayout({
             session={session}
             pathname={pathname}
             isActive={isActive}
-            collapsed={false}
-            onToggle={toggleCollapsed}
+            mobile
           />
         </nav>
 
@@ -180,7 +158,7 @@ export default function DashboardLayout({
           </header>
 
           <main className={`flex-1 ${pathname === "/" ? "overflow-hidden" : "overflow-y-auto"}`}>
-            {pathname === "/" ? children : <div className="mx-auto max-w-5xl px-6 py-8">{children}</div>}
+            {pathname === "/" ? children : <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">{children}</div>}
           </main>
         </div>
       </div>
@@ -192,15 +170,15 @@ function SidebarContent({
   session,
   pathname,
   isActive,
-  collapsed,
-  onToggle,
+  mobile,
 }: {
   session: { user?: { name?: string | null; email?: string | null; image?: string | null } };
   pathname: string;
   isActive: (href: string) => boolean;
-  collapsed: boolean;
-  onToggle: () => void;
+  mobile?: boolean;
 }) {
+  const collapsed = !mobile;
+
   return (
     <>
       {/* Brand */}
@@ -212,7 +190,7 @@ function SidebarContent({
       </div>
 
       {/* Navigation */}
-      <div className={`flex flex-col gap-px p-3 flex-1 ${collapsed ? "items-center" : ""}`}>
+      <div className={`flex flex-col gap-px p-3 ${collapsed ? "items-center" : ""}`}>
         {navigation.map((item) => {
           const active = isActive(item.href);
           const link = (
@@ -250,29 +228,59 @@ function SidebarContent({
         })}
       </div>
 
-      {/* Toggle + Profile — bottom */}
-      <div className={`border-t border-sidebar-border p-3 flex flex-col gap-1 ${collapsed ? "items-center" : ""}`}>
+      {/* Action buttons */}
+      <div className={`flex flex-col gap-px px-3 pb-3 ${collapsed ? "items-center" : ""}`}>
+        <div className={`h-px bg-sidebar-border mb-2 ${collapsed ? "w-full" : ""}`} />
         {collapsed ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={onToggle}
-                className="flex items-center justify-center size-9 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              >
-                <PanelLeft className="size-4" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">Expand sidebar</TooltipContent>
-          </Tooltip>
+          <>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link
+                  href="/sessions/new"
+                  className="flex items-center justify-center size-9 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                >
+                  <Plus className="size-4" />
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right">Add Session</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => window.dispatchEvent(new CustomEvent("start-add-spot"))}
+                  className="flex items-center justify-center size-9 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                >
+                  <MapPin className="size-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Add Spot</TooltipContent>
+            </Tooltip>
+          </>
         ) : (
-          <button
-            onClick={onToggle}
-            className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-          >
-            <PanelLeft className="size-4 shrink-0" />
-            Collapse
-          </button>
+          <>
+            <Link
+              href="/sessions/new"
+              className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            >
+              <Plus className="size-4 shrink-0" />
+              Add Session
+            </Link>
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent("start-add-spot"))}
+              className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            >
+              <MapPin className="size-4 shrink-0" />
+              Add Spot
+            </button>
+          </>
         )}
+      </div>
+
+      {/* Spacer */}
+      <div className="flex-1" />
+
+      {/* Profile — bottom */}
+      <div className={`border-t border-sidebar-border p-3 flex flex-col gap-1 ${collapsed ? "items-center" : ""}`}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             {collapsed ? (
