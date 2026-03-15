@@ -4,7 +4,6 @@ import { useSession, signOut } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -22,7 +21,7 @@ import {
 import {
   LayoutDashboard,
   Waves,
-  Plus,
+  BookOpen,
   Settings,
   LogOut,
   Menu,
@@ -175,7 +174,7 @@ export default function DashboardLayout({
               <Menu className="size-5" />
             </button>
             <Link href="/" className="flex items-center gap-2 ml-3">
-              <span className="text-lg">🏄</span>
+              <BookOpen className="size-5 text-primary" />
               <span className="font-bold text-sm">SurfSync</span>
             </Link>
           </header>
@@ -207,30 +206,9 @@ function SidebarContent({
       {/* Brand */}
       <div className={`flex flex-col gap-3 p-3 border-b border-sidebar-border ${collapsed ? "items-center" : ""}`}>
         <Link href="/" className={`flex items-center gap-2.5 ${collapsed ? "justify-center" : "px-1.5"} py-1`}>
-          <span className="text-xl">🏄</span>
+          <BookOpen className="size-5 text-primary shrink-0" />
           {!collapsed && <span className="font-bold text-sidebar-foreground">SurfSync</span>}
         </Link>
-
-        {/* Primary action */}
-        {collapsed ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button asChild size="icon" className="size-9">
-                <Link href="/sessions/new">
-                  <Plus className="size-4" />
-                </Link>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right">Log Session</TooltipContent>
-          </Tooltip>
-        ) : (
-          <Button asChild className="w-full">
-            <Link href="/sessions/new">
-              <Plus className="size-4" />
-              Log Session
-            </Link>
-          </Button>
-        )}
       </div>
 
       {/* Navigation */}
