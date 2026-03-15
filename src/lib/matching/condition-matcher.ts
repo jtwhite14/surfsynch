@@ -31,20 +31,20 @@ function directionalSimilarity(a: number, b: number, sigma: number): number {
 // ── Sigmas (tuned per-variable) ──
 
 const SIGMAS = {
-  swellHeight: (sessionValue: number) => Math.max(0.25, 0.125 * sessionValue), // relative
+  swellHeight: (sessionValue: number) => Math.max(0.4, 0.35 * sessionValue), // relative
   swellPeriod: 1.5,
   swellDirection: 15,
   windSpeed: 7.5, // km/h
   windDirection: 22.5,
-  tideHeight: 0.25, // feet
+  tideHeight: 0.75, // feet
 };
 
 // ── Rating boost ──
 
 const RATING_BOOST: Record<number, number> = {
   5: 1.0,
-  4: 0.85,
-  3: 0.5,
+  4: 0.95,
+  3: 0.85,
 };
 
 export function getRatingBoost(rating: number): number {

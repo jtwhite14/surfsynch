@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, surfSpots, surfSessions, sessionConditions, spotForecasts, spotAlerts } from "@/lib/db";
-import { eq, gte, and, inArray } from "drizzle-orm";
+import { eq, gte, and, inArray, sql } from "drizzle-orm";
 import { fetchMarineForecast } from "@/lib/api/open-meteo";
 import { fetchTideTimeline, warmStationCache } from "@/lib/api/noaa-tides";
 import {
@@ -179,13 +179,13 @@ async function processSpot(spot: {
     await db.insert(spotAlerts).values(values).onConflictDoUpdate({
       target: [spotAlerts.spotId, spotAlerts.userId, spotAlerts.forecastHour, spotAlerts.timeWindow],
       set: {
-        matchScore: values[0].matchScore, // placeholder — Drizzle uses excluded row
-        confidenceScore: values[0].confidenceScore,
-        effectiveScore: values[0].effectiveScore,
-        matchedSessionId: values[0].matchedSessionId,
-        matchDetails: values[0].matchDetails,
-        forecastSnapshot: values[0].forecastSnapshot,
-        status: "active",
+        matchScore: sql`excluded.match_score`,
+        confidenceScore: sql`excluded.confidence_score`,
+        effectiveScore: sql`excluded.effective_score`,
+        matchedSessionId: sql`excluded.matched_session_id`,
+        matchDetails: sql`excluded.match_details`,
+        forecastSnapshot: sql`excluded.forecast_snapshot`,
+        status: sql`excluded.status`,
         updatedAt: new Date(),
       },
     });
