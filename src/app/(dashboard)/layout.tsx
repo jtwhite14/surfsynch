@@ -128,7 +128,7 @@ export default function DashboardLayout({
           <div className="flex items-center justify-end p-3">
             <button
               onClick={() => setMobileMenuOpen(false)}
-              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent"
+              className="p-2.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent"
             >
               <X className="size-5" />
             </button>
@@ -147,7 +147,7 @@ export default function DashboardLayout({
           <header className="flex items-center h-14 px-4 border-b bg-background lg:hidden">
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="p-1.5 -ml-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent"
+              className="p-2 -ml-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent"
             >
               <Menu className="size-5" />
             </button>

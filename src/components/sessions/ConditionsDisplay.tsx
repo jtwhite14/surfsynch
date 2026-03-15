@@ -80,7 +80,7 @@ export function ConditionsDisplay({ conditions, compact = false }: ConditionsDis
       {/* Surf — primary data surfers care about */}
       <section>
         <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Surf</h4>
-        <div className="grid grid-cols-3 gap-x-4 gap-y-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
           <ConditionItem label="Wave Height" value={formatWaveHeight(conditions.waveHeight)} />
           <ConditionItem label="Period" value={formatWavePeriod(conditions.wavePeriod)} />
           <ConditionItem label="Direction" value={formatDirection(conditions.waveDirection)} />
@@ -114,7 +114,7 @@ export function ConditionsDisplay({ conditions, compact = false }: ConditionsDis
       {/* Wind & Tide — row of key values */}
       <section>
         <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Wind & Tide</h4>
-        <div className="grid grid-cols-3 gap-x-4 gap-y-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
           <ConditionItem
             label="Wind"
             value={
@@ -139,7 +139,7 @@ export function ConditionsDisplay({ conditions, compact = false }: ConditionsDis
       {/* Atmosphere — compact grid */}
       <section>
         <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Atmosphere</h4>
-        <div className="grid grid-cols-3 gap-x-4 gap-y-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
           <ConditionItem label="Air" value={formatTemperature(conditions.airTemp)} />
           <ConditionItem label="Water" value={formatTemperature(conditions.seaSurfaceTemp)} />
           <ConditionItem label="Humidity" value={formatValue(conditions.humidity, "%")} />

@@ -401,7 +401,7 @@ export default function OnboardingPage() {
           </div>
           {s < 3 && (
             <div
-              className={`w-16 h-0.5 ${
+              className={`w-8 sm:w-16 h-0.5 ${
                 s < step ? "bg-primary" : "bg-muted"
               }`}
             />
@@ -449,7 +449,7 @@ export default function OnboardingPage() {
   return (
     <div className="max-w-3xl mx-auto py-8">
       <div className="text-center mb-6">
-        <h1 className="text-3xl font-bold">Welcome to SurfSync</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold">Welcome to SurfSync</h1>
         <p className="text-muted-foreground mt-2">
           Import your surf photos to create your session history
         </p>
@@ -477,13 +477,14 @@ export default function OnboardingPage() {
                 </div>
               ) : token ? (
                 <div className="flex flex-col items-center space-y-4">
-                  <div className="bg-white p-4 rounded-lg">
+                  <div className="bg-white p-3 sm:p-4 rounded-lg">
                     <QRCodeSVG
                       value={`${typeof window !== "undefined" ? window.location.origin : ""}/upload/${token}`}
-                      size={256}
+                      size={200}
+                      className="w-[200px] h-[200px] sm:w-[256px] sm:h-[256px]"
                     />
                   </div>
-                  <p className="text-sm text-muted-foreground text-center max-w-md break-all">
+                  <p className="text-xs sm:text-sm text-muted-foreground text-center max-w-md break-all">
                     {typeof window !== "undefined"
                       ? `${window.location.origin}/upload/${token}`
                       : ""}
@@ -525,7 +526,7 @@ export default function OnboardingPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 sm:gap-3">
                   {photos.map((photo) => (
                     <div
                       key={photo.id}
@@ -639,7 +640,7 @@ export default function OnboardingPage() {
                       <Label className="text-sm font-medium">
                         Nearby spots
                       </Label>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {nearby.map(({ spot, distance }) => (
                           <button
                             key={spot.id}

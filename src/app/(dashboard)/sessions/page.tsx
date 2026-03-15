@@ -53,7 +53,7 @@ export default function SessionsPage() {
     return (
       <div className="max-w-3xl mx-auto space-y-6">
         <div className="h-8 bg-muted rounded w-1/4 animate-pulse"></div>
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="rounded-xl overflow-hidden">
               <div className="h-10 bg-muted animate-pulse" />
@@ -69,16 +69,16 @@ export default function SessionsPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Sessions</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold">Sessions</h1>
         <Button asChild>
           <Link href="/sessions/new">Log Session</Link>
         </Button>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-2 sm:gap-3">
         <Select value={spotFilter} onValueChange={setSpotFilter}>
-          <SelectTrigger className="w-[160px]">
+          <SelectTrigger className="w-[140px] sm:w-[160px]">
             <SelectValue placeholder="All spots" />
           </SelectTrigger>
           <SelectContent>
@@ -92,7 +92,7 @@ export default function SessionsPage() {
         </Select>
 
         <Select value={ratingFilter} onValueChange={setRatingFilter}>
-          <SelectTrigger className="w-[160px]">
+          <SelectTrigger className="w-[140px] sm:w-[160px]">
             <SelectValue placeholder="All ratings" />
           </SelectTrigger>
           <SelectContent>
@@ -121,7 +121,7 @@ export default function SessionsPage() {
 
       {/* Sessions feed */}
       {filteredSessions.length > 0 ? (
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
           {filteredSessions.map((session) => (
             <SessionCard key={session.id} session={session} />
           ))}

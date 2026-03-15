@@ -194,14 +194,14 @@ export default function SessionDetailPage() {
                   className="w-full h-[320px] sm:h-[400px] object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-8">
-                  <h1 className="text-3xl sm:text-4xl font-bold text-white">
+                <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-8">
+                  <h1 className="text-2xl sm:text-4xl font-bold text-white">
                     {session.spot?.name || "Session"}
                   </h1>
-                  <div className="flex items-center gap-3 mt-2">
-                    <span className="text-white/70">{formatFullDate(session.date)}</span>
-                    <span className="text-white/30">|</span>
-                    <span className="text-white/70">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
+                    <span className="text-sm sm:text-base text-white/70">{formatFullDate(session.date)}</span>
+                    <span className="text-white/30 hidden sm:inline">|</span>
+                    <span className="text-sm sm:text-base text-white/70">
                       {formatTime(session.startTime)}
                       {session.endTime && ` - ${formatTime(session.endTime)}`}
                     </span>
@@ -209,7 +209,7 @@ export default function SessionDetailPage() {
                       {Array.from({ length: 5 }).map((_, i) => (
                         <svg
                           key={i}
-                          className={`w-4 h-4 ${
+                          className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${
                             i < session.rating ? "text-yellow-400" : "text-white/20"
                           }`}
                           fill="currentColor"
@@ -278,7 +278,7 @@ export default function SessionDetailPage() {
         // Header without photo
         return (
           <div>
-            <h1 className="text-3xl font-bold">
+            <h1 className="text-2xl sm:text-3xl font-bold">
               {session.spot?.name || "Session"}
             </h1>
             <p className="text-muted-foreground">

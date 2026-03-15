@@ -232,8 +232,13 @@ export default function DashboardPage() {
   }, [spots, homeLocation]);
 
   // When the spot detail pane is open, pad flyTo so the spot centers in the visible area
+  // On mobile (<640px), the pane covers the full width so no padding needed
   const flyToPadding = useMemo(
-    () => (selectedSpot ? { left: typeof window !== "undefined" ? window.innerWidth * 0.5 : 700 } : undefined),
+    () => {
+      if (!selectedSpot) return undefined;
+      const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
+      return isMobile ? undefined : { left: typeof window !== "undefined" ? window.innerWidth * 0.5 : 700 };
+    },
     [selectedSpot]
   );
 
@@ -260,7 +265,7 @@ export default function DashboardPage() {
 
       {/* Spot detail pane */}
       {selectedSpot && addSpotMode === "idle" && (
-        <div className="absolute top-4 left-4 bottom-4 z-20 w-[calc(100%-2rem)] sm:w-[50vw] sm:max-w-[800px] flex flex-col rounded-lg border bg-background/90 backdrop-blur-sm shadow-lg overflow-hidden">
+        <div className="absolute inset-0 sm:inset-auto sm:top-4 sm:left-4 sm:bottom-4 z-20 w-full sm:w-[50vw] sm:max-w-[800px] flex flex-col sm:rounded-lg border bg-background/95 sm:bg-background/90 backdrop-blur-sm shadow-lg overflow-hidden">
           {/* Header */}
           <div className="flex items-start justify-between gap-2 px-4 pt-4 pb-3">
             <div className="min-w-0 flex-1">
@@ -308,7 +313,7 @@ export default function DashboardPage() {
                 <>
                   <button
                     onClick={handleStartEdit}
-                    className="rounded-md p-1.5 hover:bg-accent transition-colors"
+                    className="rounded-md p-2 hover:bg-accent transition-colors"
                     title="Edit spot"
                   >
                     <Pencil className="size-4" />
@@ -316,7 +321,7 @@ export default function DashboardPage() {
                   <button
                     onClick={handleDeleteSpot}
                     disabled={isDeletingSpot}
-                    className="rounded-md p-1.5 hover:bg-destructive/10 text-destructive transition-colors"
+                    className="rounded-md p-2 hover:bg-destructive/10 text-destructive transition-colors"
                     title="Delete spot"
                   >
                     {isDeletingSpot ? (
@@ -329,9 +334,9 @@ export default function DashboardPage() {
               )}
               <button
                 onClick={handleCloseSpotDetail}
-                className="rounded-md p-1.5 hover:bg-accent transition-colors"
+                className="rounded-md p-2 hover:bg-accent transition-colors"
               >
-                <X className="size-4" />
+                <X className="size-5 sm:size-4" />
               </button>
             </div>
           </div>
@@ -494,7 +499,7 @@ export default function DashboardPage() {
 
       {/* Recent Sessions panel — visible when no spot is selected */}
       {!selectedSpot && addSpotMode === "idle" && sessions.length > 0 && (
-        <div className="absolute top-4 left-4 z-10 w-[calc(100%-2rem)] sm:w-80">
+        <div className="absolute bottom-4 left-4 right-4 sm:bottom-auto sm:right-auto sm:top-4 z-10 sm:w-80">
           <div className="rounded-lg border bg-background/90 backdrop-blur-sm shadow-lg overflow-hidden">
             <button
               onClick={() => setPanelOpen((o) => !o)}
