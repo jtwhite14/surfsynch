@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,12 +16,26 @@ export default function SessionDetailPage() {
   const router = useRouter();
   const [session, setSession] = useState<SurfSessionWithConditions | null>(null);
   const [loading, setLoading] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (params.id) {
       fetchSession(params.id as string);
     }
   }, [params.id]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    if (menuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [menuOpen]);
 
   async function fetchSession(id: string) {
     try {
@@ -106,6 +120,59 @@ export default function SessionDetailPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      {/* Top navbar */}
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" size="sm" asChild className="-ml-2">
+          <Link href="/sessions">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="w-4 h-4 mr-1"
+            >
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            Back
+          </Link>
+        </Button>
+        <div className="relative" ref={menuRef}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setMenuOpen((prev) => !prev)}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="w-5 h-5"
+            >
+              <circle cx="12" cy="5" r="1.5" />
+              <circle cx="12" cy="12" r="1.5" />
+              <circle cx="12" cy="19" r="1.5" />
+            </svg>
+          </Button>
+          {menuOpen && (
+            <div className="absolute right-0 mt-1 w-40 rounded-md border border-border bg-popover shadow-lg z-50">
+              <button
+                className="w-full px-3 py-2 text-sm text-left text-destructive hover:bg-muted rounded-md"
+                onClick={() => {
+                  setMenuOpen(false);
+                  handleDelete();
+                }}
+              >
+                Delete session
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Hero photo */}
       {session.photoUrl && (
         <div className="relative -mx-4 sm:mx-0 sm:rounded-2xl overflow-hidden">
@@ -116,23 +183,6 @@ export default function SessionDetailPage() {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
           <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-8">
-            <Button variant="ghost" size="sm" asChild className="-ml-2 text-white/70 hover:text-white hover:bg-white/10 mb-3">
-              <Link href="/sessions">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="w-4 h-4 mr-1"
-                >
-                  <path d="M19 12H5M12 19l-7-7 7-7" />
-                </svg>
-                Back
-              </Link>
-            </Button>
             <h1 className="text-3xl sm:text-4xl font-bold text-white">
               {session.spot?.name || "Session"}
             </h1>
@@ -159,45 +209,18 @@ export default function SessionDetailPage() {
               </div>
             </div>
           </div>
-          <div className="absolute top-4 right-4">
-            <Button variant="destructive" size="sm" onClick={handleDelete} className="shadow-lg">
-              Delete
-            </Button>
-          </div>
         </div>
       )}
 
       {/* Header without photo */}
       {!session.photoUrl && (
-        <div className="flex items-center justify-between">
-          <div>
-            <Button variant="ghost" size="sm" asChild className="-ml-2">
-              <Link href="/sessions">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="w-4 h-4 mr-1"
-                >
-                  <path d="M19 12H5M12 19l-7-7 7-7" />
-                </svg>
-                Back
-              </Link>
-            </Button>
-            <h1 className="text-3xl font-bold mt-2">
-              {session.spot?.name || "Session"}
-            </h1>
-            <p className="text-muted-foreground">
-              {formatFullDate(session.date)}
-            </p>
-          </div>
-          <Button variant="destructive" size="sm" onClick={handleDelete}>
-            Delete
-          </Button>
+        <div>
+          <h1 className="text-3xl font-bold">
+            {session.spot?.name || "Session"}
+          </h1>
+          <p className="text-muted-foreground">
+            {formatFullDate(session.date)}
+          </p>
         </div>
       )}
 
