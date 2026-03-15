@@ -355,7 +355,7 @@ export default function OnboardingPage() {
         reviews.filter((r) => r.creatingNewSpot).length
       );
       toast.success("Sessions created successfully!");
-      router.push("/spots");
+      router.push("/");
     } catch (err) {
       console.error("Error creating sessions:", err);
       toast.error(
@@ -960,7 +960,7 @@ export default function OnboardingPage() {
           </Card>
 
           <div className="flex justify-center">
-            <Button size="lg" onClick={() => router.push("/spots")}>
+            <Button size="lg" onClick={() => router.push("/")}>
               Go to Dashboard
             </Button>
           </div>

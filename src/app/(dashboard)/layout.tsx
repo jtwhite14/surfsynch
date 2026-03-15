@@ -21,7 +21,6 @@ import {
 } from "@/components/ui/tooltip";
 import {
   LayoutDashboard,
-  MapPin,
   Waves,
   Plus,
   Settings,
@@ -33,7 +32,6 @@ import {
 
 const navigation = [
   { name: "Home", href: "/", icon: LayoutDashboard },
-  { name: "Spots", href: "/spots", icon: MapPin },
   { name: "Sessions", href: "/sessions", icon: Waves },
 ];
 

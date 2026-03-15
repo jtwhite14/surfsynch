@@ -175,7 +175,7 @@ export function SessionForm({ spots, defaultSpotId }: SessionFormProps) {
             {spots.length === 0 && (
               <p className="text-sm text-muted-foreground">
                 No spots yet.{" "}
-                <a href="/spots" className="text-primary hover:underline">
+                <a href="/sessions/new" className="text-primary hover:underline">
                   Add a spot first
                 </a>
               </p>

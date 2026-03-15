@@ -5,7 +5,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils/date";
-import { ChevronDown, ChevronUp, Plus, Loader2, LayoutDashboard, MapPin, Waves } from "lucide-react";
+import { ChevronDown, ChevronUp, Plus, Loader2, LayoutDashboard, Waves } from "lucide-react";
 import type { SurfSpot } from "@/lib/db/schema";
 import type { SurfSessionWithConditions } from "@/types";
 
@@ -98,7 +98,6 @@ export default function DashboardPage() {
       <div className="absolute bottom-6 right-4 z-10 flex gap-2">
         {[
           { name: "Home", href: "/", icon: LayoutDashboard },
-          { name: "Spots", href: "/spots", icon: MapPin },
           { name: "Sessions", href: "/sessions", icon: Waves },
         ].map((item) => (
           <Button
