@@ -32,12 +32,6 @@ import { toast } from "sonner";
 import { SpotConditions } from "@/components/spots/SpotConditions";
 import { SpotAlertCard } from "@/components/alerts/SpotAlertCard";
 import { EditSpotDialog } from "@/components/spots/EditSpotDialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import type { SurfSpot } from "@/lib/db/schema";
 import type { SurfSessionWithConditions } from "@/types";
 
@@ -59,8 +53,8 @@ export default function DashboardPage() {
 
   const [homeLocation, setHomeLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
-  // Add Spot state machine
-  const [addSpotMode, setAddSpotMode] = useState<"idle" | "picking" | "detailing">("idle");
+  // Add Spot / Fix Location state machine
+  const [addSpotMode, setAddSpotMode] = useState<"idle" | "picking" | "detailing" | "fixing-picking" | "fixing-detailing">("idle");
   const [newSpotMarker, setNewSpotMarker] = useState<{ lat: number; lng: number } | null>(null);
   const [newSpotName, setNewSpotName] = useState("");
   const [newSpotDescription, setNewSpotDescription] = useState("");
@@ -79,7 +73,6 @@ export default function DashboardPage() {
 
   // Missing location prompt
   const [fixLocationSpot, setFixLocationSpot] = useState<SurfSpot | null>(null);
-  const [fixLocationMarker, setFixLocationMarker] = useState<{ lat: number; lng: number } | null>(null);
   const [isSavingLocation, setIsSavingLocation] = useState(false);
   const [dismissedLocationBanner, setDismissedLocationBanner] = useState(false);
 
@@ -89,27 +82,35 @@ export default function DashboardPage() {
   );
 
   const handleFixLocation = (spot: SurfSpot) => {
+    setSelectedSpot(null);
     setFixLocationSpot(spot);
-    setFixLocationMarker(null);
+    setNewSpotMarker(null);
+    setAddSpotMode("fixing-picking");
+  };
+
+  const handleCancelFixLocation = () => {
+    setAddSpotMode("idle");
+    setNewSpotMarker(null);
+    setFixLocationSpot(null);
   };
 
   const handleSaveFixedLocation = async () => {
-    if (!fixLocationSpot || !fixLocationMarker) return;
+    if (!fixLocationSpot || !newSpotMarker) return;
     setIsSavingLocation(true);
     try {
       const res = await fetch(`/api/spots?id=${fixLocationSpot.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          latitude: fixLocationMarker.lat,
-          longitude: fixLocationMarker.lng,
+          latitude: newSpotMarker.lat,
+          longitude: newSpotMarker.lng,
         }),
       });
       if (!res.ok) throw new Error();
       const data = await res.json();
       setSpots((prev) => prev.map((s) => (s.id === data.spot.id ? data.spot : s)));
-      setFixLocationSpot(null);
       toast.success(`Location set for ${data.spot.name}`);
+      handleCancelFixLocation();
     } catch {
       toast.error("Failed to update location");
     } finally {
@@ -127,7 +128,11 @@ export default function DashboardPage() {
 
   const handleMapClick = (lat: number, lng: number) => {
     setNewSpotMarker({ lat, lng });
-    setAddSpotMode("detailing");
+    if (addSpotMode === "fixing-picking" || addSpotMode === "fixing-detailing") {
+      setAddSpotMode("fixing-detailing");
+    } else {
+      setAddSpotMode("detailing");
+    }
   };
 
   const handleCancelAddSpot = () => {
@@ -370,41 +375,6 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
-
-      {/* Fix location dialog */}
-      <Dialog open={!!fixLocationSpot} onOpenChange={(open) => { if (!open) setFixLocationSpot(null); }}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Set location for {fixLocationSpot?.name}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              {fixLocationMarker
-                ? `Selected: ${fixLocationMarker.lat.toFixed(5)}, ${fixLocationMarker.lng.toFixed(5)} — tap to adjust`
-                : "Tap the map to place this spot"}
-            </p>
-            <div className="h-[300px] rounded-lg overflow-hidden border">
-              <SpotMap
-                spots={spots.filter((s) => s.id !== fixLocationSpot?.id)}
-                onMapClick={(lat, lng) => setFixLocationMarker({ lat, lng })}
-                newSpotMarker={fixLocationMarker}
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setFixLocationSpot(null)}>
-                Cancel
-              </Button>
-              <Button
-                className="flex-1"
-                onClick={handleSaveFixedLocation}
-                disabled={!fixLocationMarker || isSavingLocation}
-              >
-                {isSavingLocation ? <Loader2 className="size-4 animate-spin" /> : "Save Location"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Spot detail pane */}
       {selectedSpot && addSpotMode === "idle" && (
@@ -747,17 +717,19 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Instruction banner (picking / detailing) */}
+      {/* Instruction banner (picking / detailing / fixing) */}
       {addSpotMode !== "idle" && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20">
           <div className="flex items-center gap-2 rounded-full bg-background/90 backdrop-blur-sm shadow-lg px-4 py-2 text-sm font-medium">
             <span>
               {addSpotMode === "picking"
                 ? "Tap the map to place your spot"
+                : addSpotMode === "fixing-picking"
+                ? `Tap the map to set location for ${fixLocationSpot?.name}`
                 : "Tap to adjust location"}
             </span>
             <button
-              onClick={handleCancelAddSpot}
+              onClick={addSpotMode.startsWith("fixing") ? handleCancelFixLocation : handleCancelAddSpot}
               className="rounded-full p-1 hover:bg-accent transition-colors"
             >
               <X className="size-4" />
@@ -803,6 +775,30 @@ export default function DashboardPage() {
                 disabled={!newSpotName.trim() || isSavingSpot}
               >
                 {isSavingSpot ? <Loader2 className="size-4 animate-spin" /> : "Save Spot"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom slide-up panel (fix location) */}
+      {addSpotMode === "fixing-detailing" && newSpotMarker && fixLocationSpot && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 w-[calc(100%-2rem)] sm:w-96">
+          <div className="rounded-lg border bg-background/95 backdrop-blur-sm shadow-lg p-4 space-y-3">
+            <p className="text-sm font-medium">{fixLocationSpot.name}</p>
+            <p className="text-xs text-muted-foreground">
+              {newSpotMarker.lat.toFixed(5)}, {newSpotMarker.lng.toFixed(5)}
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={handleCancelFixLocation}>
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={handleSaveFixedLocation}
+                disabled={isSavingLocation}
+              >
+                {isSavingLocation ? <Loader2 className="size-4 animate-spin" /> : "Save Location"}
               </Button>
             </div>
           </div>
