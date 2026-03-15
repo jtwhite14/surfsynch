@@ -192,7 +192,7 @@ function DirectionArrow({ degrees }: { degrees: number | null }) {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      style={{ transform: `rotate(${degrees}deg)` }}
+      style={{ transform: `rotate(${degrees + 180}deg)` }}
     >
       <path d="M12 19V5M5 12l7-7 7 7" />
     </svg>
