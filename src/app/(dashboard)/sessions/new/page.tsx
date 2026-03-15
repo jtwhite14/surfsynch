@@ -5,30 +5,44 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { SessionForm } from "@/components/sessions/SessionForm";
-import { SurfSpot } from "@/lib/db/schema";
+import { SurfSpot, Surfboard, Wetsuit } from "@/lib/db/schema";
 
 function NewSessionContent() {
   const searchParams = useSearchParams();
   const defaultSpotId = searchParams.get("spotId") || undefined;
   const [spots, setSpots] = useState<SurfSpot[]>([]);
+  const [surfboards, setSurfboards] = useState<Surfboard[]>([]);
+  const [wetsuits, setWetsuits] = useState<Wetsuit[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchSpots() {
+    async function fetchData() {
       try {
-        const response = await fetch("/api/spots");
-        if (response.ok) {
-          const data = await response.json();
+        const [spotsRes, boardsRes, suitsRes] = await Promise.all([
+          fetch("/api/spots"),
+          fetch("/api/surfboards"),
+          fetch("/api/wetsuits"),
+        ]);
+        if (spotsRes.ok) {
+          const data = await spotsRes.json();
           setSpots(data.spots || []);
         }
+        if (boardsRes.ok) {
+          const data = await boardsRes.json();
+          setSurfboards(data.surfboards || []);
+        }
+        if (suitsRes.ok) {
+          const data = await suitsRes.json();
+          setWetsuits(data.wetsuits || []);
+        }
       } catch (error) {
-        console.error("Error fetching spots:", error);
+        console.error("Error fetching data:", error);
       } finally {
         setLoading(false);
       }
     }
 
-    fetchSpots();
+    fetchData();
   }, []);
 
   if (loading) {
@@ -64,7 +78,7 @@ function NewSessionContent() {
 
       <h1 className="text-2xl sm:text-3xl font-bold">Log Session</h1>
 
-      <SessionForm spots={spots} defaultSpotId={defaultSpotId} />
+      <SessionForm spots={spots} defaultSpotId={defaultSpotId} surfboards={surfboards} wetsuits={wetsuits} />
     </div>
   );
 }

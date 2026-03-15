@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, surfSessions, sessionConditions, surfSpots, sessionPhotos } from "@/lib/db";
+import { db, surfSessions, sessionConditions, surfSpots, sessionPhotos, surfboards, wetsuits } from "@/lib/db";
 import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import { fetchHistoricalConditions, fetchCurrentConditions } from "@/lib/api/open-meteo";
@@ -15,6 +15,8 @@ const createSessionSchema = z.object({
   notes: z.string().optional().nullable(),
   photoUrl: z.string().url().optional().nullable(),
   photoUrls: z.array(z.string().url()).optional().nullable(),
+  surfboardId: z.string().uuid().optional().nullable(),
+  wetsuitId: z.string().uuid().optional().nullable(),
 });
 
 export async function GET(request: NextRequest) {
@@ -40,6 +42,8 @@ export async function GET(request: NextRequest) {
           conditions: true,
           spot: true,
           photos: true,
+          surfboard: true,
+          wetsuit: true,
         },
       });
 
@@ -99,12 +103,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Spot not found" }, { status: 404 });
     }
 
+    // Verify equipment ownership
+    if (validated.surfboardId) {
+      const board = await db.query.surfboards.findFirst({
+        where: and(eq(surfboards.id, validated.surfboardId), eq(surfboards.userId, session.user.id)),
+      });
+      if (!board) {
+        return NextResponse.json({ error: "Surfboard not found" }, { status: 404 });
+      }
+    }
+    if (validated.wetsuitId) {
+      const suit = await db.query.wetsuits.findFirst({
+        where: and(eq(wetsuits.id, validated.wetsuitId), eq(wetsuits.userId, session.user.id)),
+      });
+      if (!suit) {
+        return NextResponse.json({ error: "Wetsuit not found" }, { status: 404 });
+      }
+    }
+
     // Create session
     const [newSession] = await db
       .insert(surfSessions)
       .values({
         spotId: validated.spotId,
         userId: session.user.id,
+        surfboardId: validated.surfboardId || null,
+        wetsuitId: validated.wetsuitId || null,
         date: new Date(validated.date),
         startTime: new Date(validated.startTime),
         endTime: validated.endTime ? new Date(validated.endTime) : null,
@@ -219,6 +243,8 @@ const updateSessionSchema = z.object({
   rating: z.number().min(1).max(5).optional(),
   notes: z.string().optional().nullable(),
   spotId: z.string().uuid().optional(),
+  surfboardId: z.string().uuid().optional().nullable(),
+  wetsuitId: z.string().uuid().optional().nullable(),
 });
 
 export async function PUT(request: NextRequest) {
@@ -263,6 +289,24 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    // Verify equipment ownership
+    if (validated.surfboardId) {
+      const board = await db.query.surfboards.findFirst({
+        where: and(eq(surfboards.id, validated.surfboardId), eq(surfboards.userId, session.user.id)),
+      });
+      if (!board) {
+        return NextResponse.json({ error: "Surfboard not found" }, { status: 404 });
+      }
+    }
+    if (validated.wetsuitId) {
+      const suit = await db.query.wetsuits.findFirst({
+        where: and(eq(wetsuits.id, validated.wetsuitId), eq(wetsuits.userId, session.user.id)),
+      });
+      if (!suit) {
+        return NextResponse.json({ error: "Wetsuit not found" }, { status: 404 });
+      }
+    }
+
     // Build update object
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (validated.rating !== undefined) updates.rating = validated.rating;
@@ -271,6 +315,8 @@ export async function PUT(request: NextRequest) {
     if (validated.date !== undefined) updates.date = new Date(validated.date);
     if (validated.startTime !== undefined) updates.startTime = new Date(validated.startTime);
     if (validated.endTime !== undefined) updates.endTime = validated.endTime ? new Date(validated.endTime) : null;
+    if (validated.surfboardId !== undefined) updates.surfboardId = validated.surfboardId || null;
+    if (validated.wetsuitId !== undefined) updates.wetsuitId = validated.wetsuitId || null;
 
     await db
       .update(surfSessions)

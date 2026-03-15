@@ -7,6 +7,7 @@ import {
   decimal,
   integer,
   jsonb,
+  boolean,
   primaryKey,
   index,
   uniqueIndex,
@@ -84,6 +85,50 @@ export const surfSpots = pgTable("surf_spots", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Surfboards table
+export const surfboards = pgTable("surfboards", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  brand: varchar("brand", { length: 255 }),
+  model: varchar("model", { length: 255 }),
+  boardType: varchar("board_type", { length: 50 }),
+  lengthInches: decimal("length_inches", { precision: 5, scale: 1 }),
+  width: decimal("width", { precision: 4, scale: 2 }),
+  thickness: decimal("thickness", { precision: 4, scale: 2 }),
+  volume: decimal("volume", { precision: 5, scale: 1 }),
+  finSetup: varchar("fin_setup", { length: 50 }),
+  tailShape: varchar("tail_shape", { length: 50 }),
+  notes: text("notes"),
+  retired: boolean("retired").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_surfboards_user").on(table.userId),
+]);
+
+// Wetsuits table
+export const wetsuits = pgTable("wetsuits", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  brand: varchar("brand", { length: 255 }),
+  thickness: varchar("thickness", { length: 20 }),
+  style: varchar("style", { length: 50 }),
+  entry: varchar("entry", { length: 50 }),
+  size: varchar("size", { length: 10 }),
+  notes: text("notes"),
+  retired: boolean("retired").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_wetsuits_user").on(table.userId),
+]);
+
 // Surf Sessions table
 export const surfSessions = pgTable("surf_sessions", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -93,6 +138,10 @@ export const surfSessions = pgTable("surf_sessions", {
   userId: uuid("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
+  surfboardId: uuid("surfboard_id")
+    .references(() => surfboards.id, { onDelete: "set null" }),
+  wetsuitId: uuid("wetsuit_id")
+    .references(() => wetsuits.id, { onDelete: "set null" }),
   date: timestamp("date").notNull(),
   startTime: timestamp("start_time").notNull(),
   endTime: timestamp("end_time"),
@@ -101,7 +150,10 @@ export const surfSessions = pgTable("surf_sessions", {
   photoUrl: text("photo_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("idx_surf_sessions_surfboard").on(table.surfboardId),
+  index("idx_surf_sessions_wetsuit").on(table.wetsuitId),
+]);
 
 // Session Conditions table (captured at session time)
 export const sessionConditions = pgTable("session_conditions", {
@@ -192,6 +244,8 @@ export const sessionPhotos = pgTable("session_photos", {
 export const usersRelations = relations(users, ({ many }) => ({
   surfSpots: many(surfSpots),
   surfSessions: many(surfSessions),
+  surfboards: many(surfboards),
+  wetsuits: many(wetsuits),
   accounts: many(accounts),
   sessions: many(sessions),
   uploadSessions: many(uploadSessions),
@@ -230,11 +284,35 @@ export const surfSessionsRelations = relations(surfSessions, ({ one, many }) => 
     fields: [surfSessions.userId],
     references: [users.id],
   }),
+  surfboard: one(surfboards, {
+    fields: [surfSessions.surfboardId],
+    references: [surfboards.id],
+  }),
+  wetsuit: one(wetsuits, {
+    fields: [surfSessions.wetsuitId],
+    references: [wetsuits.id],
+  }),
   conditions: one(sessionConditions, {
     fields: [surfSessions.id],
     references: [sessionConditions.sessionId],
   }),
   photos: many(sessionPhotos),
+}));
+
+export const surfboardsRelations = relations(surfboards, ({ one, many }) => ({
+  user: one(users, {
+    fields: [surfboards.userId],
+    references: [users.id],
+  }),
+  surfSessions: many(surfSessions),
+}));
+
+export const wetsuitsRelations = relations(wetsuits, ({ one, many }) => ({
+  user: one(users, {
+    fields: [wetsuits.userId],
+    references: [users.id],
+  }),
+  surfSessions: many(surfSessions),
 }));
 
 export const sessionPhotosRelations = relations(sessionPhotos, ({ one }) => ({
@@ -330,3 +408,7 @@ export type UploadPhoto = typeof uploadPhotos.$inferSelect;
 export type NewUploadPhoto = typeof uploadPhotos.$inferInsert;
 export type SpotAlert = typeof spotAlerts.$inferSelect;
 export type NewSpotAlert = typeof spotAlerts.$inferInsert;
+export type Surfboard = typeof surfboards.$inferSelect;
+export type NewSurfboard = typeof surfboards.$inferInsert;
+export type Wetsuit = typeof wetsuits.$inferSelect;
+export type NewWetsuit = typeof wetsuits.$inferInsert;

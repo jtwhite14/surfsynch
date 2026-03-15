@@ -185,6 +185,8 @@ export interface SessionFormData {
   rating: number;
   notes?: string;
   photoUrl?: string;
+  surfboardId?: string | null;
+  wetsuitId?: string | null;
 }
 
 // Extended types with relations
@@ -204,6 +206,8 @@ export interface SurfSessionWithConditions {
   id: string;
   spotId: string;
   userId: string;
+  surfboardId: string | null;
+  wetsuitId: string | null;
   date: Date;
   startTime: Date;
   endTime: Date | null;
@@ -213,6 +217,22 @@ export interface SurfSessionWithConditions {
   photos?: { id: string; photoUrl: string; sortOrder: number }[];
   createdAt: Date;
   updatedAt: Date;
+  surfboard?: {
+    id: string;
+    name: string;
+    brand: string | null;
+    model: string | null;
+    boardType: string | null;
+    lengthInches: string | null;
+    volume: string | null;
+  } | null;
+  wetsuit?: {
+    id: string;
+    name: string;
+    brand: string | null;
+    thickness: string | null;
+    style: string | null;
+  } | null;
   conditions?: {
     waveHeight: string | null;
     wavePeriod: string | null;

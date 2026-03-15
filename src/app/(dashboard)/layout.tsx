@@ -28,11 +28,13 @@ import {
   X,
   Plus,
   MapPin,
+  Sailboat,
 } from "lucide-react";
 
 const navigation = [
   { name: "Home", href: "/", icon: LayoutDashboard },
   { name: "Sessions", href: "/sessions", icon: Waves },
+  { name: "Equipment", href: "/equipment", icon: Sailboat },
 ];
 
 

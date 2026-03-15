@@ -375,6 +375,39 @@ export default function SessionDetailPage() {
         );
       })()}
 
+      {/* Equipment */}
+      {(session.surfboard || session.wetsuit) && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Equipment</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {session.surfboard && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Board:</span>
+                  <span className="text-sm font-medium">{session.surfboard.name}</span>
+                  {(session.surfboard.brand || session.surfboard.model) && (
+                    <span className="text-sm text-muted-foreground">
+                      {[session.surfboard.brand, session.surfboard.model].filter(Boolean).join(" ")}
+                    </span>
+                  )}
+                </div>
+              )}
+              {session.wetsuit && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Wetsuit:</span>
+                  <span className="text-sm font-medium">{session.wetsuit.name}</span>
+                  {session.wetsuit.thickness && (
+                    <span className="text-sm text-muted-foreground">{session.wetsuit.thickness}mm</span>
+                  )}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Notes */}
       {session.notes && (
         <Card>
