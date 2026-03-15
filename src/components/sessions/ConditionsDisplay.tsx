@@ -14,25 +14,24 @@ interface ConditionsDisplayProps {
   compact?: boolean;
 }
 
+function formatValue(val: number | null, suffix: string, decimals = 0): string {
+  if (val === null) return "N/A";
+  return `${val.toFixed(decimals)}${suffix}`;
+}
+
 export function ConditionsDisplay({ conditions, compact = false }: ConditionsDisplayProps) {
   if (compact) {
     return (
       <div className="flex flex-wrap gap-2 text-sm">
-        {conditions.waveHeight !== null && (
-          <span className="inline-flex items-center px-2 py-1 rounded-full bg-blue-500/15 text-blue-400">
-            {formatWaveHeight(conditions.waveHeight)}
-          </span>
-        )}
-        {conditions.primarySwellPeriod !== null && (
-          <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-500/15 text-green-400">
-            {formatWavePeriod(conditions.primarySwellPeriod)}
-          </span>
-        )}
-        {conditions.windSpeed !== null && (
-          <span className="inline-flex items-center px-2 py-1 rounded-full bg-gray-500/15 text-gray-400">
-            {formatWindSpeed(conditions.windSpeed)}
-          </span>
-        )}
+        <span className="inline-flex items-center px-2 py-1 rounded-full bg-blue-500/15 text-blue-400">
+          {formatWaveHeight(conditions.waveHeight)}
+        </span>
+        <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-500/15 text-green-400">
+          {formatWavePeriod(conditions.primarySwellPeriod)}
+        </span>
+        <span className="inline-flex items-center px-2 py-1 rounded-full bg-gray-500/15 text-gray-400">
+          {formatWindSpeed(conditions.windSpeed)}
+        </span>
       </div>
     );
   }
@@ -78,36 +77,36 @@ export function ConditionsDisplay({ conditions, compact = false }: ConditionsDis
               ) : "N/A"
             }
           />
-          {conditions.secondarySwellHeight !== null && conditions.secondarySwellHeight > 0 && (
-            <ConditionItem
-              label="Secondary Swell"
-              value={`${formatWaveHeight(conditions.secondarySwellHeight)} @ ${formatWavePeriod(conditions.secondarySwellPeriod)} from ${getDirectionText(conditions.secondarySwellDirection)}`}
-            />
-          )}
+          <ConditionItem
+            label="Secondary Swell"
+            value={
+              conditions.secondarySwellHeight !== null && conditions.secondarySwellHeight > 0
+                ? `${formatWaveHeight(conditions.secondarySwellHeight)} @ ${formatWavePeriod(conditions.secondarySwellPeriod)} from ${getDirectionText(conditions.secondarySwellDirection)}`
+                : "N/A"
+            }
+          />
         </div>
       </div>
 
       {/* Wind Waves Section */}
-      {conditions.windWaveHeight !== null && (
-        <div>
-          <h4 className="text-sm font-medium text-muted-foreground mb-3">Wind Waves</h4>
-          <div className="grid grid-cols-2 gap-4">
-            <ConditionItem label="Wind Wave Height" value={formatWaveHeight(conditions.windWaveHeight)} />
-            <ConditionItem label="Wind Wave Period" value={formatWavePeriod(conditions.windWavePeriod)} />
-            <ConditionItem
-              label="Wind Wave Direction"
-              value={
-                conditions.windWaveDirection !== null ? (
-                  <span className="flex items-center gap-2">
-                    <DirectionArrow degrees={conditions.windWaveDirection} />
-                    {getDirectionText(conditions.windWaveDirection)}
-                  </span>
-                ) : "N/A"
-              }
-            />
-          </div>
+      <div>
+        <h4 className="text-sm font-medium text-muted-foreground mb-3">Wind Waves</h4>
+        <div className="grid grid-cols-2 gap-4">
+          <ConditionItem label="Wind Wave Height" value={formatWaveHeight(conditions.windWaveHeight)} />
+          <ConditionItem label="Wind Wave Period" value={formatWavePeriod(conditions.windWavePeriod)} />
+          <ConditionItem
+            label="Wind Wave Direction"
+            value={
+              conditions.windWaveDirection !== null ? (
+                <span className="flex items-center gap-2">
+                  <DirectionArrow degrees={conditions.windWaveDirection} />
+                  {getDirectionText(conditions.windWaveDirection)}
+                </span>
+              ) : "N/A"
+            }
+          />
         </div>
-      )}
+      </div>
 
       {/* Wind Section */}
       <div>
@@ -155,28 +154,19 @@ export function ConditionsDisplay({ conditions, compact = false }: ConditionsDis
       </div>
 
       {/* Weather Section */}
-      {(conditions.humidity !== null || conditions.precipitation !== null || conditions.pressureMsl !== null || conditions.cloudCover !== null || conditions.visibility !== null) && (
-        <div>
-          <h4 className="text-sm font-medium text-muted-foreground mb-3">Weather</h4>
-          <div className="grid grid-cols-2 gap-4">
-            {conditions.humidity !== null && (
-              <ConditionItem label="Humidity" value={`${conditions.humidity.toFixed(0)}%`} />
-            )}
-            {conditions.precipitation !== null && (
-              <ConditionItem label="Precipitation" value={`${conditions.precipitation.toFixed(1)} mm`} />
-            )}
-            {conditions.pressureMsl !== null && (
-              <ConditionItem label="Pressure" value={`${conditions.pressureMsl.toFixed(0)} hPa`} />
-            )}
-            {conditions.cloudCover !== null && (
-              <ConditionItem label="Cloud Cover" value={`${conditions.cloudCover.toFixed(0)}%`} />
-            )}
-            {conditions.visibility !== null && (
-              <ConditionItem label="Visibility" value={`${(conditions.visibility / 1000).toFixed(1)} km`} />
-            )}
-          </div>
+      <div>
+        <h4 className="text-sm font-medium text-muted-foreground mb-3">Weather</h4>
+        <div className="grid grid-cols-2 gap-4">
+          <ConditionItem label="Humidity" value={formatValue(conditions.humidity, "%")} />
+          <ConditionItem label="Precipitation" value={formatValue(conditions.precipitation, " mm", 1)} />
+          <ConditionItem label="Pressure" value={formatValue(conditions.pressureMsl, " hPa")} />
+          <ConditionItem label="Cloud Cover" value={formatValue(conditions.cloudCover, "%")} />
+          <ConditionItem
+            label="Visibility"
+            value={conditions.visibility !== null ? `${(conditions.visibility / 1000).toFixed(1)} km` : "N/A"}
+          />
         </div>
-      )}
+      </div>
     </div>
   );
 }

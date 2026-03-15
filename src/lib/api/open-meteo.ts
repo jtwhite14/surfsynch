@@ -114,7 +114,8 @@ export async function fetchMarineForecast(
 }
 
 /**
- * Fetch historical marine conditions for a specific date/time
+ * Fetch historical marine conditions for a specific date/time.
+ * Calls both the Marine API (wave/swell data) and ERA5 (weather data) in parallel.
  */
 export async function fetchHistoricalConditions(
   latitude: number,
@@ -123,16 +124,23 @@ export async function fetchHistoricalConditions(
 ): Promise<MarineConditions | null> {
   const dateStr = date.toISOString().split("T")[0];
 
-  // ERA5 historical marine data
-  const params = new URLSearchParams({
+  // Marine API with historical date range for wave/swell data
+  const marineParams = new URLSearchParams({
+    latitude: latitude.toString(),
+    longitude: longitude.toString(),
+    start_date: dateStr,
+    end_date: dateStr,
+    hourly: MARINE_PARAMS,
+    timezone: "auto",
+  });
+
+  // ERA5 for weather data (wind, temp, pressure, etc.)
+  const weatherParams = new URLSearchParams({
     latitude: latitude.toString(),
     longitude: longitude.toString(),
     start_date: dateStr,
     end_date: dateStr,
     hourly: [
-      "wave_height",
-      "wave_period",
-      "wave_direction",
       "wind_speed_10m",
       "wind_direction_10m",
       "wind_gusts_10m",
@@ -148,20 +156,25 @@ export async function fetchHistoricalConditions(
   });
 
   try {
-    const response = await fetch(`${HISTORICAL_API_BASE}?${params}`);
+    const [marineResponse, weatherResponse] = await Promise.all([
+      fetch(`${MARINE_API_BASE}?${marineParams}`),
+      fetch(`${HISTORICAL_API_BASE}?${weatherParams}`),
+    ]);
 
-    if (!response.ok) {
-      // ERA5 data may not be available for recent dates
-      console.warn(`Historical API error: ${response.status}`);
+    // We need at least one source to succeed
+    if (!marineResponse.ok && !weatherResponse.ok) {
+      console.warn(`Historical APIs both failed: marine=${marineResponse.status}, weather=${weatherResponse.status}`);
       return null;
     }
 
-    const data = await response.json();
+    const marineData: OpenMeteoMarineResponse | null = marineResponse.ok ? await marineResponse.json() : null;
+    const weatherData = weatherResponse.ok ? await weatherResponse.json() : null;
 
-    // Find the closest hour to the requested time
+    // Use marine times if available, otherwise weather times
+    const times: string[] = marineData?.hourly?.time || weatherData?.hourly?.time || [];
+    if (times.length === 0) return null;
+
     const targetHour = date.getUTCHours();
-    const times: string[] = data.hourly?.time || [];
-
     let closestIndex = 0;
     let minDiff = Infinity;
 
@@ -175,28 +188,28 @@ export async function fetchHistoricalConditions(
     });
 
     return {
-      waveHeight: data.hourly?.wave_height?.[closestIndex] ?? null,
-      wavePeriod: data.hourly?.wave_period?.[closestIndex] ?? null,
-      waveDirection: data.hourly?.wave_direction?.[closestIndex] ?? null,
-      primarySwellHeight: data.hourly?.wave_height?.[closestIndex] ?? null,
-      primarySwellPeriod: data.hourly?.wave_period?.[closestIndex] ?? null,
-      primarySwellDirection: data.hourly?.wave_direction?.[closestIndex] ?? null,
-      secondarySwellHeight: null,
-      secondarySwellPeriod: null,
-      secondarySwellDirection: null,
-      windWaveHeight: null,
-      windWavePeriod: null,
-      windWaveDirection: null,
-      windSpeed: data.hourly?.wind_speed_10m?.[closestIndex] ?? null,
-      windDirection: data.hourly?.wind_direction_10m?.[closestIndex] ?? null,
-      windGust: data.hourly?.wind_gusts_10m?.[closestIndex] ?? null,
-      airTemp: data.hourly?.temperature_2m?.[closestIndex] ?? null,
-      seaSurfaceTemp: data.hourly?.sea_surface_temperature?.[closestIndex] ?? null,
-      humidity: data.hourly?.relative_humidity_2m?.[closestIndex] ?? null,
-      precipitation: data.hourly?.precipitation?.[closestIndex] ?? null,
-      pressureMsl: data.hourly?.pressure_msl?.[closestIndex] ?? null,
-      cloudCover: data.hourly?.cloud_cover?.[closestIndex] ?? null,
-      visibility: data.hourly?.visibility?.[closestIndex] ?? null,
+      waveHeight: marineData?.hourly?.wave_height?.[closestIndex] ?? null,
+      wavePeriod: marineData?.hourly?.wave_period?.[closestIndex] ?? null,
+      waveDirection: marineData?.hourly?.wave_direction?.[closestIndex] ?? null,
+      primarySwellHeight: marineData?.hourly?.swell_wave_height?.[closestIndex] ?? null,
+      primarySwellPeriod: marineData?.hourly?.swell_wave_period?.[closestIndex] ?? null,
+      primarySwellDirection: marineData?.hourly?.swell_wave_direction?.[closestIndex] ?? null,
+      secondarySwellHeight: marineData?.hourly?.secondary_swell_wave_height?.[closestIndex] ?? null,
+      secondarySwellPeriod: marineData?.hourly?.secondary_swell_wave_period?.[closestIndex] ?? null,
+      secondarySwellDirection: marineData?.hourly?.secondary_swell_wave_direction?.[closestIndex] ?? null,
+      windWaveHeight: marineData?.hourly?.wind_wave_height?.[closestIndex] ?? null,
+      windWavePeriod: marineData?.hourly?.wind_wave_period?.[closestIndex] ?? null,
+      windWaveDirection: marineData?.hourly?.wind_wave_direction?.[closestIndex] ?? null,
+      windSpeed: weatherData?.hourly?.wind_speed_10m?.[closestIndex] ?? null,
+      windDirection: weatherData?.hourly?.wind_direction_10m?.[closestIndex] ?? null,
+      windGust: weatherData?.hourly?.wind_gusts_10m?.[closestIndex] ?? null,
+      airTemp: weatherData?.hourly?.temperature_2m?.[closestIndex] ?? null,
+      seaSurfaceTemp: weatherData?.hourly?.sea_surface_temperature?.[closestIndex] ?? null,
+      humidity: weatherData?.hourly?.relative_humidity_2m?.[closestIndex] ?? null,
+      precipitation: weatherData?.hourly?.precipitation?.[closestIndex] ?? null,
+      pressureMsl: weatherData?.hourly?.pressure_msl?.[closestIndex] ?? null,
+      cloudCover: weatherData?.hourly?.cloud_cover?.[closestIndex] ?? null,
+      visibility: weatherData?.hourly?.visibility?.[closestIndex] ?? null,
       timestamp: new Date(times[closestIndex]),
     };
   } catch (error) {
