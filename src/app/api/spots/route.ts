@@ -115,6 +115,7 @@ export async function PUT(request: NextRequest) {
 
     const body = await request.json();
     const validated = createSpotSchema.partial().parse(body);
+    const { alertsSilenced } = body;
 
     const [spot] = await db
       .update(surfSpots)
@@ -123,6 +124,7 @@ export async function PUT(request: NextRequest) {
         ...(validated.latitude && { latitude: validated.latitude.toString() }),
         ...(validated.longitude && { longitude: validated.longitude.toString() }),
         ...(validated.description !== undefined && { description: validated.description }),
+        ...(typeof alertsSilenced === "boolean" && { alertsSilenced }),
         updatedAt: new Date(),
       })
       .where(and(eq(surfSpots.id, spotId), eq(surfSpots.userId, session.user.id)))

@@ -81,6 +81,7 @@ export const surfSpots = pgTable("surf_spots", {
   longitude: decimal("longitude", { precision: 10, scale: 7 }).notNull(),
   description: text("description"),
   conditionWeights: jsonb("condition_weights"), // ConditionWeights | null
+  alertsSilenced: boolean("alerts_silenced").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

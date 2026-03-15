@@ -1,0 +1,1 @@
+ALTER TABLE "surf_spots" ADD COLUMN "alerts_silenced" boolean DEFAULT false NOT NULL;

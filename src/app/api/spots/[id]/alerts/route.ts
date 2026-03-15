@@ -29,6 +29,11 @@ export async function GET(
       return NextResponse.json({ error: "Spot not found" }, { status: 404 });
     }
 
+    // Return empty if alerts are silenced for this spot
+    if (spot.alertsSilenced) {
+      return NextResponse.json({ alerts: [], silenced: true });
+    }
+
     // Fetch active alerts for this spot
     const alerts = await db.query.spotAlerts.findMany({
       where: and(

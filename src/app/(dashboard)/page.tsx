@@ -22,6 +22,8 @@ import {
   MapPin,
   AlertTriangle,
   SlidersHorizontal,
+  BellOff,
+  Bell,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -240,6 +242,24 @@ export default function DashboardPage() {
       toast.error("Failed to delete spot");
     } finally {
       setIsDeletingSpot(false);
+    }
+  };
+
+  const handleToggleSilence = async () => {
+    if (!selectedSpot) return;
+    const newSilenced = !selectedSpot.alertsSilenced;
+    try {
+      const res = await fetch(`/api/spots?id=${selectedSpot.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alertsSilenced: newSilenced }),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      handleSpotSaved(data.spot);
+      toast.success(newSilenced ? "Alerts silenced" : "Alerts enabled");
+    } catch {
+      toast.error("Failed to update alert settings");
     }
   };
 
@@ -467,6 +487,13 @@ export default function DashboardPage() {
                         <Pencil className="size-3.5 mr-2" />
                         Edit
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleToggleSilence}>
+                        {selectedSpot.alertsSilenced ? (
+                          <><Bell className="size-3.5 mr-2" />Enable alerts</>
+                        ) : (
+                          <><BellOff className="size-3.5 mr-2" />Silence alerts</>
+                        )}
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={handleDeleteSpot} disabled={isDeletingSpot} className="text-destructive">
                         <Trash2 className="size-3.5 mr-2" />
                         Delete
@@ -560,7 +587,19 @@ export default function DashboardPage() {
                   /* Default view: Alerts + Recent Sessions + Conditions */
                   <>
                     {/* Session match alerts */}
-                    <SpotAlertCard spotId={selectedSpot.id} sessionCount={spotSessions.length} />
+                    {selectedSpot.alertsSilenced ? (
+                      <div className="rounded-lg border border-dashed border-muted-foreground/30 px-3 py-2.5 flex items-center gap-2">
+                        <BellOff className="size-3.5 text-muted-foreground shrink-0" />
+                        <p className="text-xs text-muted-foreground">
+                          Alerts are silenced.{" "}
+                          <button onClick={handleToggleSilence} className="text-primary font-medium hover:underline">
+                            Enable
+                          </button>
+                        </p>
+                      </div>
+                    ) : (
+                      <SpotAlertCard spotId={selectedSpot.id} sessionCount={spotSessions.length} />
+                    )}
 
                     {/* Alert tuning nudge */}
                     {!selectedSpot.conditionWeights && (

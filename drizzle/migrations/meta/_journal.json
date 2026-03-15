@@ -50,6 +50,13 @@
       "when": 1773604953322,
       "tag": "0006_grey_glorian",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1773610223316,
+      "tag": "0007_bored_queen_noir",
+      "breakpoints": true
     }
   ]
 }

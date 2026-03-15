@@ -32,8 +32,9 @@ export async function GET(request: NextRequest) {
     // so it doesn't compete for bandwidth with Open-Meteo forecast fetches
     await warmStationCache();
 
-    // Get all spots with rated sessions
+    // Get all spots with rated sessions (skip silenced spots)
     const allSpots = await db.query.surfSpots.findMany({
+      where: eq(surfSpots.alertsSilenced, false),
       with: {
         surfSessions: {
           where: gte(surfSessions.rating, 3),
