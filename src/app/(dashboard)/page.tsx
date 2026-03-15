@@ -201,7 +201,7 @@ export default function DashboardPage() {
       return {
         longitude: homeLocation.longitude,
         latitude: homeLocation.latitude,
-        zoom: 7,
+        zoom: 8,
       };
     }
     if (spots.length === 1) {

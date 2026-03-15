@@ -214,7 +214,7 @@ export default function SettingsPage() {
             Home Location
           </CardTitle>
           <CardDescription>
-            Set your home base to center the map within 100 miles of your location
+            Set your home base to center the map within 50 miles of your location
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

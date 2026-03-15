@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SessionCard } from "@/components/sessions/SessionCard";
 import { SurfSessionWithConditions } from "@/types";
@@ -52,11 +51,15 @@ export default function SessionsPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="max-w-lg mx-auto space-y-6">
         <div className="h-8 bg-muted rounded w-1/4 animate-pulse"></div>
-        <div className="space-y-4">
+        <div className="space-y-6">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-32 bg-muted rounded animate-pulse"></div>
+            <div key={i} className="rounded-xl overflow-hidden">
+              <div className="h-10 bg-muted animate-pulse" />
+              <div className="aspect-[4/3] bg-muted animate-pulse" />
+              <div className="h-16 bg-muted animate-pulse" />
+            </div>
           ))}
         </div>
       </div>
@@ -64,7 +67,7 @@ export default function SessionsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-lg mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Sessions</h1>
         <Button asChild>
@@ -73,9 +76,9 @@ export default function SessionsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-4">
+      <div className="flex flex-wrap gap-3">
         <Select value={spotFilter} onValueChange={setSpotFilter}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-[160px]">
             <SelectValue placeholder="All spots" />
           </SelectTrigger>
           <SelectContent>
@@ -89,7 +92,7 @@ export default function SessionsPage() {
         </Select>
 
         <Select value={ratingFilter} onValueChange={setRatingFilter}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-[160px]">
             <SelectValue placeholder="All ratings" />
           </SelectTrigger>
           <SelectContent>
@@ -105,6 +108,7 @@ export default function SessionsPage() {
         {(spotFilter !== "all" || ratingFilter !== "all") && (
           <Button
             variant="ghost"
+            size="sm"
             onClick={() => {
               setSpotFilter("all");
               setRatingFilter("all");
@@ -115,9 +119,9 @@ export default function SessionsPage() {
         )}
       </div>
 
-      {/* Sessions list */}
+      {/* Sessions feed */}
       {filteredSessions.length > 0 ? (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {filteredSessions.map((session) => (
             <SessionCard key={session.id} session={session} />
           ))}
