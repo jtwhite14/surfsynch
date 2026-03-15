@@ -27,6 +27,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { SpotConditions } from "@/components/spots/SpotConditions";
 import type { SurfSpot } from "@/lib/db/schema";
 import type { SurfSessionWithConditions } from "@/types";
 
@@ -341,8 +342,9 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          {/* Sessions list */}
-          <div className="flex-1 overflow-y-auto px-3 py-3">
+          {/* Scrollable content: conditions + sessions */}
+          <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
+            <SpotConditions spotId={selectedSpot.id} />
             {loadingSpotSessions ? (
               <div className="flex justify-center py-8">
                 <Loader2 className="size-5 animate-spin text-muted-foreground" />

@@ -9,34 +9,43 @@ import { WeatherStrip } from "./charts/WeatherStrip";
 import { AtmospherePanel } from "./charts/AtmospherePanel";
 
 interface ConditionsTimelineProps {
-  sessionId: string;
+  sessionId?: string;
+  spotId?: string;
 }
 
-export function ConditionsTimeline({ sessionId }: ConditionsTimelineProps) {
+export function ConditionsTimeline({ sessionId, spotId }: ConditionsTimelineProps) {
   const [timeline, setTimeline] = useState<HourlyForecast[]>([]);
   const [sessionHourIndex, setSessionHourIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const fetchKey = sessionId || spotId;
+
   useEffect(() => {
+    if (!fetchKey) return;
     async function fetchTimeline() {
       try {
-        const res = await fetch(`/api/sessions/${sessionId}/timeline`);
+        const url = spotId
+          ? `/api/spots/${spotId}/conditions`
+          : `/api/sessions/${sessionId}/timeline`;
+        const res = await fetch(url);
         if (!res.ok) {
           setError("Failed to load timeline");
           return;
         }
         const data = await res.json();
         setTimeline(data.timeline);
-        setSessionHourIndex(data.sessionHourIndex);
+        setSessionHourIndex(data.currentHourIndex ?? data.sessionHourIndex);
       } catch {
         setError("Failed to load timeline");
       } finally {
         setLoading(false);
       }
     }
+    setLoading(true);
+    setError(null);
     fetchTimeline();
-  }, [sessionId]);
+  }, [fetchKey, sessionId, spotId]);
 
   if (loading) {
     return (
@@ -63,7 +72,7 @@ export function ConditionsTimeline({ sessionId }: ConditionsTimelineProps) {
       <div>
         <h2 className="text-lg font-semibold tracking-tight">Conditions Timeline</h2>
         <p className="text-[13px] text-white/30 mt-0.5">
-          24-hour window around your session
+          {spotId ? "Current conditions and forecast" : "24-hour window around your session"}
         </p>
       </div>
       <div className="space-y-3">
