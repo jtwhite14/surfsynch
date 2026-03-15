@@ -354,8 +354,8 @@ export default function OnboardingPage() {
       setCreatedSpotCount(
         reviews.filter((r) => r.creatingNewSpot).length
       );
-      setIsComplete(true);
       toast.success("Sessions created successfully!");
+      router.push("/spots");
     } catch (err) {
       console.error("Error creating sessions:", err);
       toast.error(
