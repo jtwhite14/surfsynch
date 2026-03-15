@@ -1,8 +1,7 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useCallback } from "react";
 import Map, { Marker, MapRef, NavigationControl, GeolocateControl, MapMouseEvent } from "react-map-gl/mapbox";
-import mapboxgl from "mapbox-gl";
 import { SurfSpot } from "@/lib/db/schema";
 import SpotMarker from "./SpotMarker";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -14,7 +13,6 @@ interface SpotMapProps {
   selectedSpotId?: string;
   interactive?: boolean;
   newSpotMarker?: { lat: number; lng: number } | null;
-  fitToSpots?: boolean;
   initialViewState?: {
     longitude: number;
     latitude: number;
@@ -35,48 +33,10 @@ export default function SpotMap({
   selectedSpotId,
   interactive = true,
   newSpotMarker,
-  fitToSpots = false,
   initialViewState = DEFAULT_VIEW_STATE,
 }: SpotMapProps) {
   const mapRef = useRef<MapRef>(null);
   const [viewState, setViewState] = useState(initialViewState);
-  const hasFitted = useRef(false);
-  const spotsRef = useRef(spots);
-  spotsRef.current = spots;
-
-  const fitSpotsToMap = useCallback((map: MapRef, spotsToFit: SurfSpot[]) => {
-    if (spotsToFit.length === 1) {
-      map.flyTo({
-        center: [parseFloat(spotsToFit[0].longitude), parseFloat(spotsToFit[0].latitude)],
-        zoom: 12,
-        duration: 1000,
-      });
-    } else {
-      const bounds = new mapboxgl.LngLatBounds();
-      spotsToFit.forEach((spot) => {
-        bounds.extend([parseFloat(spot.longitude), parseFloat(spot.latitude)]);
-      });
-      map.fitBounds(bounds, { padding: 80, maxZoom: 13, duration: 1000 });
-    }
-  }, []);
-
-  const handleLoad = useCallback(() => {
-    if (!fitToSpots || hasFitted.current || !mapRef.current) return;
-    if (spotsRef.current.length > 0) {
-      hasFitted.current = true;
-      fitSpotsToMap(mapRef.current, spotsRef.current);
-    }
-  }, [fitToSpots, fitSpotsToMap]);
-
-  // Also try when spots arrive after map is already loaded
-  useEffect(() => {
-    if (!fitToSpots || hasFitted.current || !mapRef.current || spots.length === 0) return;
-    // Check if map is loaded
-    if (mapRef.current.loaded()) {
-      hasFitted.current = true;
-      fitSpotsToMap(mapRef.current, spots);
-    }
-  }, [fitToSpots, spots, fitSpotsToMap]);
 
   const handleMapClick = useCallback(
     (event: MapMouseEvent) => {
@@ -111,7 +71,6 @@ export default function SpotMap({
       ref={mapRef}
       {...viewState}
       onMove={(evt) => setViewState(evt.viewState)}
-      onLoad={handleLoad}
       onClick={handleMapClick}
       mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
       mapStyle="mapbox://styles/mapbox/satellite-v9"

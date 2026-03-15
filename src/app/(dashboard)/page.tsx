@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,24 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  const initialViewState = useMemo(() => {
+    if (spots.length === 0) return undefined;
+    if (spots.length === 1) {
+      return {
+        longitude: parseFloat(spots[0].longitude),
+        latitude: parseFloat(spots[0].latitude),
+        zoom: 12,
+      };
+    }
+    const lngs = spots.map((s) => parseFloat(s.longitude));
+    const lats = spots.map((s) => parseFloat(s.latitude));
+    return {
+      longitude: (Math.min(...lngs) + Math.max(...lngs)) / 2,
+      latitude: (Math.min(...lats) + Math.max(...lats)) / 2,
+      zoom: 10,
+    };
+  }, [spots]);
+
   if (loading) {
     return (
       <div className="h-full w-full flex items-center justify-center">
@@ -47,7 +65,7 @@ export default function DashboardPage() {
 
   return (
     <div className="relative h-full w-full">
-      <SpotMap spots={spots} fitToSpots interactive={false} />
+      <SpotMap spots={spots} interactive={false} {...(initialViewState && { initialViewState })} />
 
       {/* Log Session button */}
       <div className="absolute bottom-6 right-4 z-10">
