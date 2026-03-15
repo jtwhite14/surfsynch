@@ -17,12 +17,14 @@ export default function SpotMarker({ spot, isSelected }: SpotMarkerProps) {
           transition-all duration-200 ease-in-out
           ${
             isSelected
-              ? "bg-blue-600 border-white scale-125"
-              : "bg-blue-500 border-white hover:scale-110"
+              ? "bg-primary border-white scale-125"
+              : "bg-primary border-white hover:scale-110"
           }
         `}
       >
-        <span className="text-white text-sm">🏄</span>
+        <svg className="w-4 h-4 text-primary-foreground" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+        </svg>
       </div>
 
       {/* Tooltip */}
@@ -44,7 +46,7 @@ export default function SpotMarker({ spot, isSelected }: SpotMarkerProps) {
 
       {/* Selection ring */}
       {isSelected && (
-        <div className="absolute -inset-1 bg-blue-500/20 rounded-full animate-pulse" />
+        <div className="absolute -inset-1 bg-primary/20 rounded-full animate-pulse" />
       )}
     </div>
   );
