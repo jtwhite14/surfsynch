@@ -19,6 +19,8 @@ interface SpotMapProps {
     latitude: number;
     zoom: number;
   };
+  /** Extra padding (px) passed to flyTo so the spot centers in the visible area */
+  flyToPadding?: { top?: number; bottom?: number; left?: number; right?: number };
 }
 
 const DEFAULT_VIEW_STATE = {
@@ -38,6 +40,7 @@ export default function SpotMap({
   interactive = true,
   newSpotMarker,
   initialViewState = DEFAULT_VIEW_STATE,
+  flyToPadding,
 }: SpotMapProps) {
   const mapRef = useRef<MapRef>(null);
   const [viewState, setViewState] = useState(initialViewState);
@@ -114,8 +117,9 @@ export default function SpotMap({
       center: [parseFloat(spot.longitude), parseFloat(spot.latitude)],
       zoom: 12,
       duration: 1000,
+      padding: flyToPadding,
     });
-  }, []);
+  }, [flyToPadding]);
 
   const handleClusterClick = useCallback(
     (clusterId: number, longitude: number, latitude: number) => {

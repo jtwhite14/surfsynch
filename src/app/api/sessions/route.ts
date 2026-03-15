@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     const sessionId = searchParams.get("id");
+    const spotId = searchParams.get("spotId");
     const limit = searchParams.get("limit");
 
     if (sessionId) {
@@ -49,9 +50,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ session: surfSession });
     }
 
-    // Get all sessions for user
+    // Get all sessions for user (optionally filtered by spot)
     const sessions = await db.query.surfSessions.findMany({
-      where: eq(surfSessions.userId, session.user.id),
+      where: spotId
+        ? and(eq(surfSessions.userId, session.user.id), eq(surfSessions.spotId, spotId))
+        : eq(surfSessions.userId, session.user.id),
       orderBy: [desc(surfSessions.date)],
       limit: limit ? parseInt(limit) : undefined,
       with: {

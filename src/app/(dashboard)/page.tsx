@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,7 +15,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDate } from "@/lib/utils/date";
-import { ChevronDown, ChevronUp, Plus, Loader2, MapPin, Waves, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Plus,
+  Loader2,
+  MapPin,
+  Waves,
+  X,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import type { SurfSpot } from "@/lib/db/schema";
 import type { SurfSessionWithConditions } from "@/types";
@@ -29,10 +40,9 @@ const SpotMap = dynamic(() => import("@/components/map/SpotMap"), {
 });
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [spots, setSpots] = useState<SurfSpot[]>([]);
-  const [sessions, setSessions] = useState<SurfSessionWithConditions[]>([]);
   const [loading, setLoading] = useState(true);
-  const [panelOpen, setPanelOpen] = useState(true);
 
   const [homeLocation, setHomeLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
@@ -43,7 +53,18 @@ export default function DashboardPage() {
   const [newSpotDescription, setNewSpotDescription] = useState("");
   const [isSavingSpot, setIsSavingSpot] = useState(false);
 
+  // Spot detail pane
+  const [selectedSpot, setSelectedSpot] = useState<SurfSpot | null>(null);
+  const [spotSessions, setSpotSessions] = useState<SurfSessionWithConditions[]>([]);
+  const [loadingSpotSessions, setLoadingSpotSessions] = useState(false);
+  const [editingSpot, setEditingSpot] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [isDeletingSpot, setIsDeletingSpot] = useState(false);
+
   const handleStartAddSpot = () => {
+    setSelectedSpot(null);
     setAddSpotMode("picking");
     setNewSpotMarker(null);
     setNewSpotName("");
@@ -88,15 +109,85 @@ export default function DashboardPage() {
     }
   };
 
+  // Spot click handler — fetch sessions for the spot
+  const handleSpotClick = useCallback(async (spot: SurfSpot) => {
+    setSelectedSpot(spot);
+    setEditingSpot(false);
+    setLoadingSpotSessions(true);
+    try {
+      const res = await fetch(`/api/sessions?spotId=${spot.id}`);
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setSpotSessions(data.sessions || []);
+    } catch {
+      setSpotSessions([]);
+    } finally {
+      setLoadingSpotSessions(false);
+    }
+  }, []);
+
+  const handleCloseSpotDetail = () => {
+    setSelectedSpot(null);
+    setSpotSessions([]);
+    setEditingSpot(false);
+  };
+
+  const handleStartEdit = () => {
+    if (!selectedSpot) return;
+    setEditName(selectedSpot.name);
+    setEditDescription(selectedSpot.description || "");
+    setEditingSpot(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedSpot || !editName.trim()) return;
+    setIsSavingEdit(true);
+    try {
+      const res = await fetch(`/api/spots?id=${selectedSpot.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editName.trim(),
+          description: editDescription.trim() || null,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setSpots((prev) => prev.map((s) => (s.id === data.spot.id ? data.spot : s)));
+      setSelectedSpot(data.spot);
+      setEditingSpot(false);
+      toast.success("Spot updated!");
+    } catch {
+      toast.error("Failed to update spot");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleDeleteSpot = async () => {
+    if (!selectedSpot) return;
+    if (!confirm(`Delete "${selectedSpot.name}" and all its sessions?`)) return;
+    setIsDeletingSpot(true);
+    try {
+      const res = await fetch(`/api/spots?id=${selectedSpot.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      setSpots((prev) => prev.filter((s) => s.id !== selectedSpot.id));
+      handleCloseSpotDetail();
+      toast.success("Spot deleted");
+    } catch {
+      toast.error("Failed to delete spot");
+    } finally {
+      setIsDeletingSpot(false);
+    }
+  };
+
   useEffect(() => {
     Promise.all([
       fetch("/api/spots").then((r) => (r.ok ? r.json() : { spots: [] })),
-      fetch("/api/sessions?limit=5").then((r) => (r.ok ? r.json() : { sessions: [] })),
       fetch("/api/user/location").then((r) => (r.ok ? r.json() : { latitude: null, longitude: null })),
     ])
-      .then(([spotsData, sessionsData, locationData]) => {
+      .then(([spotsData, locationData]) => {
         setSpots(spotsData.spots || []);
-        setSessions(sessionsData.sessions || []);
         if (locationData.latitude && locationData.longitude) {
           setHomeLocation({ latitude: locationData.latitude, longitude: locationData.longitude });
         }
@@ -106,7 +197,6 @@ export default function DashboardPage() {
   }, []);
 
   const initialViewState = useMemo(() => {
-    // Home location is the primary default (~100mi radius ≈ zoom 7)
     if (homeLocation) {
       return {
         longitude: homeLocation.longitude,
@@ -114,7 +204,6 @@ export default function DashboardPage() {
         zoom: 7,
       };
     }
-    // Fall back to centering on spots if no home location
     if (spots.length === 1) {
       return {
         longitude: parseFloat(spots[0].longitude),
@@ -134,6 +223,12 @@ export default function DashboardPage() {
     return undefined;
   }, [spots, homeLocation]);
 
+  // When the spot detail pane is open, pad flyTo so the spot centers in the visible right half
+  const flyToPadding = useMemo(
+    () => (selectedSpot ? { left: window.innerWidth * 0.5 } : undefined),
+    [selectedSpot]
+  );
+
   if (loading) {
     return (
       <div className="h-full w-full flex items-center justify-center">
@@ -148,9 +243,154 @@ export default function DashboardPage() {
         spots={spots}
         interactive={addSpotMode !== "idle"}
         onMapClick={addSpotMode !== "idle" ? handleMapClick : undefined}
+        onSpotClick={addSpotMode === "idle" ? handleSpotClick : undefined}
+        selectedSpotId={selectedSpot?.id}
         newSpotMarker={newSpotMarker}
+        flyToPadding={flyToPadding}
         {...(initialViewState && { initialViewState })}
       />
+
+      {/* Spot detail pane (left 50%) */}
+      {selectedSpot && addSpotMode === "idle" && (
+        <div className="absolute inset-y-0 left-0 z-20 w-full sm:w-1/2 flex flex-col bg-background/95 backdrop-blur-sm border-r shadow-lg">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-2 px-5 pt-5 pb-3">
+            <div className="min-w-0 flex-1">
+              {editingSpot ? (
+                <div className="space-y-2">
+                  <Input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    autoFocus
+                    className="text-lg font-bold"
+                  />
+                  <Textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    placeholder="Description (optional)"
+                    rows={2}
+                  />
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setEditingSpot(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleSaveEdit}
+                      disabled={!editName.trim() || isSavingEdit}
+                    >
+                      {isSavingEdit ? <Loader2 className="size-3 animate-spin" /> : "Save"}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <h2 className="text-xl font-bold truncate">{selectedSpot.name}</h2>
+                  {selectedSpot.description && (
+                    <p className="text-sm text-muted-foreground mt-1">{selectedSpot.description}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {parseFloat(selectedSpot.latitude).toFixed(5)}, {parseFloat(selectedSpot.longitude).toFixed(5)}
+                  </p>
+                </>
+              )}
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              {!editingSpot && (
+                <>
+                  <button
+                    onClick={handleStartEdit}
+                    className="rounded-md p-1.5 hover:bg-accent transition-colors"
+                    title="Edit spot"
+                  >
+                    <Pencil className="size-4" />
+                  </button>
+                  <button
+                    onClick={handleDeleteSpot}
+                    disabled={isDeletingSpot}
+                    className="rounded-md p-1.5 hover:bg-destructive/10 text-destructive transition-colors"
+                    title="Delete spot"
+                  >
+                    {isDeletingSpot ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="size-4" />
+                    )}
+                  </button>
+                </>
+              )}
+              <button
+                onClick={handleCloseSpotDetail}
+                className="rounded-md p-1.5 hover:bg-accent transition-colors"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Session count */}
+          <div className="px-5 pb-3 border-b">
+            <p className="text-sm text-muted-foreground">
+              {loadingSpotSessions
+                ? "Loading sessions..."
+                : `${spotSessions.length} session${spotSessions.length !== 1 ? "s" : ""}`}
+            </p>
+          </div>
+
+          {/* Sessions list */}
+          <div className="flex-1 overflow-y-auto px-3 py-2">
+            {loadingSpotSessions ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="size-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : spotSessions.length > 0 ? (
+              <div className="space-y-1">
+                {spotSessions.map((session) => (
+                  <Link
+                    key={session.id}
+                    href={`/sessions/${session.id}`}
+                    className="flex items-center justify-between rounded-md px-3 py-3 text-sm hover:bg-accent transition-colors"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium">{formatDate(session.date)}</p>
+                      {session.notes && (
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">{session.notes}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center ml-2 shrink-0">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <svg
+                          key={i}
+                          className={`w-3 h-3 ${
+                            i < session.rating ? "text-yellow-400" : "text-muted-foreground/30"
+                          }`}
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                      ))}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-sm text-muted-foreground">No sessions at this spot yet</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => router.push(`/sessions/new?spotId=${selectedSpot.id}`)}
+                >
+                  <Plus className="size-3 mr-1" />
+                  Add Session
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Instruction banner (picking / detailing) */}
       {addSpotMode !== "idle" && (
@@ -238,56 +478,6 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
-
-      {/* Recent Sessions panel (idle only) */}
-      {addSpotMode === "idle" && <div className="absolute top-4 left-4 z-10 w-[calc(100%-2rem)] sm:w-80">
-        <div className="rounded-lg border bg-background/90 backdrop-blur-sm shadow-lg">
-          <button
-            onClick={() => setPanelOpen(!panelOpen)}
-            className="flex w-full items-center justify-between px-4 py-3 text-sm font-semibold"
-          >
-            Recent Sessions
-            {panelOpen ? <ChevronDown className="size-4" /> : <ChevronUp className="size-4" />}
-          </button>
-
-          {panelOpen && (
-            <div className="border-t px-3 pb-3 pt-1">
-              {sessions.length > 0 ? (
-                <div className="space-y-1">
-                  {sessions.map((session) => (
-                    <Link
-                      key={session.id}
-                      href={`/sessions/${session.id}`}
-                      className="flex items-center justify-between rounded-md px-2 py-2 text-sm hover:bg-accent transition-colors"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium truncate">{session.spot?.name}</p>
-                        <p className="text-xs text-muted-foreground">{formatDate(session.date)}</p>
-                      </div>
-                      <div className="flex items-center ml-2 shrink-0">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <svg
-                            key={i}
-                            className={`w-3 h-3 ${
-                              i < session.rating ? "text-yellow-400" : "text-muted-foreground/30"
-                            }`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <p className="py-4 text-center text-sm text-muted-foreground">No sessions yet</p>
-              )}
-            </div>
-          )}
-        </div>
-      </div>}
     </div>
   );
 }
