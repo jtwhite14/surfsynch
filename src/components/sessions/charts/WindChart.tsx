@@ -130,6 +130,9 @@ export function WindChart({ data, sessionIndex }: WindChartProps) {
       <div className="flex px-4 pb-4 pt-1">
         {chartData.map((d, i) => {
           const isSession = i === sessionIndex;
+          const compass = d.direction != null ? getDirectionText(d.direction) : null;
+          // Arrow points where wind comes FROM: +180°
+          const arrowDeg = d.direction != null ? (d.direction + 180) % 360 : null;
           return (
             <div key={d.time} className="flex-1 flex flex-col items-center gap-1">
               {/* Direction arrow */}
@@ -137,13 +140,13 @@ export function WindChart({ data, sessionIndex }: WindChartProps) {
                 className={`flex items-center justify-center w-5 h-5 rounded-full
                   ${isSession ? "bg-white/[0.08]" : ""}`}
               >
-                {d.direction != null ? (
+                {arrowDeg != null ? (
                   <svg
                     width="12"
                     height="12"
                     viewBox="0 0 10 10"
                     className={isSession ? "text-white/70" : "text-white/30"}
-                    style={{ transform: `rotate(${d.direction}deg)` }}
+                    style={{ transform: `rotate(${arrowDeg}deg)` }}
                   >
                     <path d="M5 1L7.5 8H2.5L5 1Z" fill="currentColor" />
                   </svg>
@@ -152,13 +155,20 @@ export function WindChart({ data, sessionIndex }: WindChartProps) {
                 )}
               </div>
 
+              {/* Direction label */}
+              {compass && (
+                <span className={`text-[9px] font-medium ${isSession ? "text-white/50" : "text-white/20"}`}>
+                  {compass}
+                </span>
+              )}
+
               {/* Speed */}
               <span
                 className={`text-[11px] font-semibold tabular-nums ${
                   isSession ? "text-white" : "text-white/50"
                 }`}
               >
-                {d.speed > 0 ? Math.round(d.speed) : "—"}
+                {d.speed > 0 ? `${Math.round(d.speed)}` : "—"}
               </span>
 
               {/* Gust */}
