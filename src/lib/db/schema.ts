@@ -8,6 +8,8 @@ import {
   integer,
   jsonb,
   primaryKey,
+  index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -76,6 +78,7 @@ export const surfSpots = pgTable("surf_spots", {
   latitude: decimal("latitude", { precision: 10, scale: 7 }).notNull(),
   longitude: decimal("longitude", { precision: 10, scale: 7 }).notNull(),
   description: text("description"),
+  conditionWeights: jsonb("condition_weights"), // ConditionWeights | null
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -141,7 +144,37 @@ export const spotForecasts = pgTable("spot_forecasts", {
     .references(() => surfSpots.id, { onDelete: "cascade" }),
   forecastData: jsonb("forecast_data").notNull(), // 16 days of hourly data
   fetchedAt: timestamp("fetched_at").defaultNow().notNull(),
-});
+}, (table) => [
+  uniqueIndex("uq_spot_forecasts_spot").on(table.spotId),
+]);
+
+// Spot Alerts table (computed alerts for forecast matching)
+export const spotAlerts = pgTable("spot_alerts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  spotId: uuid("spot_id")
+    .notNull()
+    .references(() => surfSpots.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  forecastHour: timestamp("forecast_hour").notNull(),
+  timeWindow: varchar("time_window", { length: 20 }).notNull(), // 'dawn' | 'midday' | 'afternoon'
+  matchScore: decimal("match_score", { precision: 5, scale: 2 }).notNull(),
+  confidenceScore: decimal("confidence_score", { precision: 5, scale: 2 }).notNull(),
+  effectiveScore: decimal("effective_score", { precision: 5, scale: 2 }).notNull(),
+  matchedSessionId: uuid("matched_session_id")
+    .notNull()
+    .references(() => surfSessions.id, { onDelete: "cascade" }),
+  matchDetails: jsonb("match_details").notNull(), // per-variable similarity scores
+  forecastSnapshot: jsonb("forecast_snapshot").notNull(), // matched hour + context
+  status: varchar("status", { length: 20 }).notNull().default("active"), // active | dismissed | expired | confirmed
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_spot_alerts_active").on(table.spotId, table.userId, table.status),
+  uniqueIndex("uq_spot_alerts_dedup").on(table.spotId, table.userId, table.forecastHour, table.timeWindow),
+]);
 
 // Session Photos table (multiple photos per session)
 export const sessionPhotos = pgTable("session_photos", {
@@ -184,6 +217,7 @@ export const surfSpotsRelations = relations(surfSpots, ({ one, many }) => ({
   }),
   surfSessions: many(surfSessions),
   forecasts: many(spotForecasts),
+  alerts: many(spotAlerts),
 }));
 
 export const surfSessionsRelations = relations(surfSessions, ({ one, many }) => ({
@@ -220,6 +254,21 @@ export const spotForecastsRelations = relations(spotForecasts, ({ one }) => ({
   spot: one(surfSpots, {
     fields: [spotForecasts.spotId],
     references: [surfSpots.id],
+  }),
+}));
+
+export const spotAlertsRelations = relations(spotAlerts, ({ one }) => ({
+  spot: one(surfSpots, {
+    fields: [spotAlerts.spotId],
+    references: [surfSpots.id],
+  }),
+  user: one(users, {
+    fields: [spotAlerts.userId],
+    references: [users.id],
+  }),
+  matchedSession: one(surfSessions, {
+    fields: [spotAlerts.matchedSessionId],
+    references: [surfSessions.id],
   }),
 }));
 
@@ -278,3 +327,5 @@ export type UploadSession = typeof uploadSessions.$inferSelect;
 export type NewUploadSession = typeof uploadSessions.$inferInsert;
 export type UploadPhoto = typeof uploadPhotos.$inferSelect;
 export type NewUploadPhoto = typeof uploadPhotos.$inferInsert;
+export type SpotAlert = typeof spotAlerts.$inferSelect;
+export type NewSpotAlert = typeof spotAlerts.$inferInsert;

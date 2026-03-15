@@ -212,6 +212,97 @@ export async function POST(request: NextRequest) {
   }
 }
 
+const updateSessionSchema = z.object({
+  date: z.string().datetime().optional(),
+  startTime: z.string().datetime().optional(),
+  endTime: z.string().datetime().optional().nullable(),
+  rating: z.number().min(1).max(5).optional(),
+  notes: z.string().optional().nullable(),
+  spotId: z.string().uuid().optional(),
+});
+
+export async function PUT(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const searchParams = request.nextUrl.searchParams;
+    const sessionId = searchParams.get("id");
+
+    if (!sessionId) {
+      return NextResponse.json({ error: "Session ID required" }, { status: 400 });
+    }
+
+    const body = await request.json();
+    const validated = updateSessionSchema.parse(body);
+
+    // Verify session belongs to user
+    const existing = await db.query.surfSessions.findFirst({
+      where: and(
+        eq(surfSessions.id, sessionId),
+        eq(surfSessions.userId, session.user.id)
+      ),
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    }
+
+    // If changing spot, verify new spot belongs to user
+    if (validated.spotId && validated.spotId !== existing.spotId) {
+      const spot = await db.query.surfSpots.findFirst({
+        where: and(
+          eq(surfSpots.id, validated.spotId),
+          eq(surfSpots.userId, session.user.id)
+        ),
+      });
+      if (!spot) {
+        return NextResponse.json({ error: "Spot not found" }, { status: 404 });
+      }
+    }
+
+    // Build update object
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    if (validated.rating !== undefined) updates.rating = validated.rating;
+    if (validated.notes !== undefined) updates.notes = validated.notes;
+    if (validated.spotId !== undefined) updates.spotId = validated.spotId;
+    if (validated.date !== undefined) updates.date = new Date(validated.date);
+    if (validated.startTime !== undefined) updates.startTime = new Date(validated.startTime);
+    if (validated.endTime !== undefined) updates.endTime = validated.endTime ? new Date(validated.endTime) : null;
+
+    await db
+      .update(surfSessions)
+      .set(updates)
+      .where(eq(surfSessions.id, sessionId));
+
+    // Fetch the updated session with relations
+    const updatedSession = await db.query.surfSessions.findFirst({
+      where: eq(surfSessions.id, sessionId),
+      with: {
+        conditions: true,
+        spot: true,
+        photos: true,
+      },
+    });
+
+    return NextResponse.json({ session: updatedSession });
+  } catch (error) {
+    console.error("Error updating session:", error);
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Invalid data", details: error.issues },
+        { status: 400 }
+      );
+    }
+    return NextResponse.json(
+      { error: "Failed to update session" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function DELETE(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);

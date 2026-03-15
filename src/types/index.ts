@@ -55,19 +55,93 @@ export interface AvailabilityWindow {
   duration: number; // in minutes
 }
 
+// Condition weight configuration per spot
+export interface ConditionWeights {
+  swellHeight: number;    // 0-1
+  swellPeriod: number;    // 0-1
+  swellDirection: number; // 0-1
+  tideHeight: number;     // 0-1
+  windSpeed: number;      // 0-1
+  windDirection: number;  // 0-1
+  preferredTide: 'any' | 'low' | 'mid' | 'high' | 'incoming' | 'outgoing';
+  notes?: string;
+}
+
+export const DEFAULT_CONDITION_WEIGHTS: ConditionWeights = {
+  swellHeight: 0.8,
+  swellPeriod: 0.7,
+  swellDirection: 0.9,
+  tideHeight: 0.5,
+  windSpeed: 0.7,
+  windDirection: 0.6,
+  preferredTide: 'any',
+};
+
+// Weight presets for common spot types
+export const WEIGHT_PRESETS: Record<string, { label: string; weights: Partial<ConditionWeights> }> = {
+  allAround: {
+    label: "All-around",
+    weights: { swellHeight: 0.8, swellPeriod: 0.7, swellDirection: 0.9, tideHeight: 0.5, windSpeed: 0.7, windDirection: 0.6, preferredTide: 'any' },
+  },
+  reefBreak: {
+    label: "Reef break",
+    weights: { swellHeight: 0.7, swellPeriod: 0.9, swellDirection: 1.0, tideHeight: 0.9, windSpeed: 0.8, windDirection: 0.7, preferredTide: 'low' },
+  },
+  beachBreak: {
+    label: "Beach break",
+    weights: { swellHeight: 0.9, swellPeriod: 0.6, swellDirection: 0.7, tideHeight: 0.4, windSpeed: 0.9, windDirection: 0.7, preferredTide: 'any' },
+  },
+  pointBreak: {
+    label: "Point break",
+    weights: { swellHeight: 0.7, swellPeriod: 0.8, swellDirection: 1.0, tideHeight: 0.6, windSpeed: 0.7, windDirection: 0.8, preferredTide: 'mid' },
+  },
+};
+
+// Per-variable match detail
+export interface MatchDetails {
+  swellHeight: number | null;    // 0-1 similarity
+  swellPeriod: number | null;
+  swellDirection: number | null;
+  tideHeight: number | null;
+  windSpeed: number | null;
+  windDirection: number | null;
+  coverage: number;              // fraction of variables that were non-null
+  ratingBoost: number;           // multiplier from session rating
+  forecastConfidence: number;    // decay factor from days out
+}
+
 // Prediction types
 export interface ConditionMatch {
   sessionId: string;
   sessionDate: Date;
   rating: number;
   spotName: string;
-  matchScore: number; // 0-100
-  matchingFactors: {
-    waveHeight: boolean;
-    swellDirection: boolean;
-    swellPeriod: boolean;
-    windSpeed: boolean;
+  matchScore: number; // 0-100 raw similarity
+  effectiveScore: number; // after rating boost + forecast confidence
+  matchDetails: MatchDetails;
+}
+
+export type TimeWindow = 'dawn' | 'midday' | 'afternoon';
+
+export interface SpotAlertResponse {
+  id: string;
+  spotId: string;
+  spotName: string;
+  forecastHour: Date;
+  timeWindow: TimeWindow;
+  matchScore: number;
+  confidenceScore: number;
+  effectiveScore: number;
+  matchedSession: {
+    id: string;
+    date: Date;
+    rating: number;
+    notes: string | null;
+    photoUrl: string | null;
   };
+  matchDetails: MatchDetails;
+  forecastSnapshot: MarineConditions;
+  status: 'active' | 'dismissed' | 'expired' | 'confirmed';
 }
 
 export interface SurfPrediction {

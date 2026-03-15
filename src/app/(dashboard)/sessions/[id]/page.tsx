@@ -10,6 +10,7 @@ import { ConditionsTimeline } from "@/components/sessions/ConditionsTimeline";
 import { toast } from "sonner";
 import { formatFullDate, formatTime } from "@/lib/utils/date";
 import { MarineConditions, SurfSessionWithConditions } from "@/types";
+import { SessionEditDialog } from "@/components/sessions/SessionEditDialog";
 
 export default function SessionDetailPage() {
   const params = useParams();
@@ -17,7 +18,9 @@ export default function SessionDetailPage() {
   const [session, setSession] = useState<SurfSessionWithConditions | null>(null);
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -37,6 +40,24 @@ export default function SessionDetailPage() {
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [menuOpen]);
+
+  const photoCount = session?.photos?.length || (session?.photoUrl ? 1 : 0);
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, [lightboxOpen]);
+
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setLightboxOpen(false);
+      if (e.key === "ArrowLeft") setActivePhotoIndex((prev) => (prev - 1 + photoCount) % photoCount);
+      if (e.key === "ArrowRight") setActivePhotoIndex((prev) => (prev + 1) % photoCount);
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [lightboxOpen, photoCount]);
 
   async function fetchSession(id: string) {
     try {
@@ -162,7 +183,16 @@ export default function SessionDetailPage() {
           {menuOpen && (
             <div className="absolute right-0 mt-1 w-40 rounded-md border border-border bg-popover shadow-lg z-50">
               <button
-                className="w-full px-3 py-2 text-sm text-left text-destructive hover:bg-muted rounded-md"
+                className="w-full px-3 py-2 text-sm text-left hover:bg-muted rounded-t-md"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setEditOpen(true);
+                }}
+              >
+                Edit session
+              </button>
+              <button
+                className="w-full px-3 py-2 text-sm text-left text-destructive hover:bg-muted rounded-b-md"
                 onClick={() => {
                   setMenuOpen(false);
                   handleDelete();
@@ -187,21 +217,24 @@ export default function SessionDetailPage() {
           return (
             <div className="space-y-2">
               {/* Main photo */}
-              <div className="relative -mx-4 sm:mx-0 sm:rounded-2xl overflow-hidden">
+              <div
+                className="relative -mx-4 sm:mx-0 sm:rounded-2xl overflow-hidden cursor-pointer group"
+                onClick={() => setLightboxOpen(true)}
+              >
                 <img
                   src={allPhotos[activePhotoIndex]?.photoUrl}
                   alt="Session photo"
                   className="w-full h-[320px] sm:h-[400px] object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-8">
-                  <h1 className="text-2xl sm:text-4xl font-bold text-white">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-5">
+                  <h1 className="text-lg sm:text-2xl font-semibold text-white">
                     {session.spot?.name || "Session"}
                   </h1>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
-                    <span className="text-sm sm:text-base text-white/70">{formatFullDate(session.date)}</span>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1">
+                    <span className="text-xs sm:text-sm text-white/70">{formatFullDate(session.date)}</span>
                     <span className="text-white/30 hidden sm:inline">|</span>
-                    <span className="text-sm sm:text-base text-white/70">
+                    <span className="text-xs sm:text-sm text-white/70">
                       {formatTime(session.startTime)}
                       {session.endTime && ` - ${formatTime(session.endTime)}`}
                     </span>
@@ -209,7 +242,7 @@ export default function SessionDetailPage() {
                       {Array.from({ length: 5 }).map((_, i) => (
                         <svg
                           key={i}
-                          className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${
+                          className={`w-3 h-3 ${
                             i < session.rating ? "text-yellow-400" : "text-white/20"
                           }`}
                           fill="currentColor"
@@ -222,11 +255,18 @@ export default function SessionDetailPage() {
                   </div>
                 </div>
 
+                {/* Expand hint */}
+                <div className="absolute top-3 left-3 bg-black/50 rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+                  </svg>
+                </div>
+
                 {/* Navigation arrows for multi-photo */}
                 {allPhotos.length > 1 && (
                   <>
                     <button
-                      onClick={() => setActivePhotoIndex((prev) => (prev - 1 + allPhotos.length) % allPhotos.length)}
+                      onClick={(e) => { e.stopPropagation(); setActivePhotoIndex((prev) => (prev - 1 + allPhotos.length) % allPhotos.length); }}
                       className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/40 rounded-full flex items-center justify-center hover:bg-black/60 transition-colors"
                     >
                       <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -234,14 +274,13 @@ export default function SessionDetailPage() {
                       </svg>
                     </button>
                     <button
-                      onClick={() => setActivePhotoIndex((prev) => (prev + 1) % allPhotos.length)}
+                      onClick={(e) => { e.stopPropagation(); setActivePhotoIndex((prev) => (prev + 1) % allPhotos.length); }}
                       className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/40 rounded-full flex items-center justify-center hover:bg-black/60 transition-colors"
                     >
                       <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     </button>
-                    {/* Dot indicators */}
                     <div className="absolute top-3 right-3 bg-black/50 rounded-full px-2 py-0.5 text-xs text-white">
                       {activePhotoIndex + 1} / {allPhotos.length}
                     </div>
@@ -251,15 +290,15 @@ export default function SessionDetailPage() {
 
               {/* Thumbnail strip for multi-photo */}
               {allPhotos.length > 1 && (
-                <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
+                <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
                   {allPhotos.map((photo, idx) => (
                     <button
                       key={photo.id}
                       onClick={() => setActivePhotoIndex(idx)}
-                      className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden transition-all ${
+                      className={`flex-shrink-0 w-11 h-11 rounded-md overflow-hidden transition-all ${
                         idx === activePhotoIndex
                           ? "ring-2 ring-primary opacity-100"
-                          : "opacity-60 hover:opacity-90"
+                          : "opacity-50 hover:opacity-80"
                       }`}
                     >
                       <img
@@ -269,6 +308,54 @@ export default function SessionDetailPage() {
                       />
                     </button>
                   ))}
+                </div>
+              )}
+
+              {/* Lightbox */}
+              {lightboxOpen && (
+                <div
+                  className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+                  onClick={() => setLightboxOpen(false)}
+                >
+                  <button
+                    className="absolute top-4 right-4 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors z-10"
+                    onClick={() => setLightboxOpen(false)}
+                  >
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+
+                  <img
+                    src={allPhotos[activePhotoIndex]?.photoUrl}
+                    alt="Session photo"
+                    className="max-h-[90vh] max-w-[95vw] object-contain"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+
+                  {allPhotos.length > 1 && (
+                    <>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setActivePhotoIndex((prev) => (prev - 1 + allPhotos.length) % allPhotos.length); }}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
+                      >
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setActivePhotoIndex((prev) => (prev + 1) % allPhotos.length); }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
+                      >
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/60 rounded-full px-3 py-1 text-sm text-white">
+                        {activePhotoIndex + 1} / {allPhotos.length}
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -317,6 +404,14 @@ export default function SessionDetailPage() {
 
       {/* Conditions Timeline Charts */}
       <ConditionsTimeline sessionId={session.id} />
+
+      {/* Edit Dialog */}
+      <SessionEditDialog
+        session={session}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onSaved={(updated) => setSession(updated)}
+      />
     </div>
   );
 }

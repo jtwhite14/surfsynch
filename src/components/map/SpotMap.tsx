@@ -21,6 +21,8 @@ interface SpotMapProps {
   };
   /** Extra padding (px) passed to flyTo so the spot centers in the visible area */
   flyToPadding?: { top?: number; bottom?: number; left?: number; right?: number };
+  /** Set of spot IDs that have active alerts */
+  alertSpotIds?: Set<string>;
 }
 
 const DEFAULT_VIEW_STATE = {
@@ -41,6 +43,7 @@ export default function SpotMap({
   newSpotMarker,
   initialViewState = DEFAULT_VIEW_STATE,
   flyToPadding,
+  alertSpotIds,
 }: SpotMapProps) {
   const mapRef = useRef<MapRef>(null);
   const [viewState, setViewState] = useState(initialViewState);
@@ -192,7 +195,7 @@ export default function SpotMap({
               flyToSpot(spot);
             }}
           >
-            <SpotMarker spot={spot} isSelected={selectedSpotId === spot.id} />
+            <SpotMarker spot={spot} isSelected={selectedSpotId === spot.id} hasAlert={alertSpotIds?.has(spot.id)} />
           </Marker>
         );
       })}

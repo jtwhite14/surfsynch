@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { SpotConditions } from "@/components/spots/SpotConditions";
+import { SpotAlertCard } from "@/components/alerts/SpotAlertCard";
 import type { SurfSpot } from "@/lib/db/schema";
 import type { SurfSessionWithConditions } from "@/types";
 
@@ -59,6 +60,9 @@ export default function DashboardPage() {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [isDeletingSpot, setIsDeletingSpot] = useState(false);
   const [showAllSessions, setShowAllSessions] = useState(false);
+  const [alertSpotIds, setAlertSpotIds] = useState<Set<string>>(new Set());
+  const [alertSummaries, setAlertSummaries] = useState<Array<{ spotId: string; spotName: string; effectiveScore: number; forecastHour: string; timeWindow: string; conditions: string }>>([]);
+  const [panelTab, setPanelTab] = useState<"sessions" | "alerts">("sessions");
 
   const handleStartAddSpot = () => {
     setSelectedSpot(null);
@@ -199,6 +203,45 @@ export default function DashboardPage() {
         if (locationData.latitude && locationData.longitude) {
           setHomeLocation({ latitude: locationData.latitude, longitude: locationData.longitude });
         }
+
+        // Fetch alert status for each spot (fire-and-forget, non-blocking)
+        const spotsList = spotsData.spots || [];
+        if (spotsList.length > 0) {
+          Promise.all(
+            spotsList.map((s: SurfSpot) =>
+              fetch(`/api/spots/${s.id}/alerts`)
+                .then(r => r.ok ? r.json() : { alerts: [] })
+                .then(data => ({ spot: s, alerts: data.alerts || [] }))
+                .catch(() => ({ spot: s, alerts: [] }))
+            )
+          ).then(results => {
+            const ids = new Set<string>();
+            const summaries: typeof alertSummaries = [];
+            for (const { spot, alerts } of results) {
+              if (alerts.length > 0) {
+                ids.add(spot.id);
+                const best = alerts[0]; // Already sorted by effectiveScore
+                const snapshot = best.forecastSnapshot;
+                const waveHeight = snapshot?.primarySwellHeight != null
+                  ? `${(snapshot.primarySwellHeight * 3.28084).toFixed(0)}ft`
+                  : '';
+                const period = snapshot?.primarySwellPeriod != null
+                  ? `@ ${snapshot.primarySwellPeriod.toFixed(0)}s`
+                  : '';
+                summaries.push({
+                  spotId: spot.id,
+                  spotName: spot.name,
+                  effectiveScore: Math.round(best.effectiveScore),
+                  forecastHour: best.forecastHour,
+                  timeWindow: best.timeWindow,
+                  conditions: [waveHeight, period].filter(Boolean).join(' '),
+                });
+              }
+            }
+            setAlertSpotIds(ids);
+            setAlertSummaries(summaries.sort((a, b) => b.effectiveScore - a.effectiveScore));
+          });
+        }
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -260,6 +303,7 @@ export default function DashboardPage() {
         selectedSpotId={selectedSpot?.id}
         newSpotMarker={newSpotMarker}
         flyToPadding={flyToPadding}
+        alertSpotIds={alertSpotIds}
         {...(initialViewState && { initialViewState })}
       />
 
@@ -409,8 +453,11 @@ export default function DashboardPage() {
                 </div>
               </div>
             ) : (
-              /* Default view: Recent Sessions + Conditions */
+              /* Default view: Alerts + Recent Sessions + Conditions */
               <>
+                {/* Session match alerts */}
+                <SpotAlertCard spotId={selectedSpot.id} sessionCount={spotSessions.length} />
+
                 {/* Recent Sessions section */}
                 {loadingSpotSessions ? (
                   <div className="flex justify-center py-4">
@@ -497,19 +544,43 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Recent Sessions panel — visible when no spot is selected */}
-      {!selectedSpot && addSpotMode === "idle" && sessions.length > 0 && (
+      {/* Recent Sessions / Alerts panel — visible when no spot is selected */}
+      {!selectedSpot && addSpotMode === "idle" && (sessions.length > 0 || alertSummaries.length > 0) && (
         <div className="absolute bottom-4 left-4 right-4 sm:bottom-auto sm:right-auto sm:top-4 z-10 sm:w-80">
           <div className="rounded-lg border bg-background/90 backdrop-blur-sm shadow-lg overflow-hidden">
-            <button
-              onClick={() => setPanelOpen((o) => !o)}
-              className="flex items-center justify-between w-full px-4 py-3 text-sm font-medium hover:bg-accent/50 transition-colors"
-            >
-              <span>Recent Sessions</span>
-              {panelOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
-            </button>
-            {panelOpen && (
-              <div className="border-t max-h-80 overflow-y-auto">
+            {/* Tab header */}
+            <div className="flex items-center border-b">
+              <button
+                onClick={() => { setPanelTab("sessions"); setPanelOpen(true); }}
+                className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
+                  panelTab === "sessions" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Sessions
+              </button>
+              <button
+                onClick={() => { setPanelTab("alerts"); setPanelOpen(true); }}
+                className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors relative ${
+                  panelTab === "alerts" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Alerts
+                {alertSummaries.length > 0 && (
+                  <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary/20 text-primary text-[10px] font-bold">
+                    {alertSummaries.length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setPanelOpen((o) => !o)}
+                className="px-3 py-2.5 hover:bg-accent/50 transition-colors"
+              >
+                {panelOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+              </button>
+            </div>
+
+            {panelOpen && panelTab === "sessions" && (
+              <div className="max-h-80 overflow-y-auto">
                 {sessions.map((session) => {
                   const photo = session.photos?.[0]?.photoUrl || session.photoUrl;
                   return (
@@ -548,6 +619,45 @@ export default function DashboardPage() {
                     </Link>
                   );
                 })}
+              </div>
+            )}
+
+            {panelOpen && panelTab === "alerts" && (
+              <div className="max-h-80 overflow-y-auto">
+                {alertSummaries.length === 0 ? (
+                  <div className="px-4 py-6 text-center">
+                    <p className="text-sm text-muted-foreground">No upcoming alerts</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Alerts appear when forecast conditions match your best sessions.
+                    </p>
+                  </div>
+                ) : (
+                  alertSummaries.map((summary) => {
+                    const forecastDate = new Date(summary.forecastHour);
+                    const now = new Date();
+                    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    const target = new Date(forecastDate.getFullYear(), forecastDate.getMonth(), forecastDate.getDate());
+                    const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                    const dayLabel = diffDays === 0 ? "Today" : diffDays === 1 ? "Tomorrow" : forecastDate.toLocaleDateString("en-US", { weekday: "short" });
+
+                    const spot = spots.find(s => s.id === summary.spotId);
+                    return (
+                      <button
+                        key={summary.spotId}
+                        onClick={() => spot && handleSpotClick(spot)}
+                        className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/50 transition-colors w-full text-left"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{summary.spotName}</p>
+                          <p className="text-xs text-muted-foreground">{dayLabel} {summary.conditions}</p>
+                        </div>
+                        <span className="text-xs font-medium text-primary shrink-0">
+                          {summary.effectiveScore}%
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
               </div>
             )}
           </div>
