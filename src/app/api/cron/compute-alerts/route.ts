@@ -106,7 +106,10 @@ async function processSpot(spot: {
   }>;
 }): Promise<number> {
   const sessionsWithConditions = spot.surfSessions.filter(s => s.conditions);
-  if (sessionsWithConditions.length === 0) return 0;
+  if (sessionsWithConditions.length === 0) {
+    console.log(`[alerts] Spot "${spot.id}": skipped — no sessions with conditions`);
+    return 0;
+  }
 
   // Fetch or use cached forecast
   const forecastResult = await getOrFetchForecast(
@@ -114,7 +117,10 @@ async function processSpot(spot: {
     parseFloat(spot.latitude),
     parseFloat(spot.longitude)
   );
-  if (!forecastResult || forecastResult.hourly.length === 0) return 0;
+  if (!forecastResult || forecastResult.hourly.length === 0) {
+    console.log(`[alerts] Spot "${spot.id}": skipped — no forecast data`);
+    return 0;
+  }
   const { hourly: forecast, utcOffsetSeconds } = forecastResult;
 
   // Parse sessions for matching
@@ -130,13 +136,25 @@ async function processSpot(spot: {
   // Parse forecast hours
   const forecastHours: ForecastHour[] = forecast.map(fh => ({
     time: fh.time,
-    timestamp: fh.timestamp,
+    timestamp: new Date(fh.timestamp),
     conditions: parseForecastConditions(fh),
     fullConditions: fh as MarineConditions,
   }));
 
   const weights: ConditionWeights = (spot.conditionWeights as ConditionWeights) ?? DEFAULT_CONDITION_WEIGHTS;
+
+  console.log(`[alerts] Spot "${spot.id}": ${sessionsWithConditions.length} sessions (ratings: ${sessionsWithConditions.map(s => s.rating).join(',')}), ${forecastHours.length} forecast hours, utcOffset=${utcOffsetSeconds}`);
+
   const alerts = generateAlerts(forecastHours, sessionsForMatching, weights, 70, new Date(), utcOffsetSeconds);
+
+  if (alerts.length > 0) {
+    console.log(`[alerts] Spot "${spot.id}": generated ${alerts.length} alerts, top score=${alerts[0].effectiveScore.toFixed(1)}`);
+  } else {
+    // Log the best score that didn't meet threshold for debugging
+    const debugAlerts = generateAlerts(forecastHours, sessionsForMatching, weights, 0, new Date(), utcOffsetSeconds);
+    const bestScore = debugAlerts.length > 0 ? debugAlerts[0].effectiveScore.toFixed(1) : 'N/A';
+    console.log(`[alerts] Spot "${spot.id}": 0 alerts (best score below threshold: ${bestScore}/70)`);
+  }
 
   // Expire old alerts that are no longer relevant
   const existingAlerts = await db.query.spotAlerts.findMany({
