@@ -22,6 +22,7 @@ import {
 import { toast } from "sonner";
 import { SpotConditions } from "@/components/spots/SpotConditions";
 import { SpotAlertCard } from "@/components/alerts/SpotAlertCard";
+import { AlertTuning } from "@/components/alerts/AlertTuning";
 import type { SurfSpot } from "@/lib/db/schema";
 import type { SurfSessionWithConditions } from "@/types";
 
@@ -457,6 +458,9 @@ export default function DashboardPage() {
               <>
                 {/* Session match alerts */}
                 <SpotAlertCard spotId={selectedSpot.id} sessionCount={spotSessions.length} />
+
+                {/* Alert Tuning */}
+                <AlertTuning spotId={selectedSpot.id} />
 
                 {/* Recent Sessions section */}
                 {loadingSpotSessions ? (

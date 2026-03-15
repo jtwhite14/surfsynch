@@ -13,7 +13,7 @@ import { AvailabilityWindow, CalendarEvent } from "@/types";
 import { addDays } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { MapPin, Phone, Search } from "lucide-react";
-import { AlertTuning } from "@/components/alerts/AlertTuning";
+
 
 const SpotMap = dynamic(() => import("@/components/map/SpotMap"), { ssr: false });
 
@@ -352,9 +352,6 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
-
-      {/* Alert Tuning */}
-      <AlertTuning />
 
       {/* Calendar Integration */}
       <Card>

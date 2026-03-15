@@ -1,16 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { ConditionWeights, DEFAULT_CONDITION_WEIGHTS, WEIGHT_PRESETS } from "@/types";
-import type { SurfSpot } from "@/lib/db/schema";
 
-export function AlertTuning() {
-  const [spots, setSpots] = useState<SurfSpot[]>([]);
-  const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null);
+export function AlertTuning({ spotId }: { spotId: string }) {
   const [weights, setWeights] = useState<ConditionWeights>(DEFAULT_CONDITION_WEIGHTS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -18,30 +14,17 @@ export function AlertTuning() {
   const [activePreset, setActivePreset] = useState<string | null>("allAround");
 
   useEffect(() => {
-    fetch("/api/spots")
-      .then(r => r.ok ? r.json() : { spots: [] })
-      .then(data => {
-        setSpots(data.spots || []);
-        if (data.spots?.length > 0) {
-          setSelectedSpotId(data.spots[0].id);
-        }
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    if (!selectedSpotId) return;
-    fetch(`/api/spots/${selectedSpotId}/weights`)
+    setLoading(true);
+    fetch(`/api/spots/${spotId}/weights`)
       .then(r => r.ok ? r.json() : { weights: DEFAULT_CONDITION_WEIGHTS })
       .then(data => {
         setWeights(data.weights);
-        // Detect preset
         const preset = detectPreset(data.weights);
         setActivePreset(preset);
       })
-      .catch(console.error);
-  }, [selectedSpotId]);
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [spotId]);
 
   function detectPreset(w: ConditionWeights): string | null {
     for (const [key, preset] of Object.entries(WEIGHT_PRESETS)) {
@@ -69,16 +52,13 @@ export function AlertTuning() {
     };
     setWeights(newWeights);
     setActivePreset(presetKey);
-    if (selectedSpotId) {
-      await saveWeights(newWeights);
-    }
+    await saveWeights(newWeights);
   }
 
   async function saveWeights(w: ConditionWeights = weights) {
-    if (!selectedSpotId) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/spots/${selectedSpotId}/weights`, {
+      const res = await fetch(`/api/spots/${spotId}/weights`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(w),
@@ -110,44 +90,12 @@ export function AlertTuning() {
   }
 
   if (loading) return null;
-  if (spots.length === 0) return null;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <TrendingUp className="size-5" />
-          Alert Tuning
-        </CardTitle>
-        <CardDescription>
-          Configure which conditions matter most for each spot.
-          This helps match forecasts to your best sessions.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Spot selector */}
-        {spots.length > 1 && (
-          <div>
-            <label className="text-sm font-medium mb-1.5 block">Spot</label>
-            <select
-              value={selectedSpotId || ""}
-              onChange={e => setSelectedSpotId(e.target.value)}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-            >
-              {spots.map(spot => (
-                <option key={spot.id} value={spot.id}>{spot.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
+    <div className="space-y-3">
+      <h3 className="text-sm font-semibold">Alert Tuning</h3>
 
-        {spots.length === 1 && (
-          <p className="text-sm text-muted-foreground">
-            Configuring alerts for <span className="font-medium text-foreground">{spots[0].name}</span>
-          </p>
-        )}
-
-        {/* Presets */}
+      {/* Presets */}
         <div>
           <label className="text-sm font-medium mb-1.5 block">Spot type</label>
           <div className="grid grid-cols-2 gap-2">
@@ -210,8 +158,7 @@ export function AlertTuning() {
             </div>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
   );
 }
 
