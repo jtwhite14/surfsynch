@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { HourlyForecast } from "@/types";
-import { WaveChart } from "./charts/WaveChart";
-import { SwellChart } from "./charts/SwellChart";
+import { SurfChart } from "./charts/SurfChart";
 import { WindChart } from "./charts/WindChart";
 import { TideChart } from "./charts/TideChart";
 import { WeatherStrip } from "./charts/WeatherStrip";
@@ -68,8 +67,7 @@ export function ConditionsTimeline({ sessionId }: ConditionsTimelineProps) {
         </p>
       </div>
       <div className="space-y-3">
-        <WaveChart data={timeline} sessionIndex={sessionHourIndex} />
-        <SwellChart data={timeline} sessionIndex={sessionHourIndex} />
+        <SurfChart data={timeline} sessionIndex={sessionHourIndex} />
         <TideChart data={timeline} sessionIndex={sessionHourIndex} />
         <WindChart data={timeline} sessionIndex={sessionHourIndex} />
         <WeatherStrip data={timeline} sessionIndex={sessionHourIndex} />
