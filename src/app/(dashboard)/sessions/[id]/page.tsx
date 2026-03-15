@@ -75,7 +75,8 @@ export default function SessionDetailPage() {
     return null;
   }
 
-  const c = session.conditions;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const c: any = session.conditions;
   const conditions: MarineConditions | null = c
     ? ({
         waveHeight: c.waveHeight ? parseFloat(c.waveHeight) : null,
