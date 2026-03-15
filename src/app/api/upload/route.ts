@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "crypto";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { db, sessionPhotos, surfSessions } from "@/lib/db";
+import { eq, and } from "drizzle-orm";
 import { createClient } from "@supabase/supabase-js";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -48,20 +51,50 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate unique filename
+    // Convert file to buffer
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Compute SHA-256 hash
+    const fileHash = createHash("sha256").update(buffer).digest("hex");
+
+    // Check for duplicate in existing sessions
+    const existingDupe = await db
+      .select({
+        photoUrl: sessionPhotos.photoUrl,
+        sessionId: surfSessions.id,
+        sessionDate: surfSessions.date,
+      })
+      .from(sessionPhotos)
+      .innerJoin(surfSessions, eq(sessionPhotos.sessionId, surfSessions.id))
+      .where(
+        and(
+          eq(sessionPhotos.fileHash, fileHash),
+          eq(surfSessions.userId, session.user.id)
+        )
+      )
+      .limit(1);
+
+    if (existingDupe.length > 0) {
+      // Duplicate found — return existing URL without re-uploading
+      return NextResponse.json({
+        url: existingDupe[0].photoUrl,
+        fileHash,
+        isDuplicate: true,
+        existingSession: {
+          id: existingDupe[0].sessionId,
+          date: existingDupe[0].sessionDate,
+        },
+      });
+    }
+
+    // No duplicate — upload to Supabase
     const ext = file.name.split(".").pop() || "jpg";
     const filename = `${session.user.id}/${Date.now()}-${Math.random()
       .toString(36)
       .slice(2)}.${ext}`;
 
-    // Convert file to buffer
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    // Get Supabase client
     const supabase = getSupabaseClient();
-
-    // Upload to Supabase Storage
     const { data, error } = await supabase.storage
       .from("session-photos")
       .upload(filename, buffer, {
@@ -77,12 +110,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get public URL
     const {
       data: { publicUrl },
     } = supabase.storage.from("session-photos").getPublicUrl(data.path);
 
-    return NextResponse.json({ url: publicUrl });
+    return NextResponse.json({ url: publicUrl, fileHash, isDuplicate: false });
   } catch (error) {
     console.error("Error uploading file:", error);
     return NextResponse.json(

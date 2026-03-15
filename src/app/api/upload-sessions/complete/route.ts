@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import {
   db,
   uploadSessions,
+  uploadPhotos,
   surfSessions,
   sessionConditions,
   sessionPhotos,
@@ -86,12 +87,17 @@ export async function POST(request: NextRequest) {
 
       sessionIds.push(newSession.id);
 
-      // Insert into session_photos table
+      // Insert into session_photos table, propagating fileHash from upload_photos
       if (s.photoUrl) {
+        const uploadPhoto = await db.query.uploadPhotos.findFirst({
+          where: eq(uploadPhotos.photoUrl, s.photoUrl),
+        });
+
         await db.insert(sessionPhotos).values({
           sessionId: newSession.id,
           photoUrl: s.photoUrl,
           sortOrder: 0,
+          fileHash: uploadPhoto?.fileHash ?? null,
         });
       }
 

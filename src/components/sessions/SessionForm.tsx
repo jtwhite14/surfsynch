@@ -85,6 +85,8 @@ interface UploadedPhoto {
   id: string;
   photoUrl: string;
   exifData: { dateTime?: string; latitude?: number; longitude?: number } | null;
+  isDuplicate?: boolean;
+  existingSessionDate?: string;
 }
 
 interface SessionDraft {
@@ -210,9 +212,13 @@ export function SessionForm({ spots: initialSpots, defaultSpotId, surfboards: in
           if (uploadedPhotos && uploadedPhotos.length > 0) {
             setPhotos((prev) => {
               const existingIds = new Set(prev.map((p) => p.id));
-              const newPhotos = uploadedPhotos.filter(
-                (p: UploadedPhoto) => !existingIds.has(p.id)
-              );
+              const newPhotos = uploadedPhotos
+                .filter((p: UploadedPhoto) => !existingIds.has(p.id))
+                .map((p: UploadedPhoto & { existingSessionDate?: string }) => ({
+                  ...p,
+                  isDuplicate: p.isDuplicate || false,
+                  existingSessionDate: p.existingSessionDate || undefined,
+                }));
               return [...prev, ...newPhotos];
             });
           }
@@ -260,7 +266,13 @@ export function SessionForm({ spots: initialSpots, defaultSpotId, surfboards: in
             const data = await res.json();
             setPhotos((prev) => [
               ...prev,
-              { id: data.photo.id, photoUrl: data.photo.photoUrl, exifData },
+              {
+                id: data.photo.id,
+                photoUrl: data.photo.photoUrl,
+                exifData,
+                isDuplicate: data.photo.isDuplicate || false,
+                existingSessionDate: data.photo.existingSession?.date || undefined,
+              },
             ]);
             continue;
           }
@@ -320,6 +332,12 @@ export function SessionForm({ spots: initialSpots, defaultSpotId, surfboards: in
     setPhotos([]);
     setPhotoGroups([]);
   };
+
+  const handleRemoveDuplicates = () => {
+    setPhotos((prev) => prev.filter((p) => !p.isDuplicate));
+  };
+
+  const hasDuplicates = photos.some((p) => p.isDuplicate);
 
   const updateDraft = (index: number, updates: Partial<SessionDraft>) => {
     setSessionDrafts((prev) => {
@@ -526,24 +544,32 @@ export function SessionForm({ spots: initialSpots, defaultSpotId, surfboards: in
                           </Badge>
                         </div>
                         <div className="flex gap-1.5 overflow-x-auto pb-1">
-                          {group.photos.map((photo) => (
-                            <div key={photo.id} className="relative flex-shrink-0 w-16 h-16 rounded-md overflow-hidden group">
-                              <img
-                                src={photo.photoUrl}
-                                alt="Session photo"
-                                className="w-full h-full object-cover"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => handleRemovePhoto(photo.id)}
-                                className="absolute top-0.5 right-0.5 w-5 h-5 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                              >
-                                <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                              </button>
-                            </div>
-                          ))}
+                          {group.photos.map((photo) => {
+                            const photoMeta = photos.find((p) => p.id === photo.id);
+                            return (
+                              <div key={photo.id} className="relative flex-shrink-0 w-16 h-16 rounded-md overflow-hidden group">
+                                <img
+                                  src={photo.photoUrl}
+                                  alt="Session photo"
+                                  className="w-full h-full object-cover"
+                                />
+                                {photoMeta?.isDuplicate && (
+                                  <div className="absolute bottom-0 left-0 right-0 bg-amber-500/90 text-[9px] text-white text-center font-medium py-0.5">
+                                    Duplicate
+                                  </div>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemovePhoto(photo.id)}
+                                  className="absolute top-0.5 right-0.5 w-5 h-5 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     ))}
@@ -559,6 +585,13 @@ export function SessionForm({ spots: initialSpots, defaultSpotId, surfboards: in
                             alt="Session photo"
                             className="w-full h-full object-cover"
                           />
+                          {photo.isDuplicate && (
+                            <div className="absolute bottom-0 left-0 right-0 bg-amber-500/90 text-[10px] text-white text-center font-medium py-0.5">
+                              Duplicate{photo.existingSessionDate && (
+                                <> &middot; {format(new Date(photo.existingSessionDate), "MMM d")}</>
+                              )}
+                            </div>
+                          )}
                           <button
                             type="button"
                             onClick={() => handleRemovePhoto(photo.id)}
@@ -590,15 +623,28 @@ export function SessionForm({ spots: initialSpots, defaultSpotId, surfboards: in
 
                 {/* Add more + clear */}
                 <div className="flex justify-between items-center">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleClearAllPhotos}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    Clear all
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleClearAllPhotos}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      Clear all
+                    </Button>
+                    {hasDuplicates && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleRemoveDuplicates}
+                        className="text-amber-600 hover:text-amber-700"
+                      >
+                        Remove duplicates
+                      </Button>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary">
                       {photos.length} photo{photos.length !== 1 ? "s" : ""}
@@ -797,6 +843,18 @@ export function SessionForm({ spots: initialSpots, defaultSpotId, surfboards: in
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Duplicate warning */}
+            {hasPhotos && draft.photoUrls.length > 0 &&
+              draft.photoUrls.every((url) =>
+                photos.find((p) => p.photoUrl === url)?.isDuplicate
+              ) && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-3">
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  All photos in this session already exist in a previous session. You can still save it if intended.
+                </p>
               </div>
             )}
 

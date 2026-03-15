@@ -238,8 +238,11 @@ export const sessionPhotos = pgTable("session_photos", {
     .references(() => surfSessions.id, { onDelete: "cascade" }),
   photoUrl: text("photo_url").notNull(),
   sortOrder: integer("sort_order").notNull().default(0),
+  fileHash: text("file_hash"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("idx_session_photos_file_hash").on(table.fileHash),
+]);
 
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
@@ -372,6 +375,10 @@ export const uploadPhotos = pgTable("upload_photos", {
     .references(() => uploadSessions.id, { onDelete: "cascade" }),
   photoUrl: text("photo_url").notNull(),
   exifData: jsonb("exif_data"), // { dateTime, latitude, longitude }
+  fileHash: text("file_hash"),
+  isDuplicate: boolean("is_duplicate").default(false).notNull(),
+  existingSessionId: uuid("existing_session_id"),
+  existingSessionDate: timestamp("existing_session_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

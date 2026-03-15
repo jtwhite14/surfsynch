@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, surfSessions, sessionConditions, surfSpots, sessionPhotos, surfboards, wetsuits } from "@/lib/db";
-import { eq, and, desc } from "drizzle-orm";
+import { db, surfSessions, sessionConditions, surfSpots, sessionPhotos, surfboards, wetsuits, uploadPhotos } from "@/lib/db";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { fetchHistoricalConditions, fetchCurrentConditions } from "@/lib/api/open-meteo";
 
@@ -147,11 +147,24 @@ export async function POST(request: NextRequest) {
     }
 
     if (allPhotoUrls.length > 0) {
+      // Look up file hashes from upload_photos by URL
+      const uploadPhotoRecords = await db
+        .select({ photoUrl: uploadPhotos.photoUrl, fileHash: uploadPhotos.fileHash })
+        .from(uploadPhotos)
+        .where(inArray(uploadPhotos.photoUrl, allPhotoUrls));
+
+      const hashByUrl = new Map(
+        uploadPhotoRecords
+          .filter((r) => r.fileHash)
+          .map((r) => [r.photoUrl, r.fileHash])
+      );
+
       await db.insert(sessionPhotos).values(
         allPhotoUrls.map((url, index) => ({
           sessionId: newSession.id,
           photoUrl: url,
           sortOrder: index,
+          fileHash: hashByUrl.get(url) ?? null,
         }))
       );
     }

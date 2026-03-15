@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, uploadSessions, uploadPhotos } from "@/lib/db";
+import { createHash } from "crypto";
+import { db, uploadSessions, uploadPhotos, sessionPhotos, surfSessions } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { createClient } from "@supabase/supabase-js";
 
@@ -90,37 +91,12 @@ export async function POST(request: NextRequest) {
         .where(eq(uploadSessions.id, uploadSession.id));
     }
 
-    // Generate unique filename under the user's directory
-    const ext = file.name.split(".").pop() || "jpg";
-    const filename = `${uploadSession.userId}/${Date.now()}-${Math.random()
-      .toString(36)
-      .slice(2)}.${ext}`;
-
     // Convert file to buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Upload to Supabase Storage
-    const supabase = getSupabaseClient();
-    const { data, error } = await supabase.storage
-      .from("session-photos")
-      .upload(filename, buffer, {
-        contentType: file.type,
-        upsert: false,
-      });
-
-    if (error) {
-      console.error("Upload error:", error);
-      return NextResponse.json(
-        { error: "Failed to upload file" },
-        { status: 500 }
-      );
-    }
-
-    // Get public URL
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from("session-photos").getPublicUrl(data.path);
+    // Compute SHA-256 hash of the file content
+    const fileHash = createHash("sha256").update(buffer).digest("hex");
 
     // Parse exif data if provided
     let parsedExifData = null;
@@ -132,13 +108,80 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Insert photo record
+    // Check for duplicate in existing sessions
+    const existingDupe = await db
+      .select({
+        photoUrl: sessionPhotos.photoUrl,
+        sessionId: surfSessions.id,
+        sessionDate: surfSessions.date,
+      })
+      .from(sessionPhotos)
+      .innerJoin(surfSessions, eq(sessionPhotos.sessionId, surfSessions.id))
+      .where(
+        and(
+          eq(sessionPhotos.fileHash, fileHash),
+          eq(surfSessions.userId, uploadSession.userId)
+        )
+      )
+      .limit(1);
+
+    // Check for duplicate in current upload batch
+    const batchDupe = await db.query.uploadPhotos.findFirst({
+      where: and(
+        eq(uploadPhotos.fileHash, fileHash),
+        eq(uploadPhotos.uploadSessionId, uploadSession.id)
+      ),
+    });
+
+    const isDuplicate = existingDupe.length > 0 || !!batchDupe;
+    let publicUrl: string;
+
+    if (existingDupe.length > 0) {
+      // Duplicate exists in a previous session — skip Supabase upload
+      publicUrl = existingDupe[0].photoUrl;
+    } else if (batchDupe) {
+      // Duplicate exists in current upload batch — skip Supabase upload
+      publicUrl = batchDupe.photoUrl;
+    } else {
+      // No duplicate — upload to Supabase
+      const ext = file.name.split(".").pop() || "jpg";
+      const filename = `${uploadSession.userId}/${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2)}.${ext}`;
+
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase.storage
+        .from("session-photos")
+        .upload(filename, buffer, {
+          contentType: file.type,
+          upsert: false,
+        });
+
+      if (error) {
+        console.error("Upload error:", error);
+        return NextResponse.json(
+          { error: "Failed to upload file" },
+          { status: 500 }
+        );
+      }
+
+      const {
+        data: { publicUrl: url },
+      } = supabase.storage.from("session-photos").getPublicUrl(data.path);
+      publicUrl = url;
+    }
+
+    // Insert upload photo record with hash + duplicate metadata
     const [photo] = await db
       .insert(uploadPhotos)
       .values({
         uploadSessionId: uploadSession.id,
         photoUrl: publicUrl,
         exifData: parsedExifData,
+        fileHash,
+        isDuplicate,
+        existingSessionId: existingDupe[0]?.sessionId ?? null,
+        existingSessionDate: existingDupe[0]?.sessionDate ?? null,
       })
       .returning();
 
@@ -147,6 +190,10 @@ export async function POST(request: NextRequest) {
         photo: {
           id: photo.id,
           photoUrl: photo.photoUrl,
+          isDuplicate,
+          existingSession: existingDupe[0]
+            ? { id: existingDupe[0].sessionId, date: existingDupe[0].sessionDate }
+            : null,
         },
       },
       { status: 201 }
