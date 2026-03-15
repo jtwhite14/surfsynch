@@ -66,14 +66,13 @@ export function EditSpotDialog({ spot, open, onOpenChange, onSave }: EditSpotDia
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl w-[calc(100vw-3rem)] max-h-[calc(100vh-3rem)] overflow-y-auto">
+      <DialogContent className="sm:max-w-xl w-[calc(100vw-2rem)] max-h-[calc(100vh-3rem)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Spot</DialogTitle>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-6">
-          {/* Left column: Name, description, spot type */}
-          <div className="space-y-4">
+        <div className="space-y-5">
+          <div className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="edit-spot-name">Name</Label>
               <Input
@@ -91,19 +90,15 @@ export function EditSpotDialog({ spot, open, onOpenChange, onSave }: EditSpotDia
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Optional notes about this spot…"
-                rows={3}
+                rows={2}
               />
             </div>
           </div>
 
-          {/* Right column: Alert tuning with follow-up questions */}
-          <div className="border-t md:border-t-0 md:border-l md:pl-6 pt-4 md:pt-0">
-            <h3 className="text-sm font-semibold mb-3">Alert Tuning</h3>
-            <AlertTuningSection spotId={spot.id} onSave={handleWeightsSave} />
-          </div>
+          <AlertTuningSection spotId={spot.id} onSave={handleWeightsSave} />
         </div>
 
-        <div className="flex gap-2 pt-2 border-t mt-2">
+        <div className="flex gap-2 pt-2 border-t mt-1">
           <Button variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>

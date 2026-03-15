@@ -1,16 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { ChevronRight } from "lucide-react";
 import {
   ConditionWeights,
   DEFAULT_CONDITION_WEIGHTS,
   WEIGHT_PRESETS,
   CardinalDirection,
-  PreferredWaveSize,
-  PreferredSwellPeriod,
-  PreferredWind,
 } from "@/types";
 import { SwellExposurePicker } from "@/components/spots/SwellExposurePicker";
 
@@ -119,36 +116,53 @@ export function AlertTuningSection({ spotId, onSave }: AlertTuningSectionProps) 
     debouncedSave(newWeights);
   }
 
-  function handleMultiPreferenceChange<K extends keyof ConditionWeights>(
-    key: K,
+  function handleSmartPreferenceChange(
+    preferenceKey: "preferredWaveSize" | "preferredSwellPeriod" | "preferredWind" | "preferredTide",
+    importanceKey: "swellHeight" | "swellPeriod" | "windSpeed" | "tideHeight",
     value: string,
   ) {
-    // "unknown" means "I don't know" — clear all selections
-    if (value === "unknown") {
-      const newWeights = { ...weights, [key]: undefined };
-      setWeights(newWeights);
-      setActivePreset(null);
-      debouncedSave(newWeights);
-      return;
-    }
-    const current = (weights[key] as string[] | undefined) ?? [];
+    const current = (weights[preferenceKey] as string[] | undefined) ?? [];
     const updated = current.includes(value)
       ? current.filter(v => v !== value)
       : [...current, value];
-    const newWeights = { ...weights, [key]: updated.length > 0 ? updated : undefined };
+    const newWeights: ConditionWeights = {
+      ...weights,
+      [preferenceKey]: updated.length > 0 ? updated : undefined,
+    };
+
+    // Auto-bump importance from "I don't know" (0) to "Somewhat" (0.6)
+    // when user is actively selecting preferences
+    if (updated.length > 0 && weights[importanceKey] === 0) {
+      (newWeights as unknown as Record<string, unknown>)[importanceKey] = 0.6;
+    }
+
     setWeights(newWeights);
     setActivePreset(null);
     debouncedSave(newWeights);
   }
 
   function handleExposureChange(directions: CardinalDirection[]) {
-    const newWeights = { ...weights, swellExposure: directions.length > 0 ? directions : undefined };
+    const newWeights: ConditionWeights = {
+      ...weights,
+      swellExposure: directions.length > 0 ? directions : undefined,
+    };
+    // Auto-bump swell direction importance
+    if (directions.length > 0 && weights.swellDirection === 0) {
+      newWeights.swellDirection = 0.6;
+    }
     setWeights(newWeights);
     debouncedSave(newWeights);
   }
 
   function handleWindDirectionChange(directions: CardinalDirection[]) {
-    const newWeights = { ...weights, preferredWindDirections: directions.length > 0 ? directions : undefined };
+    const newWeights: ConditionWeights = {
+      ...weights,
+      preferredWindDirections: directions.length > 0 ? directions : undefined,
+    };
+    // Auto-bump wind direction importance
+    if (directions.length > 0 && weights.windDirection === 0) {
+      newWeights.windDirection = 0.6;
+    }
     setWeights(newWeights);
     debouncedSave(newWeights);
   }
@@ -172,39 +186,38 @@ export function AlertTuningSection({ spotId, onSave }: AlertTuningSectionProps) 
   const tideLevel = weightToLevel(weights.tideHeight);
 
   return (
-    <div className="space-y-4">
-      {/* Presets */}
+    <div className="space-y-3">
+      {/* Spot type presets */}
       <div>
-        <label className="text-sm font-medium mb-1.5 block">Spot type</label>
-        <div className="grid grid-cols-2 gap-2">
+        <label className="text-xs font-medium text-muted-foreground mb-2 block">Spot type</label>
+        <div className="flex flex-wrap gap-1.5">
           {Object.entries(WEIGHT_PRESETS).map(([key, preset]) => (
-            <Button
+            <button
               key={key}
-              variant={activePreset === key ? "default" : "outline"}
-              size="sm"
               onClick={() => applyPreset(key)}
-              className="text-xs"
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                activePreset === key
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-accent"
+              }`}
             >
               {preset.label}
-            </Button>
+            </button>
           ))}
         </div>
       </div>
 
-      {/* Customize weights */}
-      <div className="space-y-0.5">
-        <label className="text-sm font-medium block mb-1">Customize</label>
-
+      <div className="space-y-2">
         {/* Swell section */}
-        <div className="space-y-0.5">
-          <WeightRow
-            label="How important is wave size?"
-            value={swellHeightLevel}
-            onChange={level => handleWeightChange("swellHeight", level)}
-          />
-          <FollowUpRow
-            visible={swellHeightLevel >= 1 && swellHeightLevel !== 3}
-            label="What size waves?"
+        <TuningSection
+          title="Swell"
+          summary={getSwellSummary(weights)}
+          defaultOpen
+        >
+          <PreferenceGroup
+            label="Wave size"
+            importance={swellHeightLevel}
+            onImportanceChange={(level) => handleWeightChange("swellHeight", level)}
             options={[
               { value: "small", label: "Small (<3ft)" },
               { value: "medium", label: "Medium (3–6ft)" },
@@ -212,53 +225,41 @@ export function AlertTuningSection({ spotId, onSave }: AlertTuningSectionProps) 
               { value: "xl", label: "XL (10ft+)" },
             ]}
             selected={weights.preferredWaveSize ?? []}
-            onChange={(v) => handleMultiPreferenceChange("preferredWaveSize", v)}
+            onSelect={(v) => handleSmartPreferenceChange("preferredWaveSize", "swellHeight", v)}
           />
-
-          <WeightRow
-            label="How important is swell period?"
-            value={swellPeriodLevel}
-            onChange={level => handleWeightChange("swellPeriod", level)}
-          />
-          <FollowUpRow
-            visible={swellPeriodLevel >= 1 && swellPeriodLevel !== 3}
-            label="What swell period?"
+          <PreferenceGroup
+            label="Period"
+            importance={swellPeriodLevel}
+            onImportanceChange={(level) => handleWeightChange("swellPeriod", level)}
             options={[
               { value: "short", label: "Short (<8s)" },
               { value: "medium", label: "Medium (8–12s)" },
               { value: "long", label: "Long (12s+)" },
             ]}
             selected={weights.preferredSwellPeriod ?? []}
-            onChange={(v) => handleMultiPreferenceChange("preferredSwellPeriod", v)}
+            onSelect={(v) => handleSmartPreferenceChange("preferredSwellPeriod", "swellPeriod", v)}
           />
-
-          <WeightRow
-            label="How important is swell direction?"
-            value={swellDirLevel}
-            onChange={level => handleWeightChange("swellDirection", level)}
-          />
-          {swellDirLevel >= 1 && swellDirLevel !== 3 && (
-            <div className="pl-1 pb-1">
-              <SwellExposurePicker
-                value={weights.swellExposure ?? []}
-                onChange={handleExposureChange}
-              />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">Exposure</span>
+              <ImportanceDots value={swellDirLevel} onChange={(level) => handleWeightChange("swellDirection", level)} />
             </div>
-          )}
-        </div>
-
-        <div className="border-t my-2" />
+            <SwellExposurePicker
+              value={weights.swellExposure ?? []}
+              onChange={handleExposureChange}
+            />
+          </div>
+        </TuningSection>
 
         {/* Wind section */}
-        <div className="space-y-0.5">
-          <WeightRow
-            label="How important is wind?"
-            value={windSpeedLevel}
-            onChange={level => handleWeightChange("windSpeed", level)}
-          />
-          <FollowUpRow
-            visible={windSpeedLevel >= 1 && windSpeedLevel !== 3}
-            label="What wind conditions?"
+        <TuningSection
+          title="Wind"
+          summary={getWindSummary(weights)}
+        >
+          <PreferenceGroup
+            label="Conditions"
+            importance={windSpeedLevel}
+            onImportanceChange={(level) => handleWeightChange("windSpeed", level)}
             options={[
               { value: "glassy", label: "Light/Glassy" },
               { value: "offshore", label: "Offshore" },
@@ -266,36 +267,29 @@ export function AlertTuningSection({ spotId, onSave }: AlertTuningSectionProps) 
               { value: "onshore", label: "Onshore" },
             ]}
             selected={weights.preferredWind ?? []}
-            onChange={(v) => handleMultiPreferenceChange("preferredWind", v)}
+            onSelect={(v) => handleSmartPreferenceChange("preferredWind", "windSpeed", v)}
           />
-
-          <WeightRow
-            label="How important is wind direction?"
-            value={windDirLevel}
-            onChange={level => handleWeightChange("windDirection", level)}
-          />
-          {windDirLevel >= 1 && windDirLevel !== 3 && (
-            <div className="pl-1 pb-1">
-              <WindDirectionPicker
-                value={weights.preferredWindDirections ?? []}
-                onChange={handleWindDirectionChange}
-              />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">Direction</span>
+              <ImportanceDots value={windDirLevel} onChange={(level) => handleWeightChange("windDirection", level)} />
             </div>
-          )}
-        </div>
-
-        <div className="border-t my-2" />
+            <WindDirectionPicker
+              value={weights.preferredWindDirections ?? []}
+              onChange={handleWindDirectionChange}
+            />
+          </div>
+        </TuningSection>
 
         {/* Tide section */}
-        <div className="space-y-0.5">
-          <WeightRow
-            label="How important is tide?"
-            value={tideLevel}
-            onChange={level => handleWeightChange("tideHeight", level)}
-          />
-          <FollowUpRow
-            visible={tideLevel >= 1 && tideLevel !== 3}
-            label="Best tide?"
+        <TuningSection
+          title="Tide"
+          summary={getTideSummary(weights)}
+        >
+          <PreferenceGroup
+            label="Preferred tide"
+            importance={tideLevel}
+            onImportanceChange={(level) => handleWeightChange("tideHeight", level)}
             options={[
               { value: "low", label: "Low" },
               { value: "mid", label: "Mid" },
@@ -304,102 +298,173 @@ export function AlertTuningSection({ spotId, onSave }: AlertTuningSectionProps) 
               { value: "outgoing", label: "Outgoing" },
             ]}
             selected={weights.preferredTide ?? []}
-            onChange={(v) => handleMultiPreferenceChange("preferredTide", v)}
+            onSelect={(v) => handleSmartPreferenceChange("preferredTide", "tideHeight", v)}
           />
-        </div>
+        </TuningSection>
       </div>
     </div>
   );
 }
 
-function WeightRow({
-  label,
-  value,
-  onChange,
+// --- Sub-components ---
+
+function TuningSection({
+  title,
+  summary,
+  children,
+  defaultOpen = false,
 }: {
-  label: string;
-  value: number;
-  onChange: (level: number) => void;
+  title: string;
+  summary: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
 }) {
-  const levels: { text: string; level: number }[] = [
-    { text: "Not very", level: 0 },
-    { text: "Somewhat", level: 1 },
-    { text: "Very", level: 2 },
-    { text: "I don't know", level: 3 },
-  ];
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="pt-2">
-      <label className="text-xs text-muted-foreground mb-1 block">{label}</label>
-      <div className="flex gap-1">
-        {levels.map(({ text, level }) => (
-          <button
-            key={level}
-            onClick={() => onChange(level)}
-            className={`flex-1 px-1.5 py-1 rounded text-xs font-medium transition-colors ${
-              value === level
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground hover:bg-accent"
-            }`}
-          >
-            {text}
-          </button>
-        ))}
-      </div>
+    <div className="rounded-lg border overflow-hidden">
+      <button
+        className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-muted/50 transition-colors"
+        onClick={() => setOpen(!open)}
+      >
+        <ChevronRight className={`size-3.5 text-muted-foreground shrink-0 transition-transform duration-200 ${open ? 'rotate-90' : ''}`} />
+        <span className="text-sm font-medium flex-1">{title}</span>
+        {!open && (
+          <span className="text-xs text-muted-foreground truncate max-w-[250px]">{summary}</span>
+        )}
+      </button>
+      {open && (
+        <div className="px-3 pb-3 pt-1 space-y-3 border-t">
+          {children}
+        </div>
+      )}
     </div>
   );
 }
 
-function FollowUpRow({
-  visible,
+function PreferenceGroup({
   label,
+  importance,
+  onImportanceChange,
   options,
   selected,
-  onChange,
+  onSelect,
 }: {
-  visible: boolean;
   label: string;
+  importance: number;
+  onImportanceChange: (level: number) => void;
   options: { value: string; label: string }[];
   selected: string[];
-  onChange: (value: string) => void;
+  onSelect: (value: string) => void;
 }) {
-  const isIdk = selected.length === 0;
   return (
-    <div
-      className={`overflow-hidden transition-all duration-200 ${
-        visible ? "max-h-24 opacity-100" : "max-h-0 opacity-0"
-      }`}
-    >
-      <div className="pl-1 pt-1 pb-1">
-        <label className="text-xs text-muted-foreground mb-1 block">{label}</label>
-        <div className="flex flex-wrap gap-1">
-          <button
-            onClick={() => onChange("unknown")}
-            className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
-              isIdk
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground hover:bg-accent"
-            }`}
-          >
-            I don&apos;t know
-          </button>
-          {options.map((opt) => (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+        <ImportanceDots value={importance} onChange={onImportanceChange} />
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map(opt => {
+          const isSelected = selected.includes(opt.value);
+          return (
             <button
               key={opt.value}
-              onClick={() => onChange(opt.value)}
-              className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
-                selected.includes(opt.value)
+              onClick={() => onSelect(opt.value)}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                isSelected
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:bg-accent"
               }`}
             >
               {opt.label}
             </button>
-          ))}
-        </div>
+          );
+        })}
       </div>
     </div>
   );
 }
+
+function ImportanceDots({
+  value,
+  onChange,
+}: {
+  value: number; // 0 = low, 1 = medium, 2 = high, 3 = any/idk
+  onChange: (level: number) => void;
+}) {
+  const labels = ["Low", "Med", "High", "Any"];
+
+  function cycle(e: React.MouseEvent) {
+    e.stopPropagation();
+    // Cycle: any(3) → low(0) → med(1) → high(2) → any(3)
+    if (value === 3) onChange(0);
+    else if (value === 2) onChange(3);
+    else onChange(value + 1);
+  }
+
+  return (
+    <button
+      onClick={cycle}
+      className="flex items-center gap-1.5 px-1.5 py-0.5 rounded hover:bg-muted/50 transition-colors"
+      title={`Priority: ${labels[value]} — click to change`}
+    >
+      <span className="text-[10px] text-muted-foreground leading-none">{labels[value]}</span>
+      <div className="flex gap-[3px]">
+        {[0, 1, 2].map(i => (
+          <div
+            key={i}
+            className={`w-[5px] h-[5px] rounded-full transition-colors ${
+              value === 3
+                ? "bg-muted-foreground/25"
+                : i <= value
+                  ? "bg-primary"
+                  : "bg-muted-foreground/25"
+            }`}
+          />
+        ))}
+      </div>
+    </button>
+  );
+}
+
+// --- Summary helpers ---
+
+function getSwellSummary(weights: ConditionWeights): string {
+  const parts: string[] = [];
+  if (weights.preferredWaveSize?.length) {
+    const labels: Record<string, string> = { small: "Small", medium: "Med", large: "Large", xl: "XL" };
+    parts.push(weights.preferredWaveSize.map(s => labels[s] || s).join(", "));
+  }
+  if (weights.preferredSwellPeriod?.length) {
+    const labels: Record<string, string> = { short: "Short", medium: "Med", long: "Long" };
+    parts.push(weights.preferredSwellPeriod.map(s => labels[s] || s).join(", "));
+  }
+  if (weights.swellExposure?.length) {
+    parts.push(weights.swellExposure.join(", "));
+  }
+  return parts.length > 0 ? parts.join(" · ") : "No preference";
+}
+
+function getWindSummary(weights: ConditionWeights): string {
+  const parts: string[] = [];
+  if (weights.preferredWind?.length) {
+    const labels: Record<string, string> = { glassy: "Glassy", offshore: "Offshore", "cross-offshore": "Cross-off", onshore: "Onshore" };
+    parts.push(weights.preferredWind.map(s => labels[s] || s).join(", "));
+  }
+  if (weights.preferredWindDirections?.length) {
+    parts.push(weights.preferredWindDirections.join(", "));
+  }
+  return parts.length > 0 ? parts.join(" · ") : "No preference";
+}
+
+function getTideSummary(weights: ConditionWeights): string {
+  if (weights.preferredTide?.length) {
+    const labels: Record<string, string> = { low: "Low", mid: "Mid", high: "High", incoming: "Incoming", outgoing: "Outgoing" };
+    return weights.preferredTide.map(s => labels[s] || s).join(", ");
+  }
+  return "No preference";
+}
+
+// --- Compass pickers ---
 
 const WIND_DIRECTIONS: { dir: CardinalDirection; row: number; col: number }[] = [
   { dir: "NW", row: 0, col: 0 },
@@ -428,42 +493,37 @@ function WindDirectionPicker({
   }
 
   return (
-    <div>
-      <p className="text-xs text-muted-foreground mb-2">
-        Select preferred wind directions.
-      </p>
-      <div className="grid grid-cols-3 gap-1.5 w-fit">
-        {[0, 1, 2].map(row =>
-          [0, 1, 2].map(col => {
-            const entry = WIND_DIRECTIONS.find(d => d.row === row && d.col === col);
-            if (!entry) {
-              return (
-                <div
-                  key={`${row}-${col}`}
-                  className="w-10 h-10 flex items-center justify-center"
-                >
-                  <div className="w-2 h-2 rounded-full bg-muted-foreground/30" />
-                </div>
-              );
-            }
-            const selected = value.includes(entry.dir);
+    <div className="grid grid-cols-3 gap-1.5 w-fit">
+      {[0, 1, 2].map(row =>
+        [0, 1, 2].map(col => {
+          const entry = WIND_DIRECTIONS.find(d => d.row === row && d.col === col);
+          if (!entry) {
             return (
-              <button
-                key={entry.dir}
-                type="button"
-                onClick={() => toggle(entry.dir)}
-                className={`w-10 h-10 rounded text-xs font-medium transition-colors ${
-                  selected
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-accent"
-                }`}
+              <div
+                key={`${row}-${col}`}
+                className="w-9 h-9 flex items-center justify-center"
               >
-                {entry.dir}
-              </button>
+                <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30" />
+              </div>
             );
-          })
-        )}
-      </div>
+          }
+          const selected = value.includes(entry.dir);
+          return (
+            <button
+              key={entry.dir}
+              type="button"
+              onClick={() => toggle(entry.dir)}
+              className={`w-9 h-9 rounded text-xs font-medium transition-colors ${
+                selected
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-accent"
+              }`}
+            >
+              {entry.dir}
+            </button>
+          );
+        })
+      )}
     </div>
   );
 }
