@@ -2,11 +2,25 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { ConditionWeights, DEFAULT_CONDITION_WEIGHTS, WEIGHT_PRESETS } from "@/types";
 
-export function AlertTuning({ spotId }: { spotId: string }) {
+interface AlertTuningProps {
+  spotId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave?: (weights: ConditionWeights) => void;
+}
+
+export function AlertTuningDialog({ spotId, open, onOpenChange, onSave }: AlertTuningProps) {
   const [weights, setWeights] = useState<ConditionWeights>(DEFAULT_CONDITION_WEIGHTS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -14,6 +28,7 @@ export function AlertTuning({ spotId }: { spotId: string }) {
   const [activePreset, setActivePreset] = useState<string | null>("allAround");
 
   useEffect(() => {
+    if (!open) return;
     setLoading(true);
     fetch(`/api/spots/${spotId}/weights`)
       .then(r => r.ok ? r.json() : { weights: DEFAULT_CONDITION_WEIGHTS })
@@ -24,7 +39,7 @@ export function AlertTuning({ spotId }: { spotId: string }) {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [spotId]);
+  }, [spotId, open]);
 
   function detectPreset(w: ConditionWeights): string | null {
     for (const [key, preset] of Object.entries(WEIGHT_PRESETS)) {
@@ -64,6 +79,7 @@ export function AlertTuning({ spotId }: { spotId: string }) {
         body: JSON.stringify(w),
       });
       if (!res.ok) throw new Error();
+      onSave?.(w);
     } catch {
       toast.error("Failed to save alert preferences");
     } finally {
@@ -78,7 +94,6 @@ export function AlertTuning({ spotId }: { spotId: string }) {
     const newWeights = { ...weights, [key]: value };
     setWeights(newWeights);
     setActivePreset(null);
-    // Debounce saves so rapid clicks don't fire many PUT requests
     clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => saveWeights(newWeights), 700);
   }
@@ -89,76 +104,87 @@ export function AlertTuning({ spotId }: { spotId: string }) {
     return 2;
   }
 
-  if (loading) return null;
-
   return (
-    <div className="space-y-3">
-      <h3 className="text-sm font-semibold">Alert Tuning</h3>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Alert Tuning</DialogTitle>
+          <DialogDescription>
+            Set how conditions are weighted when matching alerts for this spot.
+          </DialogDescription>
+        </DialogHeader>
 
-      {/* Presets */}
-        <div>
-          <label className="text-sm font-medium mb-1.5 block">Spot type</label>
-          <div className="grid grid-cols-2 gap-2">
-            {Object.entries(WEIGHT_PRESETS).map(([key, preset]) => (
-              <Button
-                key={key}
-                variant={activePreset === key ? "default" : "outline"}
-                size="sm"
-                onClick={() => applyPreset(key)}
-                className="text-xs"
-              >
-                {preset.label}
-              </Button>
-            ))}
-          </div>
-        </div>
-
-        {/* Advanced customization */}
-        <div>
-          <button
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Customize
-            {showAdvanced ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-          </button>
-
-          {showAdvanced && (
-            <div className="mt-3 space-y-3">
-              <WeightRow
-                label="How important is wave size?"
-                value={weightToLevel(weights.swellHeight)}
-                onChange={level => handleWeightChange("swellHeight", level)}
-              />
-              <WeightRow
-                label="How important is swell period?"
-                value={weightToLevel(weights.swellPeriod)}
-                onChange={level => handleWeightChange("swellPeriod", level)}
-              />
-              <WeightRow
-                label="How important is swell direction?"
-                value={weightToLevel(weights.swellDirection)}
-                onChange={level => handleWeightChange("swellDirection", level)}
-              />
-              <WeightRow
-                label="How important is wind?"
-                value={weightToLevel(weights.windSpeed)}
-                onChange={level => handleWeightChange("windSpeed", level)}
-              />
-              <WeightRow
-                label="How important is wind direction?"
-                value={weightToLevel(weights.windDirection)}
-                onChange={level => handleWeightChange("windDirection", level)}
-              />
-              <WeightRow
-                label="How important is tide?"
-                value={weightToLevel(weights.tideHeight)}
-                onChange={level => handleWeightChange("tideHeight", level)}
-              />
+        {loading ? (
+          <div className="py-4 text-center text-sm text-muted-foreground">Loading…</div>
+        ) : (
+          <div className="space-y-4">
+            {/* Presets */}
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Spot type</label>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries(WEIGHT_PRESETS).map(([key, preset]) => (
+                  <Button
+                    key={key}
+                    variant={activePreset === key ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => applyPreset(key)}
+                    className="text-xs"
+                  >
+                    {preset.label}
+                  </Button>
+                ))}
+              </div>
             </div>
-          )}
-        </div>
-      </div>
+
+            {/* Advanced customization */}
+            <div>
+              <button
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Customize
+                {showAdvanced ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+              </button>
+
+              {showAdvanced && (
+                <div className="mt-3 space-y-3">
+                  <WeightRow
+                    label="How important is wave size?"
+                    value={weightToLevel(weights.swellHeight)}
+                    onChange={level => handleWeightChange("swellHeight", level)}
+                  />
+                  <WeightRow
+                    label="How important is swell period?"
+                    value={weightToLevel(weights.swellPeriod)}
+                    onChange={level => handleWeightChange("swellPeriod", level)}
+                  />
+                  <WeightRow
+                    label="How important is swell direction?"
+                    value={weightToLevel(weights.swellDirection)}
+                    onChange={level => handleWeightChange("swellDirection", level)}
+                  />
+                  <WeightRow
+                    label="How important is wind?"
+                    value={weightToLevel(weights.windSpeed)}
+                    onChange={level => handleWeightChange("windSpeed", level)}
+                  />
+                  <WeightRow
+                    label="How important is wind direction?"
+                    value={weightToLevel(weights.windDirection)}
+                    onChange={level => handleWeightChange("windDirection", level)}
+                  />
+                  <WeightRow
+                    label="How important is tide?"
+                    value={weightToLevel(weights.tideHeight)}
+                    onChange={level => handleWeightChange("tideHeight", level)}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -16,13 +16,21 @@ import {
   Plus,
   Loader2,
   X,
+  MoreHorizontal,
   Pencil,
   Trash2,
+  SlidersHorizontal,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { SpotConditions } from "@/components/spots/SpotConditions";
 import { SpotAlertCard } from "@/components/alerts/SpotAlertCard";
-import { AlertTuning } from "@/components/alerts/AlertTuning";
+import { AlertTuningDialog } from "@/components/alerts/AlertTuning";
 import type { SurfSpot } from "@/lib/db/schema";
 import type { SurfSessionWithConditions } from "@/types";
 
@@ -61,6 +69,7 @@ export default function DashboardPage() {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [isDeletingSpot, setIsDeletingSpot] = useState(false);
   const [showAllSessions, setShowAllSessions] = useState(false);
+  const [alertTuningOpen, setAlertTuningOpen] = useState(false);
   const [alertSpotIds, setAlertSpotIds] = useState<Set<string>>(new Set());
   const [alertSummaries, setAlertSummaries] = useState<Array<{ spotId: string; spotName: string; effectiveScore: number; forecastHour: string; timeWindow: string; conditions: string }>>([]);
   const [panelTab, setPanelTab] = useState<"sessions" | "alerts">("alerts");
@@ -328,6 +337,15 @@ export default function DashboardPage() {
                     placeholder="Description (optional)"
                     rows={2}
                   />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="w-full justify-start text-muted-foreground"
+                    onClick={() => setAlertTuningOpen(true)}
+                  >
+                    <SlidersHorizontal className="size-3.5 mr-2" />
+                    Alert Tuning
+                  </Button>
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline" onClick={() => setEditingSpot(false)}>
                       Cancel
@@ -355,27 +373,27 @@ export default function DashboardPage() {
             </div>
             <div className="flex items-center gap-1 shrink-0">
               {!editingSpot && (
-                <>
-                  <button
-                    onClick={handleStartEdit}
-                    className="rounded-md p-2 hover:bg-accent transition-colors"
-                    title="Edit spot"
-                  >
-                    <Pencil className="size-4" />
-                  </button>
-                  <button
-                    onClick={handleDeleteSpot}
-                    disabled={isDeletingSpot}
-                    className="rounded-md p-2 hover:bg-destructive/10 text-destructive transition-colors"
-                    title="Delete spot"
-                  >
-                    {isDeletingSpot ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="size-4" />
-                    )}
-                  </button>
-                </>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="rounded-md p-2 hover:bg-accent transition-colors">
+                      <MoreHorizontal className="size-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleStartEdit}>
+                      <Pencil className="size-3.5 mr-2" />
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setAlertTuningOpen(true)}>
+                      <SlidersHorizontal className="size-3.5 mr-2" />
+                      Alert Tuning
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleDeleteSpot} disabled={isDeletingSpot} className="text-destructive">
+                      <Trash2 className="size-3.5 mr-2" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
               <button
                 onClick={handleCloseSpotDetail}
@@ -459,8 +477,29 @@ export default function DashboardPage() {
                 {/* Session match alerts */}
                 <SpotAlertCard spotId={selectedSpot.id} sessionCount={spotSessions.length} />
 
-                {/* Alert Tuning */}
-                <AlertTuning spotId={selectedSpot.id} />
+                {/* Alert tuning nudge */}
+                {!selectedSpot.conditionWeights && (
+                  <button
+                    onClick={() => setAlertTuningOpen(true)}
+                    className="w-full rounded-lg border border-dashed border-muted-foreground/30 px-3 py-2.5 text-left hover:border-muted-foreground/50 transition-colors"
+                  >
+                    <p className="text-xs text-muted-foreground">
+                      Set your spot type to improve alert accuracy.{" "}
+                      <span className="text-primary font-medium">Tune alerts</span>
+                    </p>
+                  </button>
+                )}
+
+                {/* Alert Tuning Dialog */}
+                <AlertTuningDialog
+                  spotId={selectedSpot.id}
+                  open={alertTuningOpen}
+                  onOpenChange={setAlertTuningOpen}
+                  onSave={(weights) => {
+                    setSelectedSpot((prev) => prev ? { ...prev, conditionWeights: weights } : prev);
+                    setSpots((prev) => prev.map((s) => s.id === selectedSpot.id ? { ...s, conditionWeights: weights } : s));
+                  }}
+                />
 
                 {/* Recent Sessions section */}
                 {loadingSpotSessions ? (
