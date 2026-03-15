@@ -11,7 +11,7 @@ import {
 } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
-import { fetchHistoricalConditions } from "@/lib/api/open-meteo";
+import { fetchHistoricalConditions, fetchCurrentConditions } from "@/lib/api/open-meteo";
 
 const completeSchema = z.object({
   uploadSessionId: z.string().uuid(),
@@ -95,23 +95,23 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Try to fetch historical conditions
-      const conditionsPromises = [
-        fetchHistoricalConditions(
+      // Try to fetch conditions – historical first, then current as fallback
+      const sessionDate = new Date(s.startTime);
+      let conditions = await fetchHistoricalConditions(
+        parseFloat(spot.latitude),
+        parseFloat(spot.longitude),
+        sessionDate
+      );
+
+      // If historical fails (e.g. recent date not yet in archive), try current
+      if (!conditions) {
+        conditions = await fetchCurrentConditions(
           parseFloat(spot.latitude),
-          parseFloat(spot.longitude),
-          new Date(s.startTime)
-        ),
-      ];
+          parseFloat(spot.longitude)
+        );
+      }
 
-      const results = await Promise.allSettled(conditionsPromises);
-      const conditionResult = results[0];
-
-      if (
-        conditionResult.status === "fulfilled" &&
-        conditionResult.value
-      ) {
-        const conditions = conditionResult.value;
+      if (conditions) {
         await db.insert(sessionConditions).values({
           sessionId: newSession.id,
           waveHeight: conditions.waveHeight?.toString() || null,

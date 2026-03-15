@@ -1,6 +1,7 @@
 import { MarineConditions, HourlyForecast, ForecastData } from "@/types";
 
 const MARINE_API_BASE = "https://marine-api.open-meteo.com/v1/marine";
+const MARINE_ARCHIVE_API_BASE = "https://marine-archive-api.open-meteo.com/v1/marine";
 const HISTORICAL_API_BASE = "https://archive-api.open-meteo.com/v1/era5";
 
 // Marine API parameters for surf conditions
@@ -124,6 +125,15 @@ export async function fetchHistoricalConditions(
 ): Promise<MarineConditions | null> {
   const dateStr = date.toISOString().split("T")[0];
 
+  // Use archive APIs for old dates, forecast APIs for recent dates
+  const now = new Date();
+  const daysAgo = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+  const marineApiBase = daysAgo > 90 ? MARINE_ARCHIVE_API_BASE : MARINE_API_BASE;
+  // ERA5 archive has ~5 day lag; use forecast API for recent dates
+  const weatherApiBase = daysAgo <= 5
+    ? "https://api.open-meteo.com/v1/forecast"
+    : HISTORICAL_API_BASE;
+
   // Marine API with historical date range for wave/swell data
   const marineParams = new URLSearchParams({
     latitude: latitude.toString(),
@@ -134,12 +144,10 @@ export async function fetchHistoricalConditions(
     timezone: "auto",
   });
 
-  // ERA5 for weather data (wind, temp, pressure, etc.)
-  const weatherParams = new URLSearchParams({
+  // Weather data (wind, temp, pressure, etc.)
+  const weatherParamsObj: Record<string, string> = {
     latitude: latitude.toString(),
     longitude: longitude.toString(),
-    start_date: dateStr,
-    end_date: dateStr,
     hourly: [
       "wind_speed_10m",
       "wind_direction_10m",
@@ -153,12 +161,21 @@ export async function fetchHistoricalConditions(
       "visibility",
     ].join(","),
     timezone: "auto",
-  });
+  };
+  if (daysAgo <= 5) {
+    // Forecast API uses past_days to access recent history
+    weatherParamsObj.past_days = Math.max(daysAgo, 1).toString();
+    weatherParamsObj.forecast_days = "1";
+  } else {
+    weatherParamsObj.start_date = dateStr;
+    weatherParamsObj.end_date = dateStr;
+  }
+  const weatherParams = new URLSearchParams(weatherParamsObj);
 
   try {
     const [marineResponse, weatherResponse] = await Promise.all([
-      fetch(`${MARINE_API_BASE}?${marineParams}`),
-      fetch(`${HISTORICAL_API_BASE}?${weatherParams}`),
+      fetch(`${marineApiBase}?${marineParams}`),
+      fetch(`${weatherApiBase}?${weatherParams}`),
     ]);
 
     // We need at least one source to succeed
@@ -341,11 +358,17 @@ export async function fetchHourlyTimeline(
     timezone: "auto",
   });
 
-  const weatherParams = new URLSearchParams({
+  // Use archive APIs for old dates, forecast APIs for recent dates
+  const now = new Date();
+  const daysAgo = Math.floor((now.getTime() - sessionTime.getTime()) / (1000 * 60 * 60 * 24));
+  const marineApiBase = daysAgo > 90 ? MARINE_ARCHIVE_API_BASE : MARINE_API_BASE;
+  const weatherApiBase = daysAgo <= 5
+    ? "https://api.open-meteo.com/v1/forecast"
+    : HISTORICAL_API_BASE;
+
+  const weatherParamsObj: Record<string, string> = {
     latitude: latitude.toString(),
     longitude: longitude.toString(),
-    start_date: startDate,
-    end_date: endDate,
     hourly: [
       "wind_speed_10m",
       "wind_direction_10m",
@@ -359,11 +382,20 @@ export async function fetchHourlyTimeline(
       "visibility",
     ].join(","),
     timezone: "auto",
-  });
+  };
+  if (daysAgo <= 5) {
+    // Forecast API: use past_days to cover the 2-day range around the session
+    weatherParamsObj.past_days = Math.max(daysAgo + 1, 2).toString();
+    weatherParamsObj.forecast_days = "2";
+  } else {
+    weatherParamsObj.start_date = startDate;
+    weatherParamsObj.end_date = endDate;
+  }
+  const weatherParams = new URLSearchParams(weatherParamsObj);
 
   const [marineResponse, weatherResponse] = await Promise.all([
-    fetch(`${MARINE_API_BASE}?${marineParams}`),
-    fetch(`${HISTORICAL_API_BASE}?${weatherParams}`),
+    fetch(`${marineApiBase}?${marineParams}`),
+    fetch(`${weatherApiBase}?${weatherParams}`),
   ]);
 
   const marineData: OpenMeteoMarineResponse | null = marineResponse.ok
