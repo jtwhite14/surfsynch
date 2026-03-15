@@ -210,15 +210,6 @@ export function SurfChart({ data, sessionIndex }: SurfChartProps) {
 
           return (
             <div key={d.time} className="flex-1 flex flex-col items-center gap-1">
-              {/* Time */}
-              <span
-                className={`text-[10px] font-medium tabular-nums ${
-                  isSession ? "text-white/50" : "text-white/20"
-                }`}
-              >
-                {formatHour(d.time)}
-              </span>
-
               {/* Period */}
               <span
                 className={`text-[10px] tabular-nums font-medium ${
@@ -254,6 +245,15 @@ export function SurfChart({ data, sessionIndex }: SurfChartProps) {
                   {compass}
                 </span>
               )}
+
+              {/* Time */}
+              <span
+                className={`text-[10px] font-medium tabular-nums ${
+                  isSession ? "text-white/50" : "text-white/20"
+                }`}
+              >
+                {formatHour(d.time)}
+              </span>
             </div>
           );
         })}

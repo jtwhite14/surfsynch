@@ -754,6 +754,16 @@ export function SessionForm({ spots, defaultSpotId, surfboards = [], wetsuits = 
                   </Select>
                 </div>
 
+                {/* Equipment */}
+                <EquipmentSelect
+                  surfboards={surfboards}
+                  wetsuits={wetsuits}
+                  surfboardId={draft.surfboardId}
+                  wetsuitId={draft.wetsuitId}
+                  onSurfboardChange={(v) => updateDraft(idx, { surfboardId: v })}
+                  onWetsuitChange={(v) => updateDraft(idx, { wetsuitId: v })}
+                />
+
                 {/* Date */}
                 <div className="space-y-2">
                   <Label>Date</Label>
