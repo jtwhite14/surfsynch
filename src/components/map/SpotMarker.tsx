@@ -15,17 +15,17 @@ export default function SpotMarker({ spot, isSelected, hasAlert }: SpotMarkerPro
       {hasAlert && !isSelected && (
         <div className="absolute -top-0.5 -right-0.5 z-10">
           <div className="relative">
-            <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-primary motion-safe:animate-ping opacity-75" style={{ animationIterationCount: 3 }} />
-            <div className="w-2.5 h-2.5 rounded-full bg-primary border border-background" />
+            <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-red-500 motion-safe:animate-ping opacity-75" style={{ animationIterationCount: 3 }} />
+            <div className="w-2.5 h-2.5 rounded-full bg-red-500 border border-background" />
           </div>
         </div>
       )}
 
       {/* Marker */}
       <svg
-        className={`w-8 h-8 text-primary drop-shadow-lg transition-all duration-200 ease-in-out ${
-          isSelected ? "scale-125" : "hover:scale-110"
-        }`}
+        className={`w-8 h-8 drop-shadow-lg transition-all duration-200 ease-in-out ${
+          hasAlert ? "text-red-500" : "text-primary"
+        } ${isSelected ? "scale-125" : "hover:scale-110"}`}
         fill="currentColor"
         viewBox="0 0 20 20"
       >
