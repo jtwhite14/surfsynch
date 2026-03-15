@@ -32,6 +32,7 @@ import {
 import { toast } from "sonner";
 import { SpotConditions } from "@/components/spots/SpotConditions";
 import { SpotAlertCard } from "@/components/alerts/SpotAlertCard";
+import { ForecastScores } from "@/components/alerts/ForecastScores";
 import { EditSpotDialog } from "@/components/spots/EditSpotDialog";
 import type { SurfSpot } from "@/lib/db/schema";
 import type { SurfSessionWithConditions } from "@/types";
@@ -536,6 +537,9 @@ export default function DashboardPage() {
                     </p>
                   </button>
                 )}
+
+                {/* 5-day forecast score breakdown */}
+                <ForecastScores spotId={selectedSpot.id} />
 
                 {/* Edit Spot Dialog */}
                 <EditSpotDialog

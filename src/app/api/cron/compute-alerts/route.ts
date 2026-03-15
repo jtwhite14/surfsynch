@@ -94,6 +94,7 @@ async function processSpot(spot: {
     rating: number;
     notes: string | null;
     photoUrl: string | null;
+    ignored: boolean;
     photos?: Array<{ photoUrl: string }>;
     conditions: {
       primarySwellHeight: string | null;
@@ -106,7 +107,7 @@ async function processSpot(spot: {
     } | null;
   }>;
 }): Promise<number> {
-  const sessionsWithConditions = spot.surfSessions.filter(s => s.conditions);
+  const sessionsWithConditions = spot.surfSessions.filter(s => s.conditions && !s.ignored);
   if (sessionsWithConditions.length === 0) {
     console.log(`[alerts] Spot "${spot.id}": skipped — no sessions with conditions`);
     return 0;
