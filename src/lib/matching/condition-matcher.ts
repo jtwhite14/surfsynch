@@ -185,15 +185,24 @@ const SWELL_PERIOD_RANGES: Record<PreferredSwellPeriod, [number, number]> = {
   long: [12, Infinity],
 };
 
-function getPreferenceMultiplier(value: number | null, pref: string | undefined, ranges: Record<string, [number, number]>): number {
-  if (value == null || !pref || !(pref in ranges)) return 1.0;
-  const [min, max] = ranges[pref];
-  return (value >= min && value < max) ? PREF_BONUS : PREF_PENALTY;
+function getPreferenceMultiplier(value: number | null, pref: string | string[] | undefined, ranges: Record<string, [number, number]>): number {
+  if (value == null || !pref) return 1.0;
+  const prefs = Array.isArray(pref) ? pref : [pref];
+  if (prefs.length === 0) return 1.0;
+  for (const p of prefs) {
+    if (p in ranges) {
+      const [min, max] = ranges[p];
+      if (value >= min && value < max) return PREF_BONUS;
+    }
+  }
+  return PREF_PENALTY;
 }
 
-function getWindPreferenceMultiplier(windSpeed: number | null, pref: PreferredWind | undefined): number {
+function getWindPreferenceMultiplier(windSpeed: number | null, pref: PreferredWind | PreferredWind[] | undefined): number {
   if (windSpeed == null || !pref) return 1.0;
-  if (pref === 'glassy') {
+  const prefs = Array.isArray(pref) ? pref : [pref];
+  if (prefs.length === 0) return 1.0;
+  if (prefs.includes('glassy')) {
     if (windSpeed < 10) return PREF_BONUS;
     if (windSpeed > 15) return PREF_PENALTY;
     return 1.0;

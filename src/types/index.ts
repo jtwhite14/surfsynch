@@ -80,10 +80,11 @@ export interface ConditionWeights {
   windDirection: number;  // 0-1
   waveEnergy: number;     // 0-1
   preferredTide: 'any' | 'low' | 'mid' | 'high' | 'incoming' | 'outgoing';
-  preferredWaveSize?: PreferredWaveSize;
-  preferredSwellPeriod?: PreferredSwellPeriod;
-  preferredWind?: PreferredWind;
+  preferredWaveSize?: PreferredWaveSize[];
+  preferredSwellPeriod?: PreferredSwellPeriod[];
+  preferredWind?: PreferredWind[];
   swellExposure?: CardinalDirection[];
+  preferredWindDirections?: CardinalDirection[];
   notes?: string;
 }
 
@@ -106,15 +107,15 @@ export const WEIGHT_PRESETS: Record<string, { label: string; weights: Partial<Co
   },
   reefBreak: {
     label: "Reef break",
-    weights: { swellHeight: 0.7, swellPeriod: 0.9, swellDirection: 1.0, tideHeight: 0.9, windSpeed: 0.8, windDirection: 0.7, waveEnergy: 0.8, preferredTide: 'low', preferredWind: 'offshore', preferredSwellPeriod: 'long' },
+    weights: { swellHeight: 0.7, swellPeriod: 0.9, swellDirection: 1.0, tideHeight: 0.9, windSpeed: 0.8, windDirection: 0.7, waveEnergy: 0.8, preferredTide: 'low', preferredWind: ['offshore'], preferredSwellPeriod: ['long'] },
   },
   beachBreak: {
     label: "Beach break",
-    weights: { swellHeight: 0.9, swellPeriod: 0.6, swellDirection: 0.7, tideHeight: 0.4, windSpeed: 0.9, windDirection: 0.7, waveEnergy: 0.9, preferredTide: 'any', preferredWind: 'glassy' },
+    weights: { swellHeight: 0.9, swellPeriod: 0.6, swellDirection: 0.7, tideHeight: 0.4, windSpeed: 0.9, windDirection: 0.7, waveEnergy: 0.9, preferredTide: 'any', preferredWind: ['glassy'] },
   },
   pointBreak: {
     label: "Point break",
-    weights: { swellHeight: 0.7, swellPeriod: 0.8, swellDirection: 1.0, tideHeight: 0.6, windSpeed: 0.7, windDirection: 0.8, waveEnergy: 0.8, preferredTide: 'mid', preferredWind: 'offshore', preferredSwellPeriod: 'long' },
+    weights: { swellHeight: 0.7, swellPeriod: 0.8, swellDirection: 1.0, tideHeight: 0.6, windSpeed: 0.7, windDirection: 0.8, waveEnergy: 0.8, preferredTide: 'mid', preferredWind: ['offshore'], preferredSwellPeriod: ['long'] },
   },
 };
 

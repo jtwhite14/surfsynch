@@ -66,17 +66,23 @@ export async function PUT(
       preferredTide: ['any', 'low', 'mid', 'high', 'incoming', 'outgoing'].includes(body.preferredTide)
         ? body.preferredTide
         : 'any',
-      preferredWaveSize: VALID_PREFERRED_WAVE_SIZES.includes(body.preferredWaveSize)
-        ? body.preferredWaveSize
+      preferredWaveSize: Array.isArray(body.preferredWaveSize)
+        ? body.preferredWaveSize.filter((v: string) => VALID_PREFERRED_WAVE_SIZES.includes(v as any))
+        : VALID_PREFERRED_WAVE_SIZES.includes(body.preferredWaveSize) ? [body.preferredWaveSize]
         : undefined,
-      preferredSwellPeriod: VALID_PREFERRED_SWELL_PERIODS.includes(body.preferredSwellPeriod)
-        ? body.preferredSwellPeriod
+      preferredSwellPeriod: Array.isArray(body.preferredSwellPeriod)
+        ? body.preferredSwellPeriod.filter((v: string) => VALID_PREFERRED_SWELL_PERIODS.includes(v as any))
+        : VALID_PREFERRED_SWELL_PERIODS.includes(body.preferredSwellPeriod) ? [body.preferredSwellPeriod]
         : undefined,
-      preferredWind: VALID_PREFERRED_WINDS.includes(body.preferredWind)
-        ? body.preferredWind
+      preferredWind: Array.isArray(body.preferredWind)
+        ? body.preferredWind.filter((v: string) => VALID_PREFERRED_WINDS.includes(v as any))
+        : VALID_PREFERRED_WINDS.includes(body.preferredWind) ? [body.preferredWind]
         : undefined,
       swellExposure: Array.isArray(body.swellExposure)
         ? body.swellExposure.filter((d: string) => VALID_CARDINAL_DIRECTIONS.includes(d as CardinalDirection)) as CardinalDirection[]
+        : undefined,
+      preferredWindDirections: Array.isArray(body.preferredWindDirections)
+        ? body.preferredWindDirections.filter((d: string) => VALID_CARDINAL_DIRECTIONS.includes(d as CardinalDirection)) as CardinalDirection[]
         : undefined,
       notes: body.notes ?? undefined,
     };
