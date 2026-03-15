@@ -188,13 +188,12 @@ export async function fetchHistoricalConditions(
     const times: string[] = marineData?.hourly?.time || weatherData?.hourly?.time || [];
     if (times.length === 0) return null;
 
-    const targetHour = date.getUTCHours();
+    const targetMs = date.getTime();
     let closestIndex = 0;
     let minDiff = Infinity;
 
     times.forEach((time: string, index: number) => {
-      const hour = new Date(time).getUTCHours();
-      const diff = Math.abs(hour - targetHour);
+      const diff = Math.abs(new Date(time).getTime() - targetMs);
       if (diff < minDiff) {
         minDiff = diff;
         closestIndex = index;
