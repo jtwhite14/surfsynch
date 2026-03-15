@@ -1,7 +1,6 @@
 import { MarineConditions, HourlyForecast, ForecastData } from "@/types";
 
 const MARINE_API_BASE = "https://marine-api.open-meteo.com/v1/marine";
-const MARINE_ARCHIVE_API_BASE = "https://marine-archive-api.open-meteo.com/v1/marine";
 const HISTORICAL_API_BASE = "https://archive-api.open-meteo.com/v1/era5";
 
 // Marine API parameters for surf conditions
@@ -125,11 +124,9 @@ export async function fetchHistoricalConditions(
 ): Promise<MarineConditions | null> {
   const dateStr = date.toISOString().split("T")[0];
 
-  // Use archive APIs for old dates, forecast APIs for recent dates
+  // ERA5 archive has ~5 day lag; use forecast weather API for recent dates
   const now = new Date();
   const daysAgo = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-  const marineApiBase = daysAgo > 90 ? MARINE_ARCHIVE_API_BASE : MARINE_API_BASE;
-  // ERA5 archive has ~5 day lag; use forecast API for recent dates
   const weatherApiBase = daysAgo <= 5
     ? "https://api.open-meteo.com/v1/forecast"
     : HISTORICAL_API_BASE;
@@ -174,7 +171,7 @@ export async function fetchHistoricalConditions(
 
   try {
     const [marineResponse, weatherResponse] = await Promise.all([
-      fetch(`${marineApiBase}?${marineParams}`),
+      fetch(`${MARINE_API_BASE}?${marineParams}`),
       fetch(`${weatherApiBase}?${weatherParams}`),
     ]);
 
@@ -358,10 +355,9 @@ export async function fetchHourlyTimeline(
     timezone: "auto",
   });
 
-  // Use archive APIs for old dates, forecast APIs for recent dates
+  // ERA5 archive has ~5 day lag; use forecast weather API for recent dates
   const now = new Date();
   const daysAgo = Math.floor((now.getTime() - sessionTime.getTime()) / (1000 * 60 * 60 * 24));
-  const marineApiBase = daysAgo > 90 ? MARINE_ARCHIVE_API_BASE : MARINE_API_BASE;
   const weatherApiBase = daysAgo <= 5
     ? "https://api.open-meteo.com/v1/forecast"
     : HISTORICAL_API_BASE;
@@ -394,7 +390,7 @@ export async function fetchHourlyTimeline(
   const weatherParams = new URLSearchParams(weatherParamsObj);
 
   const [marineResponse, weatherResponse] = await Promise.all([
-    fetch(`${marineApiBase}?${marineParams}`),
+    fetch(`${MARINE_API_BASE}?${marineParams}`),
     fetch(`${weatherApiBase}?${weatherParams}`),
   ]);
 
