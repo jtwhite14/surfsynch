@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { AvailabilityWindow, CalendarEvent } from "@/types";
 import { addDays } from "date-fns";
 import { Input } from "@/components/ui/input";
-import { MapPin, Search } from "lucide-react";
+import { MapPin, Phone, Search } from "lucide-react";
 import { AlertTuning } from "@/components/alerts/AlertTuning";
 
 const SpotMap = dynamic(() => import("@/components/map/SpotMap"), { ssr: false });
@@ -30,10 +30,14 @@ export default function SettingsPage() {
   const [addressQuery, setAddressQuery] = useState("");
   const [addressResults, setAddressResults] = useState<Array<{ place_name: string; center: [number, number] }>>([]);
   const [addressSearching, setAddressSearching] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneLoading, setPhoneLoading] = useState(true);
+  const [phoneSaving, setPhoneSaving] = useState(false);
 
   useEffect(() => {
     fetchCalendarData();
     fetchHomeLocation();
+    fetchPhoneNumber();
   }, []);
 
   async function fetchCalendarData() {
@@ -104,6 +108,41 @@ export default function SettingsPage() {
       console.error("Error fetching home location:", error);
     } finally {
       setLocationLoading(false);
+    }
+  }
+
+  async function fetchPhoneNumber() {
+    try {
+      const res = await fetch("/api/user/phone");
+      if (res.ok) {
+        const data = await res.json();
+        setPhoneNumber(data.phoneNumber || "");
+      }
+    } catch (error) {
+      console.error("Error fetching phone number:", error);
+    } finally {
+      setPhoneLoading(false);
+    }
+  }
+
+  async function handleSavePhone() {
+    setPhoneSaving(true);
+    try {
+      const res = await fetch("/api/user/phone", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneNumber }),
+      });
+      if (res.ok) {
+        toast.success("Phone number saved");
+      } else {
+        const data = await res.json();
+        toast.error(data.error || "Failed to save phone number");
+      }
+    } catch {
+      toast.error("Failed to save phone number");
+    } finally {
+      setPhoneSaving(false);
     }
   }
 
@@ -202,6 +241,32 @@ export default function SettingsPage() {
                 alt="Profile"
                 className="w-12 h-12 rounded-full"
               />
+            )}
+          </div>
+          <Separator />
+          <div className="space-y-2">
+            <label className="text-sm font-medium flex items-center gap-2">
+              <Phone className="size-4" />
+              Phone Number
+            </label>
+            <p className="text-sm text-muted-foreground">
+              Add your phone number to receive SMS surf alerts
+            </p>
+            {phoneLoading ? (
+              <div className="h-10 bg-muted rounded animate-pulse" />
+            ) : (
+              <div className="flex gap-2">
+                <Input
+                  type="tel"
+                  placeholder="+1 (555) 123-4567"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  className="max-w-xs"
+                />
+                <Button onClick={handleSavePhone} disabled={phoneSaving}>
+                  {phoneSaving ? "Saving..." : "Save"}
+                </Button>
+              </div>
             )}
           </div>
         </CardContent>

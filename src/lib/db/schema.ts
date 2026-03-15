@@ -20,6 +20,7 @@ export const users = pgTable("users", {
   name: varchar("name", { length: 255 }),
   emailVerified: timestamp("email_verified"),
   image: text("image"),
+  phoneNumber: varchar("phone_number", { length: 20 }),
   homeLatitude: decimal("home_latitude", { precision: 10, scale: 7 }),
   homeLongitude: decimal("home_longitude", { precision: 10, scale: 7 }),
   googleRefreshToken: text("google_refresh_token"),

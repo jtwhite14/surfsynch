@@ -210,7 +210,7 @@ export default function SpotMap({
           <div className="relative">
             <div className="absolute -inset-2 bg-blue-500/30 rounded-full animate-ping" />
             <div className="w-8 h-8 bg-blue-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
-              <span className="text-white text-lg">+</span>
+              <span className="text-white text-lg leading-none flex items-center justify-center">+</span>
             </div>
           </div>
         </Marker>
