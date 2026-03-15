@@ -63,7 +63,7 @@ export default function DashboardPage() {
   const [showAllSessions, setShowAllSessions] = useState(false);
   const [alertSpotIds, setAlertSpotIds] = useState<Set<string>>(new Set());
   const [alertSummaries, setAlertSummaries] = useState<Array<{ spotId: string; spotName: string; effectiveScore: number; forecastHour: string; timeWindow: string; conditions: string }>>([]);
-  const [panelTab, setPanelTab] = useState<"sessions" | "alerts">("sessions");
+  const [panelTab, setPanelTab] = useState<"sessions" | "alerts">("alerts");
 
   const handleStartAddSpot = () => {
     setSelectedSpot(null);
@@ -555,14 +555,6 @@ export default function DashboardPage() {
             {/* Tab header */}
             <div className="flex items-center border-b">
               <button
-                onClick={() => { setPanelTab("sessions"); setPanelOpen(true); }}
-                className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
-                  panelTab === "sessions" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Sessions
-              </button>
-              <button
                 onClick={() => { setPanelTab("alerts"); setPanelOpen(true); }}
                 className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors relative ${
                   panelTab === "alerts" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
@@ -574,6 +566,14 @@ export default function DashboardPage() {
                     {alertSummaries.length}
                   </span>
                 )}
+              </button>
+              <button
+                onClick={() => { setPanelTab("sessions"); setPanelOpen(true); }}
+                className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
+                  panelTab === "sessions" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Sessions
               </button>
               <button
                 onClick={() => setPanelOpen((o) => !o)}
