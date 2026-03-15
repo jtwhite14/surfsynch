@@ -296,26 +296,52 @@ export default function OnboardingPage() {
   const handleCreateSessions = async () => {
     setIsCreating(true);
     try {
-      const payload = reviews.map((r) => ({
-        photoId: r.photoId,
-        photoUrl: r.photoUrl,
-        spotId: r.creatingNewSpot ? null : r.spotId,
-        newSpot: r.creatingNewSpot
-          ? {
-              name: r.newSpotName,
-              latitude: r.newSpotLat,
-              longitude: r.newSpotLng,
+      // Create any spots that haven't been saved yet
+      for (const r of reviews) {
+        if (r.creatingNewSpot && r.newSpotName && !r.spotId) {
+          try {
+            const res = await fetch("/api/spots", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                name: r.newSpotName,
+                latitude: r.newSpotLat,
+                longitude: r.newSpotLng,
+              }),
+            });
+            if (res.ok) {
+              const data = await res.json();
+              r.spotId = data.spot.id;
+              r.spotName = data.spot.name;
+              r.creatingNewSpot = false;
+              setSpots((prev) => [...prev, data.spot]);
             }
-          : null,
-        rating: r.rating,
-        notes: r.notes || null,
-        exifData: r.exifData,
-      }));
+          } catch {
+            toast.error(`Failed to create spot "${r.newSpotName}"`);
+          }
+        }
+      }
+
+      const sessions = reviews
+        .filter((r) => r.spotId)
+        .map((r) => {
+          const dateTime = r.exifData?.dateTime
+            ? new Date(r.exifData.dateTime).toISOString()
+            : new Date().toISOString();
+          return {
+            photoUrl: r.photoUrl,
+            spotId: r.spotId,
+            date: dateTime,
+            startTime: dateTime,
+            rating: r.rating,
+            notes: r.notes || undefined,
+          };
+        });
 
       const res = await fetch("/api/upload-sessions/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uploadSessionId: sessionId, sessions: payload }),
+        body: JSON.stringify({ uploadSessionId: sessionId, sessions }),
       });
 
       if (!res.ok) {
@@ -324,8 +350,10 @@ export default function OnboardingPage() {
       }
 
       const data = await res.json();
-      setCreatedCount(data.sessionsCreated || reviews.length);
-      setCreatedSpotCount(data.spotsCreated || 0);
+      setCreatedCount(data.created || reviews.length);
+      setCreatedSpotCount(
+        reviews.filter((r) => r.creatingNewSpot).length
+      );
       setIsComplete(true);
       toast.success("Sessions created successfully!");
     } catch (err) {
