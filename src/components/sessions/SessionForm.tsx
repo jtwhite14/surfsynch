@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -18,59 +20,222 @@ import { extractExifData, isExifSupported } from "@/lib/utils/exif";
 import { SurfSpot } from "@/lib/db/schema";
 import { findNearestSpot } from "@/lib/utils/geo";
 
+const MAX_FILE_SIZE = 4 * 1024 * 1024;
+const MAX_DIMENSION = 2048;
+
+function resizeImage(file: File): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    if (file.size <= MAX_FILE_SIZE) {
+      resolve(file);
+      return;
+    }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+        const ratio = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { reject(new Error("Canvas error")); return; }
+      ctx.drawImage(img, 0, 0, width, height);
+      let quality = 0.85;
+      const tryCompress = () => {
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) { reject(new Error("Compress failed")); return; }
+            if (blob.size > MAX_FILE_SIZE && quality > 0.3) { quality -= 0.15; tryCompress(); }
+            else resolve(blob);
+          },
+          "image/jpeg",
+          quality
+        );
+      };
+      tryCompress();
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
 interface SessionFormProps {
   spots: SurfSpot[];
   defaultSpotId?: string;
 }
 
+interface UploadedPhoto {
+  id: string;
+  photoUrl: string;
+  exifData: { dateTime?: string; latitude?: number; longitude?: number } | null;
+}
+
 export function SessionForm({ spots, defaultSpotId }: SessionFormProps) {
   const router = useRouter();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [step, setStep] = useState<"photo" | "details">("photo");
 
-  // Form state
+  // Photo upload state
+  const [uploadSessionId, setUploadSessionId] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const [photo, setPhoto] = useState<UploadedPhoto | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [localPhotoFile, setLocalPhotoFile] = useState<File | null>(null);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Session details state
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [spotId, setSpotId] = useState(defaultSpotId || "");
   const [date, setDate] = useState<Date>(new Date());
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("");
   const [rating, setRating] = useState(3);
   const [notes, setNotes] = useState("");
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
-  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Create upload session on mount (for QR code)
+  useEffect(() => {
+    async function createUploadSession() {
+      setIsCreatingSession(true);
+      try {
+        const res = await fetch("/api/upload-sessions", { method: "POST" });
+        if (!res.ok) throw new Error("Failed to create upload session");
+        const data = await res.json();
+        setUploadSessionId(data.id);
+        setToken(data.token);
+      } catch (err) {
+        console.error("Error creating upload session:", err);
+      } finally {
+        setIsCreatingSession(false);
+      }
+    }
+    createUploadSession();
+  }, []);
+
+  // Poll for photos uploaded via QR code
+  useEffect(() => {
+    if (!uploadSessionId || step !== "photo" || photo) return;
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/upload-sessions?id=${uploadSessionId}`);
+        if (res.ok) {
+          const data = await res.json();
+          const photos = data.uploadSession?.photos || data.photos;
+          if (photos && photos.length > 0) {
+            const uploaded = photos[photos.length - 1];
+            setPhoto(uploaded);
+            setPhotoPreview(uploaded.photoUrl);
+            applyExifData(uploaded.exifData);
+          }
+        }
+      } catch {
+        // Silently ignore polling errors
+      }
+    };
+
+    pollingRef.current = setInterval(poll, 3000);
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [uploadSessionId, step, photo]);
+
+  const applyExifData = useCallback((exifData: UploadedPhoto["exifData"]) => {
+    if (!exifData) return;
+
+    if (exifData.dateTime) {
+      const dt = new Date(exifData.dateTime);
+      setDate(dt);
+      const hours = dt.getHours().toString().padStart(2, "0");
+      const minutes = dt.getMinutes().toString().padStart(2, "0");
+      setStartTime(`${hours}:${minutes}`);
+      toast.success("Date and time extracted from photo");
+    }
+
+    if (exifData.latitude && exifData.longitude && spots.length > 0) {
+      const nearest = findNearestSpot(exifData.latitude, exifData.longitude, spots);
+      if (nearest && nearest.distance < 10) {
+        setSpotId(nearest.spot.id);
+        toast.success(`Location matched to ${nearest.spot.name}`);
+      }
+    }
+  }, [spots]);
+
+  // Handle direct file upload from this device
+  const handleDesktopUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setPhotoFile(file);
     setPhotoPreview(URL.createObjectURL(file));
+    setLocalPhotoFile(file);
 
-    // Try to extract EXIF data
+    // Extract EXIF data locally
     if (isExifSupported(file)) {
       try {
         const exifData = await extractExifData(file);
-
-        if (exifData.dateTime) {
-          setDate(exifData.dateTime);
-          const hours = exifData.dateTime.getHours().toString().padStart(2, "0");
-          const minutes = exifData.dateTime.getMinutes().toString().padStart(2, "0");
-          setStartTime(`${hours}:${minutes}`);
-          toast.success("Date and time extracted from photo");
-        }
-
-        if (exifData.latitude && exifData.longitude && spots.length > 0) {
-          // Find nearest spot
-          const nearest = findNearestSpot(exifData.latitude, exifData.longitude, spots);
-          if (nearest && nearest.distance < 10) {
-            // Within 10km
-            setSpotId(nearest.spot.id);
-            toast.success(`Location matched to ${nearest.spot.name}`);
-          }
-        }
+        applyExifData(exifData as UploadedPhoto["exifData"]);
       } catch (error) {
         console.error("Error extracting EXIF:", error);
       }
     }
+
+    // If we have an upload session, also upload via the public route so it's stored
+    if (token) {
+      try {
+        let exifData = {};
+        if (isExifSupported(file)) {
+          exifData = await extractExifData(file);
+        }
+        const processedFile = await resizeImage(file);
+        const formData = new FormData();
+        formData.append("file", processedFile, file.name);
+        formData.append("token", token);
+        formData.append("exifData", JSON.stringify(exifData));
+
+        const res = await fetch("/api/upload/public", {
+          method: "POST",
+          body: formData,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setPhoto({
+            id: data.photo.id,
+            photoUrl: data.photo.photoUrl,
+            exifData: null,
+          });
+          setPhotoPreview(data.photo.photoUrl);
+          setLocalPhotoFile(null); // No need to re-upload on submit
+        }
+      } catch {
+        // Keep the local file as fallback
+      }
+    }
+
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleContinueToDetails = () => {
+    if (!photoPreview) {
+      toast.error("Please upload a photo first");
+      return;
+    }
+    setStep("details");
+  };
+
+  const handleSkipPhoto = () => {
+    setStep("details");
+  };
+
+  const handleRemovePhoto = () => {
+    setPhoto(null);
+    setPhotoPreview(null);
+    setLocalPhotoFile(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -84,12 +249,14 @@ export function SessionForm({ spots, defaultSpotId }: SessionFormProps) {
     setIsSubmitting(true);
 
     try {
-      // Upload photo first if present
-      let photoUrl: string | null = null;
-      if (photoFile) {
+      // Determine photo URL
+      let photoUrl: string | null = photo?.photoUrl || null;
+
+      // If we have a local file that wasn't uploaded via the session, upload it now
+      if (localPhotoFile && !photoUrl) {
         setUploadingPhoto(true);
         const formData = new FormData();
-        formData.append("file", photoFile);
+        formData.append("file", localPhotoFile);
 
         const uploadResponse = await fetch("/api/upload", {
           method: "POST",
@@ -147,8 +314,201 @@ export function SessionForm({ spots, defaultSpotId }: SessionFormProps) {
     }
   };
 
+  // ---- Step indicator ----
+  const StepIndicator = () => (
+    <div className="flex items-center justify-center gap-2 mb-6">
+      {[
+        { key: "photo", label: "Photo" },
+        { key: "details", label: "Details" },
+      ].map((s, idx) => (
+        <div key={s.key} className="flex items-center gap-2">
+          <div
+            className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+              s.key === step
+                ? "bg-primary text-primary-foreground"
+                : s.key === "photo" && step === "details"
+                  ? "bg-primary/20 text-primary"
+                  : "bg-muted text-muted-foreground"
+            }`}
+          >
+            {s.key === "photo" && step === "details" ? (
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            ) : (
+              idx + 1
+            )}
+          </div>
+          {idx < 1 && (
+            <div
+              className={`w-16 h-0.5 ${
+                step === "details" ? "bg-primary" : "bg-muted"
+              }`}
+            />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+
+  // ---- STEP 1: Photo Upload ----
+  if (step === "photo") {
+    return (
+      <div className="space-y-6">
+        <StepIndicator />
+
+        <Card>
+          <CardHeader className="text-center">
+            <CardTitle>Add a Photo</CardTitle>
+            <CardDescription>
+              Scan the QR code with your phone to upload a photo, or upload
+              directly from this device. Date, time, and location will be
+              extracted automatically.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {photoPreview ? (
+              <div className="space-y-4">
+                <div className="relative flex justify-center">
+                  <img
+                    src={photoPreview}
+                    alt="Session photo"
+                    className="max-h-72 rounded-lg object-contain"
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    className="absolute top-2 right-2"
+                    onClick={handleRemovePhoto}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* QR Code */}
+                {isCreatingSession ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-pulse text-muted-foreground">
+                      Setting up...
+                    </div>
+                  </div>
+                ) : token ? (
+                  <div className="flex flex-col items-center space-y-3">
+                    <div className="bg-white p-4 rounded-lg">
+                      <QRCodeSVG
+                        value={`${typeof window !== "undefined" ? window.location.origin : ""}/upload/${token}`}
+                        size={200}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground text-center">
+                      Scan with your phone to upload a photo
+                    </p>
+                  </div>
+                ) : null}
+
+                {/* Direct upload */}
+                <div className="border-t pt-4">
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="w-4 h-4 mr-2"
+                    >
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="17 8 12 3 7 8" />
+                      <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    Upload from this device
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleDesktopUpload}
+                  />
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="flex justify-between">
+          <Button variant="ghost" size="sm" onClick={handleSkipPhoto}>
+            Skip photo
+          </Button>
+          <Button
+            size="lg"
+            disabled={!photoPreview}
+            onClick={handleContinueToDetails}
+          >
+            Continue
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- STEP 2: Session Details ----
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      <StepIndicator />
+
+      {/* Photo preview thumbnail */}
+      {photoPreview && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="w-20 h-20 rounded-lg overflow-hidden border flex-shrink-0">
+                <img
+                  src={photoPreview}
+                  alt="Session photo"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium">Photo attached</p>
+                <p className="text-xs text-muted-foreground">
+                  Date and location auto-filled from photo metadata
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setStep("photo");
+                }}
+              >
+                Change
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Session Details</CardTitle>
@@ -293,47 +653,6 @@ export function SessionForm({ spots, defaultSpotId }: SessionFormProps) {
         </CardContent>
       </Card>
 
-      {/* Photo Upload */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Photo (optional)</CardTitle>
-          <CardDescription>
-            Upload a photo from your session. Date/time and location may be extracted automatically.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <Input
-              type="file"
-              accept="image/*"
-              onChange={handlePhotoSelect}
-              className="cursor-pointer"
-            />
-            {photoPreview && (
-              <div className="relative">
-                <img
-                  src={photoPreview}
-                  alt="Preview"
-                  className="max-h-64 rounded-lg object-contain"
-                />
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  className="absolute top-2 right-2"
-                  onClick={() => {
-                    setPhotoFile(null);
-                    setPhotoPreview(null);
-                  }}
-                >
-                  Remove
-                </Button>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Submit */}
       <div className="flex gap-4">
         <Button
@@ -355,4 +674,3 @@ export function SessionForm({ spots, defaultSpotId }: SessionFormProps) {
     </form>
   );
 }
-
