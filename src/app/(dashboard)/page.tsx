@@ -19,6 +19,8 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
+  MapPin,
+  AlertTriangle,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -30,6 +32,12 @@ import { toast } from "sonner";
 import { SpotConditions } from "@/components/spots/SpotConditions";
 import { SpotAlertCard } from "@/components/alerts/SpotAlertCard";
 import { EditSpotDialog } from "@/components/spots/EditSpotDialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { SurfSpot } from "@/lib/db/schema";
 import type { SurfSessionWithConditions } from "@/types";
 
@@ -68,6 +76,46 @@ export default function DashboardPage() {
   const [alertSpotIds, setAlertSpotIds] = useState<Set<string>>(new Set());
   const [alertSummaries, setAlertSummaries] = useState<Array<{ spotId: string; spotName: string; effectiveScore: number; forecastHour: string; timeWindow: string; conditions: string }>>([]);
   const [panelTab, setPanelTab] = useState<"sessions" | "alerts">("alerts");
+
+  // Missing location prompt
+  const [fixLocationSpot, setFixLocationSpot] = useState<SurfSpot | null>(null);
+  const [fixLocationMarker, setFixLocationMarker] = useState<{ lat: number; lng: number } | null>(null);
+  const [isSavingLocation, setIsSavingLocation] = useState(false);
+  const [dismissedLocationBanner, setDismissedLocationBanner] = useState(false);
+
+  const spotsWithoutLocation = useMemo(
+    () => spots.filter((s) => parseFloat(s.latitude) === 0 && parseFloat(s.longitude) === 0),
+    [spots]
+  );
+
+  const handleFixLocation = (spot: SurfSpot) => {
+    setFixLocationSpot(spot);
+    setFixLocationMarker(null);
+  };
+
+  const handleSaveFixedLocation = async () => {
+    if (!fixLocationSpot || !fixLocationMarker) return;
+    setIsSavingLocation(true);
+    try {
+      const res = await fetch(`/api/spots?id=${fixLocationSpot.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          latitude: fixLocationMarker.lat,
+          longitude: fixLocationMarker.lng,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setSpots((prev) => prev.map((s) => (s.id === data.spot.id ? data.spot : s)));
+      setFixLocationSpot(null);
+      toast.success(`Location set for ${data.spot.name}`);
+    } catch {
+      toast.error("Failed to update location");
+    } finally {
+      setIsSavingLocation(false);
+    }
+  };
 
   const handleStartAddSpot = () => {
     setSelectedSpot(null);
@@ -282,6 +330,81 @@ export default function DashboardPage() {
         alertSpotIds={alertSpotIds}
         {...(initialViewState && { initialViewState })}
       />
+
+      {/* Missing location banner */}
+      {spotsWithoutLocation.length > 0 && !dismissedLocationBanner && !selectedSpot && addSpotMode === "idle" && (
+        <div className="absolute top-4 left-4 right-4 sm:left-auto sm:right-4 z-20 sm:w-96">
+          <div className="rounded-lg border border-amber-500/40 bg-background/95 backdrop-blur-sm shadow-lg p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="size-5 text-amber-500 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">
+                  {spotsWithoutLocation.length === 1
+                    ? "1 spot is missing a location"
+                    : `${spotsWithoutLocation.length} spots are missing locations`}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Spots need locations for alerts and conditions to work.
+                </p>
+                <div className="mt-3 space-y-2">
+                  {spotsWithoutLocation.map((spot) => (
+                    <button
+                      key={spot.id}
+                      onClick={() => handleFixLocation(spot)}
+                      className="flex items-center gap-2 w-full rounded-md border border-dashed px-3 py-2 text-left hover:bg-accent/50 transition-colors"
+                    >
+                      <MapPin className="size-3.5 text-muted-foreground shrink-0" />
+                      <span className="text-sm truncate flex-1">{spot.name}</span>
+                      <span className="text-xs text-primary font-medium shrink-0">Set location</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button
+                onClick={() => setDismissedLocationBanner(true)}
+                className="rounded-md p-1 hover:bg-accent transition-colors shrink-0"
+              >
+                <X className="size-4 text-muted-foreground" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fix location dialog */}
+      <Dialog open={!!fixLocationSpot} onOpenChange={(open) => { if (!open) setFixLocationSpot(null); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Set location for {fixLocationSpot?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              {fixLocationMarker
+                ? `Selected: ${fixLocationMarker.lat.toFixed(5)}, ${fixLocationMarker.lng.toFixed(5)} — tap to adjust`
+                : "Tap the map to place this spot"}
+            </p>
+            <div className="h-[300px] rounded-lg overflow-hidden border">
+              <SpotMap
+                spots={spots.filter((s) => s.id !== fixLocationSpot?.id)}
+                onMapClick={(lat, lng) => setFixLocationMarker({ lat, lng })}
+                newSpotMarker={fixLocationMarker}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setFixLocationSpot(null)}>
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={handleSaveFixedLocation}
+                disabled={!fixLocationMarker || isSavingLocation}
+              >
+                {isSavingLocation ? <Loader2 className="size-4 animate-spin" /> : "Save Location"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Spot detail pane */}
       {selectedSpot && addSpotMode === "idle" && (
