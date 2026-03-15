@@ -208,6 +208,25 @@ export function SurfChart({ data, sessionIndex }: SurfChartProps) {
         </ResponsiveContainer>
       </div>
 
+      {/* Swell period row */}
+      <div className="flex px-5 pt-2">
+        <div className="flex items-center justify-between flex-1">
+          {chartData.map((d, i) => {
+            const isSession = i === sessionIndex;
+            return (
+              <span
+                key={i}
+                className={`text-[10px] tabular-nums font-medium ${
+                  isSession ? "text-white/60" : "text-white/20"
+                }`}
+              >
+                {d.period != null ? `${Math.round(d.period)}s` : ""}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Swell direction strip */}
       <DirectionStrip directions={directions} sessionIndex={sessionIndex} showAllLabels />
     </div>
