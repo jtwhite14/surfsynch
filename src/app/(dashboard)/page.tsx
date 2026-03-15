@@ -19,7 +19,6 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
-  SlidersHorizontal,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -30,7 +29,7 @@ import {
 import { toast } from "sonner";
 import { SpotConditions } from "@/components/spots/SpotConditions";
 import { SpotAlertCard } from "@/components/alerts/SpotAlertCard";
-import { AlertTuningDialog } from "@/components/alerts/AlertTuning";
+import { EditSpotDialog } from "@/components/spots/EditSpotDialog";
 import type { SurfSpot } from "@/lib/db/schema";
 import type { SurfSessionWithConditions } from "@/types";
 
@@ -63,13 +62,9 @@ export default function DashboardPage() {
   const [selectedSpot, setSelectedSpot] = useState<SurfSpot | null>(null);
   const [spotSessions, setSpotSessions] = useState<SurfSessionWithConditions[]>([]);
   const [loadingSpotSessions, setLoadingSpotSessions] = useState(false);
-  const [editingSpot, setEditingSpot] = useState(false);
-  const [editName, setEditName] = useState("");
-  const [editDescription, setEditDescription] = useState("");
-  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editSpotOpen, setEditSpotOpen] = useState(false);
   const [isDeletingSpot, setIsDeletingSpot] = useState(false);
   const [showAllSessions, setShowAllSessions] = useState(false);
-  const [alertTuningOpen, setAlertTuningOpen] = useState(false);
   const [alertSpotIds, setAlertSpotIds] = useState<Set<string>>(new Set());
   const [alertSummaries, setAlertSummaries] = useState<Array<{ spotId: string; spotName: string; effectiveScore: number; forecastHour: string; timeWindow: string; conditions: string }>>([]);
   const [panelTab, setPanelTab] = useState<"sessions" | "alerts">("alerts");
@@ -123,7 +118,6 @@ export default function DashboardPage() {
   // Spot click handler — fetch sessions for the spot
   const handleSpotClick = useCallback(async (spot: SurfSpot) => {
     setSelectedSpot(spot);
-    setEditingSpot(false);
     setShowAllSessions(false);
     setLoadingSpotSessions(true);
     try {
@@ -141,40 +135,12 @@ export default function DashboardPage() {
   const handleCloseSpotDetail = () => {
     setSelectedSpot(null);
     setSpotSessions([]);
-    setEditingSpot(false);
     setShowAllSessions(false);
   };
 
-  const handleStartEdit = () => {
-    if (!selectedSpot) return;
-    setEditName(selectedSpot.name);
-    setEditDescription(selectedSpot.description || "");
-    setEditingSpot(true);
-  };
-
-  const handleSaveEdit = async () => {
-    if (!selectedSpot || !editName.trim()) return;
-    setIsSavingEdit(true);
-    try {
-      const res = await fetch(`/api/spots?id=${selectedSpot.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: editName.trim(),
-          description: editDescription.trim() || null,
-        }),
-      });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setSpots((prev) => prev.map((s) => (s.id === data.spot.id ? data.spot : s)));
-      setSelectedSpot(data.spot);
-      setEditingSpot(false);
-      toast.success("Spot updated!");
-    } catch {
-      toast.error("Failed to update spot");
-    } finally {
-      setIsSavingEdit(false);
-    }
+  const handleSpotSaved = (updatedSpot: SurfSpot) => {
+    setSpots((prev) => prev.map((s) => (s.id === updatedSpot.id ? updatedSpot : s)));
+    setSelectedSpot(updatedSpot);
   };
 
   const handleDeleteSpot = async () => {
@@ -323,78 +289,32 @@ export default function DashboardPage() {
           {/* Header */}
           <div className="flex items-start justify-between gap-2 px-4 pt-4 pb-3">
             <div className="min-w-0 flex-1">
-              {editingSpot ? (
-                <div className="space-y-2">
-                  <Input
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    autoFocus
-                    className="text-lg font-bold"
-                  />
-                  <Textarea
-                    value={editDescription}
-                    onChange={(e) => setEditDescription(e.target.value)}
-                    placeholder="Description (optional)"
-                    rows={2}
-                  />
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="w-full justify-start text-muted-foreground"
-                    onClick={() => setAlertTuningOpen(true)}
-                  >
-                    <SlidersHorizontal className="size-3.5 mr-2" />
-                    Alert Tuning
-                  </Button>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setEditingSpot(false)}>
-                      Cancel
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={handleSaveEdit}
-                      disabled={!editName.trim() || isSavingEdit}
-                    >
-                      {isSavingEdit ? <Loader2 className="size-3 animate-spin" /> : "Save"}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <h2 className="text-xl font-bold truncate">{selectedSpot.name}</h2>
-                  {selectedSpot.description && (
-                    <p className="text-sm text-muted-foreground mt-1">{selectedSpot.description}</p>
-                  )}
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {parseFloat(selectedSpot.latitude).toFixed(5)}, {parseFloat(selectedSpot.longitude).toFixed(5)}
-                  </p>
-                </>
+              <h2 className="text-xl font-bold truncate">{selectedSpot.name}</h2>
+              {selectedSpot.description && (
+                <p className="text-sm text-muted-foreground mt-1">{selectedSpot.description}</p>
               )}
+              <p className="text-xs text-muted-foreground mt-1">
+                {parseFloat(selectedSpot.latitude).toFixed(5)}, {parseFloat(selectedSpot.longitude).toFixed(5)}
+              </p>
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              {!editingSpot && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="rounded-md p-2 hover:bg-accent transition-colors">
-                      <MoreHorizontal className="size-4" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={handleStartEdit}>
-                      <Pencil className="size-3.5 mr-2" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setAlertTuningOpen(true)}>
-                      <SlidersHorizontal className="size-3.5 mr-2" />
-                      Alert Tuning
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleDeleteSpot} disabled={isDeletingSpot} className="text-destructive">
-                      <Trash2 className="size-3.5 mr-2" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="rounded-md p-2 hover:bg-accent transition-colors">
+                    <MoreHorizontal className="size-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setEditSpotOpen(true)}>
+                    <Pencil className="size-3.5 mr-2" />
+                    Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleDeleteSpot} disabled={isDeletingSpot} className="text-destructive">
+                    <Trash2 className="size-3.5 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <button
                 onClick={handleCloseSpotDetail}
                 className="rounded-md p-2 hover:bg-accent transition-colors"
@@ -480,7 +400,7 @@ export default function DashboardPage() {
                 {/* Alert tuning nudge */}
                 {!selectedSpot.conditionWeights && (
                   <button
-                    onClick={() => setAlertTuningOpen(true)}
+                    onClick={() => setEditSpotOpen(true)}
                     className="w-full rounded-lg border border-dashed border-muted-foreground/30 px-3 py-2.5 text-left hover:border-muted-foreground/50 transition-colors"
                   >
                     <p className="text-xs text-muted-foreground">
@@ -490,15 +410,12 @@ export default function DashboardPage() {
                   </button>
                 )}
 
-                {/* Alert Tuning Dialog */}
-                <AlertTuningDialog
-                  spotId={selectedSpot.id}
-                  open={alertTuningOpen}
-                  onOpenChange={setAlertTuningOpen}
-                  onSave={(weights) => {
-                    setSelectedSpot((prev) => prev ? { ...prev, conditionWeights: weights } : prev);
-                    setSpots((prev) => prev.map((s) => s.id === selectedSpot.id ? { ...s, conditionWeights: weights } : s));
-                  }}
+                {/* Edit Spot Dialog */}
+                <EditSpotDialog
+                  spot={selectedSpot}
+                  open={editSpotOpen}
+                  onOpenChange={setEditSpotOpen}
+                  onSave={handleSpotSaved}
                 />
 
                 {/* Recent Sessions section */}
