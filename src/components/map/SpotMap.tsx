@@ -77,8 +77,8 @@ export default function SpotMap({
       style={{ width: "100%", height: "100%" }}
       cursor={interactive && onMapClick ? "crosshair" : "grab"}
     >
-      <NavigationControl position="top-right" />
-      <GeolocateControl position="top-right" trackUserLocation />
+      <NavigationControl position="bottom-right" />
+      <GeolocateControl position="bottom-right" trackUserLocation />
 
       {/* Existing spots */}
       {spots.map((spot) => (
