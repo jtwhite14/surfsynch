@@ -9,13 +9,13 @@ import {
   YAxis,
 } from "recharts";
 import {
-  ChartShell,
+  ChartPanel,
   SharedXAxis,
   SharedYAxis,
-  SharedGrid,
-  SessionMarkers,
+  SessionMarker,
   CustomTooltip,
   axisColor,
+  getDirectionText,
 } from "./TimelineChart";
 import { DirectionStrip } from "./DirectionStrip";
 import { HourlyForecast } from "@/types";
@@ -26,21 +26,51 @@ interface SwellChartProps {
   sessionIndex: number;
 }
 
+const c1 = "oklch(0.82 0.17 90)";     // yellow — height
+const c2 = "oklch(0.769 0.188 70.08)"; // orange — period
+
 export function SwellChart({ data, sessionIndex }: SwellChartProps) {
   const chartData = data.map((h) => ({
     time: h.time,
-    "Swell Height": metersToFeet(h.primarySwellHeight) ?? undefined,
-    "Swell Period": h.primarySwellPeriod ?? undefined,
+    Height: metersToFeet(h.primarySwellHeight) ?? undefined,
+    Period: h.primarySwellPeriod ?? undefined,
   }));
 
   const directions = data.map((h) => h.primarySwellDirection);
 
+  const sessionHeight = chartData[sessionIndex]?.Height;
+  const sessionPeriod = chartData[sessionIndex]?.Period;
+  const sessionDir = directions[sessionIndex];
+  const dirText = sessionDir != null ? getDirectionText(sessionDir) : null;
+
+  // Build a surfer-friendly hero subtitle
+  const heroSub = [
+    sessionPeriod != null ? `${sessionPeriod.toFixed(0)}s period` : null,
+    dirText ? `from ${dirText}` : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <div>
-      <ChartShell data={chartData} sessionIndex={sessionIndex} title="Swell (ft / s)">
+      <ChartPanel
+        title="PRIMARY SWELL"
+        heroValue={sessionHeight != null ? sessionHeight.toFixed(1) : "—"}
+        heroUnit="ft"
+        heroSub={heroSub || undefined}
+        legends={[
+          { label: "Height", color: c1 },
+          { label: "Period", color: c2 },
+        ]}
+      >
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-            <SharedGrid />
+          <ComposedChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+            <defs>
+              <linearGradient id="gradSwell" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={c1} stopOpacity={0.2} />
+                <stop offset="100%" stopColor={c1} stopOpacity={0} />
+              </linearGradient>
+            </defs>
             <SharedXAxis />
             <SharedYAxis
               yAxisId="left"
@@ -50,37 +80,38 @@ export function SwellChart({ data, sessionIndex }: SwellChartProps) {
             <YAxis
               yAxisId="right"
               orientation="right"
-              tick={{ fill: axisColor, fontSize: 11 }}
+              tick={{ fill: axisColor, fontSize: 10, fontWeight: 500 }}
               axisLine={false}
               tickLine={false}
               tickFormatter={(v) => `${v}s`}
               domain={[0, "auto"]}
-              width={40}
+              width={32}
             />
-            <Tooltip content={<CustomTooltip />} />
-            <SessionMarkers data={chartData} sessionIndex={sessionIndex} />
+            <Tooltip content={<CustomTooltip />} cursor={false} />
+            <SessionMarker data={chartData} sessionIndex={sessionIndex} />
             <Area
-              type="monotone"
-              dataKey="Swell Height"
+              type="natural"
+              dataKey="Height"
               yAxisId="left"
-              stroke="var(--chart-1)"
-              fill="var(--chart-1)"
-              fillOpacity={0.15}
+              stroke={c1}
+              fill="url(#gradSwell)"
               strokeWidth={2}
               dot={false}
+              activeDot={{ r: 3, fill: c1, stroke: "none" }}
             />
             <Line
-              type="monotone"
-              dataKey="Swell Period"
+              type="natural"
+              dataKey="Period"
               yAxisId="right"
-              stroke="var(--chart-3)"
-              strokeWidth={2}
+              stroke={c2}
+              strokeWidth={1.5}
               dot={false}
+              activeDot={{ r: 3, fill: c2, stroke: "none" }}
             />
           </ComposedChart>
         </ResponsiveContainer>
-      </ChartShell>
-      <DirectionStrip directions={directions} sessionIndex={sessionIndex} />
+      </ChartPanel>
+      <DirectionStrip directions={directions} sessionIndex={sessionIndex} label="Swell direction" />
     </div>
   );
 }

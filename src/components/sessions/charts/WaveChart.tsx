@@ -1,17 +1,16 @@
 "use client";
 
 import {
-  ComposedChart,
+  AreaChart,
   Area,
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
 import {
-  ChartShell,
+  ChartPanel,
   SharedXAxis,
   SharedYAxis,
-  SharedGrid,
-  SessionMarkers,
+  SessionMarker,
   CustomTooltip,
 } from "./TimelineChart";
 import { HourlyForecast } from "@/types";
@@ -22,45 +21,69 @@ interface WaveChartProps {
   sessionIndex: number;
 }
 
+const c1 = "oklch(0.82 0.17 90)";   // yellow — sig wave
+const c2 = "oklch(0.696 0.17 162.48)"; // teal — wind wave
+
 export function WaveChart({ data, sessionIndex }: WaveChartProps) {
   const chartData = data.map((h) => ({
     time: h.time,
-    "Sig. Wave Height": metersToFeet(h.waveHeight) ?? undefined,
-    "Wind Wave Height": metersToFeet(h.windWaveHeight) ?? undefined,
+    "Sig. Wave": metersToFeet(h.waveHeight) ?? undefined,
+    "Wind Wave": metersToFeet(h.windWaveHeight) ?? undefined,
   }));
 
+  const sessionSig = chartData[sessionIndex]?.["Sig. Wave"];
+  const sessionWind = chartData[sessionIndex]?.["Wind Wave"];
+
   return (
-    <ChartShell data={chartData} sessionIndex={sessionIndex} title="Wave Heights (ft)">
+    <ChartPanel
+      title="WAVE HEIGHT"
+      heroValue={sessionSig != null ? sessionSig.toFixed(1) : "—"}
+      heroUnit="ft"
+      heroSub={sessionWind != null ? `Wind chop ${sessionWind.toFixed(1)} ft` : undefined}
+      legends={[
+        { label: "Significant", color: c1 },
+        { label: "Wind wave", color: c2 },
+      ]}
+    >
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-          <SharedGrid />
+        <AreaChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="gradSig" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={c1} stopOpacity={0.25} />
+              <stop offset="100%" stopColor={c1} stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="gradWind" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={c2} stopOpacity={0.15} />
+              <stop offset="100%" stopColor={c2} stopOpacity={0} />
+            </linearGradient>
+          </defs>
           <SharedXAxis />
           <SharedYAxis
             tickFormatter={(v) => `${v.toFixed(1)}`}
             domain={[0, "auto"]}
           />
-          <Tooltip content={<CustomTooltip />} />
-          <SessionMarkers data={chartData} sessionIndex={sessionIndex} />
+          <Tooltip content={<CustomTooltip />} cursor={false} />
+          <SessionMarker data={chartData} sessionIndex={sessionIndex} />
           <Area
-            type="monotone"
-            dataKey="Sig. Wave Height"
-            stroke="var(--chart-1)"
-            fill="var(--chart-1)"
-            fillOpacity={0.15}
+            type="natural"
+            dataKey="Sig. Wave"
+            stroke={c1}
+            fill="url(#gradSig)"
             strokeWidth={2}
             dot={false}
+            activeDot={{ r: 3, fill: c1, stroke: "none" }}
           />
           <Area
-            type="monotone"
-            dataKey="Wind Wave Height"
-            stroke="var(--chart-2)"
-            fill="var(--chart-2)"
-            fillOpacity={0.1}
+            type="natural"
+            dataKey="Wind Wave"
+            stroke={c2}
+            fill="url(#gradWind)"
             strokeWidth={1.5}
             dot={false}
+            activeDot={{ r: 3, fill: c2, stroke: "none" }}
           />
-        </ComposedChart>
+        </AreaChart>
       </ResponsiveContainer>
-    </ChartShell>
+    </ChartPanel>
   );
 }

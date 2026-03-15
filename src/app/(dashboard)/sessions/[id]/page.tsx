@@ -65,7 +65,7 @@ export default function SessionDetailPage() {
 
   if (loading) {
     return (
-      <div className="max-w-3xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto space-y-6">
         <div className="h-8 bg-muted rounded w-1/4 animate-pulse"></div>
         <div className="h-64 bg-muted rounded animate-pulse"></div>
       </div>
@@ -107,7 +107,7 @@ export default function SessionDetailPage() {
     : null;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">

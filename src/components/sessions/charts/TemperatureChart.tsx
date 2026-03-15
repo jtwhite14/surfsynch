@@ -1,17 +1,16 @@
 "use client";
 
 import {
-  ComposedChart,
-  Line,
+  AreaChart,
+  Area,
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
 import {
-  ChartShell,
+  ChartPanel,
   SharedXAxis,
   SharedYAxis,
-  SharedGrid,
-  SessionMarkers,
+  SessionMarker,
   CustomTooltip,
 } from "./TimelineChart";
 import { HourlyForecast } from "@/types";
@@ -22,41 +21,69 @@ interface TemperatureChartProps {
   sessionIndex: number;
 }
 
+const cAir = "oklch(0.769 0.188 70.08)";  // warm orange
+const cWater = "oklch(0.696 0.17 162.48)"; // cool teal
+
 export function TemperatureChart({ data, sessionIndex }: TemperatureChartProps) {
   const chartData = data.map((h) => ({
     time: h.time,
-    "Air Temp": celsiusToFahrenheit(h.airTemp) ?? undefined,
-    "Water Temp": celsiusToFahrenheit(h.seaSurfaceTemp) ?? undefined,
+    Air: celsiusToFahrenheit(h.airTemp) ?? undefined,
+    Water: celsiusToFahrenheit(h.seaSurfaceTemp) ?? undefined,
   }));
 
+  const sessionAir = chartData[sessionIndex]?.Air;
+  const sessionWater = chartData[sessionIndex]?.Water;
+
   return (
-    <ChartShell data={chartData} sessionIndex={sessionIndex} title="Temperature (\u00B0F)">
+    <ChartPanel
+      title="TEMPERATURE"
+      heroValue={sessionWater != null ? `${sessionWater.toFixed(0)}\u00B0` : "—"}
+      heroUnit="water"
+      heroSub={sessionAir != null ? `${sessionAir.toFixed(0)}\u00B0F air` : undefined}
+      legends={[
+        { label: "Water", color: cWater },
+        { label: "Air", color: cAir },
+      ]}
+    >
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-          <SharedGrid />
+        <AreaChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="gradWater" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={cWater} stopOpacity={0.2} />
+              <stop offset="100%" stopColor={cWater} stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="gradAir" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={cAir} stopOpacity={0.1} />
+              <stop offset="100%" stopColor={cAir} stopOpacity={0} />
+            </linearGradient>
+          </defs>
           <SharedXAxis />
           <SharedYAxis
             tickFormatter={(v) => `${v.toFixed(0)}\u00B0`}
             domain={["auto", "auto"]}
           />
-          <Tooltip content={<CustomTooltip />} />
-          <SessionMarkers data={chartData} sessionIndex={sessionIndex} />
-          <Line
-            type="monotone"
-            dataKey="Air Temp"
-            stroke="var(--chart-3)"
+          <Tooltip content={<CustomTooltip />} cursor={false} />
+          <SessionMarker data={chartData} sessionIndex={sessionIndex} />
+          <Area
+            type="natural"
+            dataKey="Water"
+            stroke={cWater}
+            fill="url(#gradWater)"
             strokeWidth={2}
             dot={false}
+            activeDot={{ r: 3, fill: cWater, stroke: "none" }}
           />
-          <Line
-            type="monotone"
-            dataKey="Water Temp"
-            stroke="var(--chart-2)"
-            strokeWidth={2}
+          <Area
+            type="natural"
+            dataKey="Air"
+            stroke={cAir}
+            fill="url(#gradAir)"
+            strokeWidth={1.5}
             dot={false}
+            activeDot={{ r: 3, fill: cAir, stroke: "none" }}
           />
-        </ComposedChart>
+        </AreaChart>
       </ResponsiveContainer>
-    </ChartShell>
+    </ChartPanel>
   );
 }

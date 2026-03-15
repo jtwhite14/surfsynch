@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { HourlyForecast } from "@/types";
 import { WaveChart } from "./charts/WaveChart";
 import { SwellChart } from "./charts/SwellChart";
@@ -41,18 +40,17 @@ export function ConditionsTimeline({ sessionId }: ConditionsTimelineProps) {
 
   if (loading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Conditions Timeline</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-[200px] bg-muted rounded animate-pulse" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <div className="flex items-baseline gap-2">
+          <div className="h-5 w-40 bg-white/[0.04] rounded animate-pulse" />
+        </div>
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div
+            key={i}
+            className="h-[260px] rounded-2xl border border-white/[0.06] bg-white/[0.02] animate-pulse"
+          />
+        ))}
+      </div>
     );
   }
 
@@ -61,20 +59,20 @@ export function ConditionsTimeline({ sessionId }: ConditionsTimelineProps) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Conditions Timeline</CardTitle>
-        <CardDescription>
-          13-hour window around your session (highlighted)
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-8">
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold tracking-tight">Conditions Timeline</h2>
+        <p className="text-[13px] text-white/30 mt-0.5">
+          13-hour window around your session
+        </p>
+      </div>
+      <div className="space-y-3">
         <WaveChart data={timeline} sessionIndex={sessionHourIndex} />
         <SwellChart data={timeline} sessionIndex={sessionHourIndex} />
         <WindChart data={timeline} sessionIndex={sessionHourIndex} />
         <TemperatureChart data={timeline} sessionIndex={sessionHourIndex} />
         <AtmospherePanel data={timeline} sessionIndex={sessionHourIndex} />
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
