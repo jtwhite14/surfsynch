@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { ConditionWeights, DEFAULT_CONDITION_WEIGHTS, WEIGHT_PRESETS } from "@/types";
+import { ConditionWeights, DEFAULT_CONDITION_WEIGHTS, WEIGHT_PRESETS, CardinalDirection } from "@/types";
+import { SwellExposurePicker } from "@/components/spots/SwellExposurePicker";
 
 interface AlertTuningSectionProps {
   spotId: string;
@@ -81,6 +82,13 @@ export function AlertTuningSection({ spotId, onSave }: AlertTuningSectionProps) 
     saveTimeoutRef.current = setTimeout(() => saveWeights(newWeights), 700);
   }
 
+  function handleExposureChange(directions: CardinalDirection[]) {
+    const newWeights = { ...weights, swellExposure: directions.length > 0 ? directions : undefined };
+    setWeights(newWeights);
+    clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => saveWeights(newWeights), 700);
+  }
+
   function weightToLevel(value: number): number {
     if (value <= 0.45) return 0;
     if (value <= 0.8) return 1;
@@ -110,6 +118,12 @@ export function AlertTuningSection({ spotId, onSave }: AlertTuningSectionProps) 
           ))}
         </div>
       </div>
+
+      {/* Swell exposure */}
+      <SwellExposurePicker
+        value={weights.swellExposure ?? []}
+        onChange={handleExposureChange}
+      />
 
       {/* Customize weights */}
       <div className="space-y-3">

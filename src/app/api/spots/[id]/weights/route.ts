@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db, surfSpots } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
-import { ConditionWeights, DEFAULT_CONDITION_WEIGHTS } from "@/types";
+import { ConditionWeights, DEFAULT_CONDITION_WEIGHTS, VALID_CARDINAL_DIRECTIONS, CardinalDirection } from "@/types";
 
 export async function GET(
   request: NextRequest,
@@ -65,6 +65,9 @@ export async function PUT(
       preferredTide: ['any', 'low', 'mid', 'high', 'incoming', 'outgoing'].includes(body.preferredTide)
         ? body.preferredTide
         : 'any',
+      swellExposure: Array.isArray(body.swellExposure)
+        ? body.swellExposure.filter((d: string) => VALID_CARDINAL_DIRECTIONS.includes(d as CardinalDirection)) as CardinalDirection[]
+        : undefined,
       notes: body.notes ?? undefined,
     };
 

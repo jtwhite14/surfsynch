@@ -41,6 +41,52 @@ export function calculateWaveEnergy(
   return Math.round(energyKj);
 }
 
+// ── Direction attenuation ──
+
+import type { CardinalDirection } from "@/types";
+
+/** Degree mapping for each cardinal direction. */
+export const DIRECTION_DEGREES: Record<CardinalDirection, number> = {
+  N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315,
+};
+
+/**
+ * Compute an angular distance between two degree values (0-360), accounting for wrap.
+ */
+function angularDistance(a: number, b: number): number {
+  const diff = Math.abs(a - b) % 360;
+  return diff > 180 ? 360 - diff : diff;
+}
+
+/**
+ * Calculate direction attenuation factor (0-1) for a swell direction
+ * against a set of exposure directions.
+ *
+ * - No exposure set or no swell direction → 1.0 (no attenuation)
+ * - Uses cos²(minDelta) when minDelta ≤ 90°, else 0
+ * - Physical basis: wave energy flux perpendicular to shoreline ∝ cos²(θ)
+ */
+export function calculateDirectionAttenuation(
+  swellDirDeg: number | null,
+  exposureDirections?: CardinalDirection[]
+): number {
+  if (!exposureDirections || exposureDirections.length === 0) return 1.0;
+  if (swellDirDeg == null) return 1.0;
+
+  // Find the minimum angular distance between swell direction and any exposure direction
+  let minDelta = 360;
+  for (const dir of exposureDirections) {
+    const delta = angularDistance(swellDirDeg, DIRECTION_DEGREES[dir]);
+    if (delta < minDelta) minDelta = delta;
+  }
+
+  if (minDelta > 90) return 0;
+
+  const radians = (minDelta * Math.PI) / 180;
+  const cosVal = Math.cos(radians);
+  return cosVal * cosVal; // cos²(θ)
+}
+
 /**
  * Human-readable energy label based on kJ thresholds.
  */

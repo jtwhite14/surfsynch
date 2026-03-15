@@ -145,13 +145,13 @@ async function processSpot(spot: {
 
   console.log(`[alerts] Spot "${spot.id}": ${sessionsWithConditions.length} sessions (ratings: ${sessionsWithConditions.map(s => s.rating).join(',')}), ${forecastHours.length} forecast hours, utcOffset=${utcOffsetSeconds}`);
 
-  const alerts = generateAlerts(forecastHours, sessionsForMatching, weights, 50, new Date(), utcOffsetSeconds);
+  const alerts = generateAlerts(forecastHours, sessionsForMatching, weights, 50, new Date(), utcOffsetSeconds, weights.swellExposure);
 
   if (alerts.length > 0) {
     console.log(`[alerts] Spot "${spot.id}": generated ${alerts.length} alerts, top score=${alerts[0].effectiveScore.toFixed(1)}`);
   } else {
     // Log the best score that didn't meet threshold for debugging
-    const debugAlerts = generateAlerts(forecastHours, sessionsForMatching, weights, 0, new Date(), utcOffsetSeconds);
+    const debugAlerts = generateAlerts(forecastHours, sessionsForMatching, weights, 0, new Date(), utcOffsetSeconds, weights.swellExposure);
     const bestScore = debugAlerts.length > 0 ? debugAlerts[0].effectiveScore.toFixed(1) : 'N/A';
     console.log(`[alerts] Spot "${spot.id}": 0 alerts (best score below threshold: ${bestScore}/50)`);
   }

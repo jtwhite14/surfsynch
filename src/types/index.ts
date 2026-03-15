@@ -56,6 +56,11 @@ export interface AvailabilityWindow {
   duration: number; // in minutes
 }
 
+// Cardinal direction type for swell exposure
+export type CardinalDirection = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
+
+export const VALID_CARDINAL_DIRECTIONS: CardinalDirection[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+
 // Condition weight configuration per spot
 export interface ConditionWeights {
   swellHeight: number;    // 0-1
@@ -65,6 +70,7 @@ export interface ConditionWeights {
   windSpeed: number;      // 0-1
   windDirection: number;  // 0-1
   preferredTide: 'any' | 'low' | 'mid' | 'high' | 'incoming' | 'outgoing';
+  swellExposure?: CardinalDirection[];
   notes?: string;
 }
 

@@ -1,4 +1,5 @@
-import { MarineConditions, ConditionWeights, DEFAULT_CONDITION_WEIGHTS, MatchDetails, TimeWindow } from "@/types";
+import { MarineConditions, ConditionWeights, DEFAULT_CONDITION_WEIGHTS, MatchDetails, TimeWindow, CardinalDirection } from "@/types";
+import { calculateDirectionAttenuation } from "@/lib/wave-energy";
 
 // ── Gaussian similarity ──
 
@@ -327,7 +328,8 @@ export function generateAlerts(
   weights: ConditionWeights = DEFAULT_CONDITION_WEIGHTS,
   threshold: number = 50,
   now: Date = new Date(),
-  utcOffsetSeconds: number = 0
+  utcOffsetSeconds: number = 0,
+  swellExposure?: CardinalDirection[]
 ): ComputedAlert[] {
   if (sessions.length === 0) return [];
 
@@ -360,6 +362,13 @@ export function generateAlerts(
     // Compare in local-as-UTC space so timezone doesn't cause false filtering
     if (fh.timestamp.getTime() + 3600000 <= nowLocalMs) continue;
 
+    // Direction attenuation from swell exposure setting
+    const swellDir = fh.conditions.swellDirection;
+    const attenuation = calculateDirectionAttenuation(swellDir, swellExposure);
+
+    // If swell is mostly blocked by exposure, skip this hour entirely
+    if (attenuation < 0.25) continue;
+
     const daysOut = (fh.timestamp.getTime() - nowLocalMs) / (1000 * 60 * 60 * 24);
     const forecastConfidence = getForecastConfidence(daysOut);
 
@@ -375,7 +384,9 @@ export function generateAlerts(
       if (coverage < 0.5) continue;
 
       const ratingBoost = getRatingBoost(session.rating);
-      const effectiveScore = score * forecastConfidence * ratingBoost;
+      // Soft-penalize partially exposed hours: sqrt so 45° ≈ 0.84x, not 0.5x
+      const exposurePenalty = attenuation < 1.0 ? Math.sqrt(attenuation) : 1.0;
+      const effectiveScore = score * forecastConfidence * ratingBoost * exposurePenalty;
 
       details.ratingBoost = ratingBoost;
       details.forecastConfidence = forecastConfidence;
