@@ -208,20 +208,10 @@ function SidebarContent({
     <>
       {/* Brand */}
       <div className={`flex flex-col gap-3 p-3 border-b border-sidebar-border ${collapsed ? "items-center" : ""}`}>
-        <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between"}`}>
-          <Link href="/" className={`flex items-center gap-2.5 ${collapsed ? "" : "px-1.5"} py-1`}>
-            <span className="text-xl">🏄</span>
-            {!collapsed && <span className="font-bold text-sidebar-foreground">SurfSync</span>}
-          </Link>
-          {!collapsed && (
-            <button
-              onClick={onToggle}
-              className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-            >
-              <PanelLeft className="size-4" />
-            </button>
-          )}
-        </div>
+        <Link href="/" className={`flex items-center gap-2.5 ${collapsed ? "justify-center" : "px-1.5"} py-1`}>
+          <span className="text-xl">🏄</span>
+          {!collapsed && <span className="font-bold text-sidebar-foreground">SurfSync</span>}
+        </Link>
 
         {/* Primary action */}
         {collapsed ? (
@@ -247,19 +237,6 @@ function SidebarContent({
 
       {/* Navigation */}
       <div className={`flex flex-col gap-px p-3 flex-1 ${collapsed ? "items-center" : ""}`}>
-        {collapsed && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={onToggle}
-                className="flex items-center justify-center size-9 rounded-md mb-1 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              >
-                <PanelLeft className="size-4" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">Expand sidebar</TooltipContent>
-          </Tooltip>
-        )}
         {navigation.map((item) => {
           const active = isActive(item.href);
           const link = (
@@ -297,8 +274,29 @@ function SidebarContent({
         })}
       </div>
 
-      {/* Profile — bottom */}
-      <div className={`border-t border-sidebar-border p-3 ${collapsed ? "flex justify-center" : ""}`}>
+      {/* Toggle + Profile — bottom */}
+      <div className={`border-t border-sidebar-border p-3 flex flex-col gap-1 ${collapsed ? "items-center" : ""}`}>
+        {collapsed ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={onToggle}
+                className="flex items-center justify-center size-9 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              >
+                <PanelLeft className="size-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Expand sidebar</TooltipContent>
+          </Tooltip>
+        ) : (
+          <button
+            onClick={onToggle}
+            className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          >
+            <PanelLeft className="size-4 shrink-0" />
+            Collapse
+          </button>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             {collapsed ? (
