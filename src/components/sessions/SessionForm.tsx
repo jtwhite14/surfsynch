@@ -28,7 +28,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus } from "lucide-react";
+import { Plus, MapPin } from "lucide-react";
+import dynamic from "next/dynamic";
+
+const SpotMap = dynamic(() => import("@/components/map/SpotMap"), { ssr: false });
 
 const MAX_FILE_SIZE = 4 * 1024 * 1024;
 const MAX_DIMENSION = 2048;
@@ -164,6 +167,7 @@ export function SessionForm({ spots: initialSpots, defaultSpotId, surfboards: in
   const [newSpotName, setNewSpotName] = useState("");
   const [newSpotDescription, setNewSpotDescription] = useState("");
   const [isSavingSpot, setIsSavingSpot] = useState(false);
+  const [newSpotLocation, setNewSpotLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   // Add new equipment dialogs
   const [equipDialogType, setEquipDialogType] = useState<"surfboard" | "wetsuit">("surfboard");
@@ -362,17 +366,21 @@ export function SessionForm({ spots: initialSpots, defaultSpotId, surfboards: in
     setAddSpotDraftIdx(draftIdx);
     setNewSpotName("");
     setNewSpotDescription("");
+    const group = photoGroups[draftIdx];
+    if (group?.centroidLat && group?.centroidLng) {
+      setNewSpotLocation({ lat: group.centroidLat, lng: group.centroidLng });
+    } else {
+      setNewSpotLocation(null);
+    }
     setAddSpotOpen(true);
   };
 
   const handleSaveNewSpot = async () => {
-    if (!newSpotName.trim()) return;
+    if (!newSpotName.trim() || !newSpotLocation) return;
     setIsSavingSpot(true);
 
-    // Try to get coords from the photo group's centroid
-    const group = photoGroups[addSpotDraftIdx];
-    const lat = group?.centroidLat ?? 0;
-    const lng = group?.centroidLng ?? 0;
+    const lat = newSpotLocation.lat;
+    const lng = newSpotLocation.lng;
 
     try {
       const res = await fetch("/api/spots", {
@@ -1040,7 +1048,7 @@ export function SessionForm({ spots: initialSpots, defaultSpotId, surfboards: in
 
       {/* Add New Spot Dialog */}
       <Dialog open={addSpotOpen} onOpenChange={setAddSpotOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Add New Spot</DialogTitle>
           </DialogHeader>
@@ -1063,15 +1071,29 @@ export function SessionForm({ spots: initialSpots, defaultSpotId, surfboards: in
                 rows={2}
               />
             </div>
-            {photoGroups[addSpotDraftIdx]?.centroidLat ? (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5">
+                <MapPin className="size-3.5" />
+                Location *
+              </Label>
               <p className="text-xs text-muted-foreground">
-                Location from photo: {photoGroups[addSpotDraftIdx].centroidLat!.toFixed(5)}, {photoGroups[addSpotDraftIdx].centroidLng!.toFixed(5)}
+                {newSpotLocation
+                  ? `Selected: ${newSpotLocation.lat.toFixed(5)}, ${newSpotLocation.lng.toFixed(5)} — tap the map to adjust`
+                  : "Tap the map to set the spot location"}
               </p>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                No GPS from photos — you can update the location later from the map.
-              </p>
-            )}
+              <div className="h-[250px] rounded-lg overflow-hidden border">
+                <SpotMap
+                  spots={spots}
+                  onMapClick={(lat, lng) => setNewSpotLocation({ lat, lng })}
+                  newSpotMarker={newSpotLocation}
+                  initialViewState={
+                    newSpotLocation
+                      ? { longitude: newSpotLocation.lng, latitude: newSpotLocation.lat, zoom: 13 }
+                      : undefined
+                  }
+                />
+              </div>
+            </div>
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setAddSpotOpen(false)}>
                 Cancel
@@ -1079,7 +1101,7 @@ export function SessionForm({ spots: initialSpots, defaultSpotId, surfboards: in
               <Button
                 className="flex-1"
                 onClick={handleSaveNewSpot}
-                disabled={!newSpotName.trim() || isSavingSpot}
+                disabled={!newSpotName.trim() || !newSpotLocation || isSavingSpot}
               >
                 {isSavingSpot ? "Creating…" : "Create Spot"}
               </Button>
