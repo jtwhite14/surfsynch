@@ -182,8 +182,8 @@ export default function DashboardLayout({
             </Link>
           </header>
 
-          <main className="flex-1 overflow-y-auto">
-            <div className="mx-auto max-w-5xl px-6 py-8">{children}</div>
+          <main className={`flex-1 ${pathname === "/" ? "overflow-hidden" : "overflow-y-auto"}`}>
+            {pathname === "/" ? children : <div className="mx-auto max-w-5xl px-6 py-8">{children}</div>}
           </main>
         </div>
       </div>

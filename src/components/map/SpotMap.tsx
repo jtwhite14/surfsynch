@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import Map, { Marker, MapRef, NavigationControl, GeolocateControl, MapMouseEvent } from "react-map-gl/mapbox";
+import mapboxgl from "mapbox-gl";
 import { SurfSpot } from "@/lib/db/schema";
 import SpotMarker from "./SpotMarker";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -13,6 +14,7 @@ interface SpotMapProps {
   selectedSpotId?: string;
   interactive?: boolean;
   newSpotMarker?: { lat: number; lng: number } | null;
+  fitToSpots?: boolean;
   initialViewState?: {
     longitude: number;
     latitude: number;
@@ -33,10 +35,31 @@ export default function SpotMap({
   selectedSpotId,
   interactive = true,
   newSpotMarker,
+  fitToSpots = false,
   initialViewState = DEFAULT_VIEW_STATE,
 }: SpotMapProps) {
   const mapRef = useRef<MapRef>(null);
   const [viewState, setViewState] = useState(initialViewState);
+  const hasFitted = useRef(false);
+
+  useEffect(() => {
+    if (!fitToSpots || hasFitted.current || !mapRef.current || spots.length === 0) return;
+    hasFitted.current = true;
+
+    if (spots.length === 1) {
+      mapRef.current.flyTo({
+        center: [parseFloat(spots[0].longitude), parseFloat(spots[0].latitude)],
+        zoom: 12,
+        duration: 1000,
+      });
+    } else {
+      const bounds = new mapboxgl.LngLatBounds();
+      spots.forEach((spot) => {
+        bounds.extend([parseFloat(spot.longitude), parseFloat(spot.latitude)]);
+      });
+      mapRef.current.fitBounds(bounds, { padding: 80, maxZoom: 13, duration: 1000 });
+    }
+  }, [fitToSpots, spots]);
 
   const handleMapClick = useCallback(
     (event: MapMouseEvent) => {
