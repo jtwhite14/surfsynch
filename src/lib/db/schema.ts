@@ -101,6 +101,7 @@ export const surfboards = pgTable("surfboards", {
   volume: decimal("volume", { precision: 5, scale: 1 }),
   finSetup: varchar("fin_setup", { length: 50 }),
   tailShape: varchar("tail_shape", { length: 50 }),
+  photoUrl: text("photo_url"),
   notes: text("notes"),
   retired: boolean("retired").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

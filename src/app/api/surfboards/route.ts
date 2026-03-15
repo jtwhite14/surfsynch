@@ -18,6 +18,7 @@ const surfboardSchema = z.object({
   volume: z.number().min(10).max(300).optional().nullable(),
   finSetup: z.enum(["thruster", "quad", "twin", "single", "2+1", "five", "none"]).optional().nullable(),
   tailShape: z.enum(["squash", "round", "pin", "swallow", "fish", "diamond"]).optional().nullable(),
+  photoUrl: z.string().url().optional().nullable(),
   notes: z.string().optional().nullable(),
   retired: z.boolean().optional(),
 });
@@ -65,6 +66,7 @@ export async function POST(request: NextRequest) {
         volume: validated.volume?.toString() || null,
         finSetup: validated.finSetup || null,
         tailShape: validated.tailShape || null,
+        photoUrl: validated.photoUrl || null,
         notes: validated.notes || null,
         retired: validated.retired ?? false,
       })
@@ -106,6 +108,7 @@ export async function PUT(request: NextRequest) {
     if (validated.volume !== undefined) updates.volume = validated.volume?.toString() || null;
     if (validated.finSetup !== undefined) updates.finSetup = validated.finSetup || null;
     if (validated.tailShape !== undefined) updates.tailShape = validated.tailShape || null;
+    if (validated.photoUrl !== undefined) updates.photoUrl = validated.photoUrl || null;
     if (validated.notes !== undefined) updates.notes = validated.notes || null;
     if (validated.retired !== undefined) updates.retired = validated.retired;
 

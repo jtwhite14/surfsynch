@@ -65,8 +65,20 @@ export function EquipmentCard({ equipment, type, onEdit, onDelete, onRetire }: E
       ].filter(Boolean).join(" ")
     : (equipment as Wetsuit).brand || "";
 
+  const photoUrl = type === "surfboard" ? (equipment as Surfboard).photoUrl : null;
+
   return (
-    <div className={`relative rounded-lg border p-4 ${isRetired ? "opacity-50" : ""}`}>
+    <div className={`relative rounded-lg border overflow-hidden ${isRetired ? "opacity-50" : ""}`}>
+      {photoUrl && (
+        <div className="w-full aspect-[4/3]">
+          <img
+            src={photoUrl}
+            alt={equipment.name}
+            className="w-full h-full object-cover"
+          />
+        </div>
+      )}
+      <div className="p-4">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -103,6 +115,7 @@ export function EquipmentCard({ equipment, type, onEdit, onDelete, onRetire }: E
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }

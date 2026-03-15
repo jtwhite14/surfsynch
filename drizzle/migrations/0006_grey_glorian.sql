@@ -1,0 +1,1 @@
+ALTER TABLE "surfboards" ADD COLUMN "photo_url" text;

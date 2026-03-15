@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { Camera, X } from "lucide-react";
 import { Surfboard, Wetsuit } from "@/lib/db/schema";
 
 interface EquipmentFormDialogProps {
@@ -52,6 +53,9 @@ export function EquipmentFormDialog({
   const [saving, setSaving] = useState(false);
 
   // Surfboard fields
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [model, setModel] = useState("");
   const [boardType, setBoardType] = useState("");
   const [lengthFeet, setLengthFeet] = useState("");
@@ -95,6 +99,7 @@ export function EquipmentFormDialog({
         setVolume(board.volume || "");
         setFinSetup(board.finSetup || "");
         setTailShape(board.tailShape || "");
+        setPhotoUrl(board.photoUrl || null);
       } else {
         const suit = existing as Wetsuit;
         setWetsuitThickness(suit.thickness || "");
@@ -118,9 +123,40 @@ export function EquipmentFormDialog({
       setStyle("");
       setEntry("");
       setSize("");
+      setPhotoUrl(null);
       setNotes("");
     }
   }, [open, existing, equipmentType]);
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        toast.error(data.error || "Failed to upload photo");
+        return;
+      }
+
+      const data = await response.json();
+      setPhotoUrl(data.url);
+    } catch {
+      toast.error("Failed to upload photo");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -150,6 +186,7 @@ export function EquipmentFormDialog({
           volume: volume ? parseFloat(volume) : null,
           finSetup: finSetup || null,
           tailShape: tailShape || null,
+          photoUrl: photoUrl || null,
           notes: notes.trim() || null,
         };
       } else {
@@ -219,6 +256,43 @@ export function EquipmentFormDialog({
 
           {equipmentType === "surfboard" ? (
             <>
+              <div className="space-y-2">
+                <Label>Photo</Label>
+                {photoUrl ? (
+                  <div className="relative w-full aspect-[4/3] rounded-md overflow-hidden border">
+                    <img
+                      src={photoUrl}
+                      alt="Board photo"
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setPhotoUrl(null)}
+                      className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/60 text-white hover:bg-black/80"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="flex items-center justify-center gap-2 w-full h-24 rounded-md border border-dashed text-sm text-muted-foreground hover:bg-accent/50 transition-colors"
+                  >
+                    <Camera className="size-4" />
+                    {uploading ? "Uploading..." : "Add a photo"}
+                  </button>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={handlePhotoUpload}
+                />
+              </div>
+
               <div className="space-y-2">
                 <Label>Model</Label>
                 <Input
