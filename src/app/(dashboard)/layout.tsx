@@ -228,52 +228,38 @@ function SidebarContent({
         })}
       </div>
 
-      {/* Action buttons */}
+      {/* Add button */}
       <div className={`flex flex-col gap-px px-3 pb-3 ${collapsed ? "items-center" : ""}`}>
         <div className={`h-px bg-sidebar-border mb-2 ${collapsed ? "w-full" : ""}`} />
-        {collapsed ? (
-          <>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Link
-                  href="/sessions/new"
-                  className="flex items-center justify-center size-9 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-                >
-                  <Plus className="size-4" />
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right">Add Session</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => window.dispatchEvent(new CustomEvent("start-add-spot"))}
-                  className="flex items-center justify-center size-9 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-                >
-                  <MapPin className="size-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Add Spot</TooltipContent>
-            </Tooltip>
-          </>
-        ) : (
-          <>
-            <Link
-              href="/sessions/new"
-              className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-            >
-              <Plus className="size-4 shrink-0" />
-              Add Session
-            </Link>
-            <button
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            {collapsed ? (
+              <button className="flex items-center justify-center size-9 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                <Plus className="size-4" />
+              </button>
+            ) : (
+              <button className="flex w-full items-center justify-center gap-2 rounded-md px-2.5 py-1.5 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                <Plus className="size-4 shrink-0" />
+                Add
+              </button>
+            )}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side={collapsed ? "right" : "top"} align={collapsed ? "start" : "center"}>
+            <DropdownMenuItem asChild>
+              <Link href="/sessions/new" className="flex items-center gap-2">
+                <Waves className="size-4" />
+                Add Session
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="flex items-center gap-2 cursor-pointer"
               onClick={() => window.dispatchEvent(new CustomEvent("start-add-spot"))}
-              className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
             >
-              <MapPin className="size-4 shrink-0" />
+              <MapPin className="size-4" />
               Add Spot
-            </button>
-          </>
-        )}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Spacer */}
