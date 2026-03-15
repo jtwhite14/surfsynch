@@ -34,6 +34,7 @@ const WEATHER_PARAMS = [
 interface OpenMeteoMarineResponse {
   latitude: number;
   longitude: number;
+  utc_offset_seconds: number;
   hourly: {
     time: string[];
     wave_height?: number[];
@@ -131,42 +132,45 @@ export async function fetchHistoricalConditions(
     ? "https://api.open-meteo.com/v1/forecast"
     : HISTORICAL_API_BASE;
 
-  // Marine API with historical date range for wave/swell data
+  // Query a 2-day range around the UTC date to handle timezone boundaries
+  // (e.g. 10pm Pacific July 15 = 5am UTC July 16)
+  const dayBefore = new Date(date);
+  dayBefore.setUTCDate(dayBefore.getUTCDate() - 1);
+  const dayBeforeStr = dayBefore.toISOString().split("T")[0];
+  const dayAfter = new Date(date);
+  dayAfter.setUTCDate(dayAfter.getUTCDate() + 1);
+  const dayAfterStr = dayAfter.toISOString().split("T")[0];
+
+  // Marine API — use GMT so times match the UTC-stored session time
   const marineParams = new URLSearchParams({
     latitude: latitude.toString(),
     longitude: longitude.toString(),
-    start_date: dateStr,
-    end_date: dateStr,
+    start_date: dayBeforeStr,
+    end_date: dayAfterStr,
     hourly: MARINE_PARAMS,
-    timezone: "auto",
   });
 
   // Weather data (wind, temp, pressure, etc.)
+  const weatherHourly = [
+    "wind_speed_10m",
+    "wind_direction_10m",
+    "wind_gusts_10m",
+    "temperature_2m",
+    "sea_surface_temperature",
+    "relative_humidity_2m",
+    "precipitation",
+    "pressure_msl",
+    "cloud_cover",
+    "visibility",
+  ].join(",");
+
   const weatherParamsObj: Record<string, string> = {
     latitude: latitude.toString(),
     longitude: longitude.toString(),
-    hourly: [
-      "wind_speed_10m",
-      "wind_direction_10m",
-      "wind_gusts_10m",
-      "temperature_2m",
-      "sea_surface_temperature",
-      "relative_humidity_2m",
-      "precipitation",
-      "pressure_msl",
-      "cloud_cover",
-      "visibility",
-    ].join(","),
-    timezone: "auto",
+    hourly: weatherHourly,
+    start_date: dayBeforeStr,
+    end_date: dayAfterStr,
   };
-  if (daysAgo <= 5) {
-    // Forecast API uses past_days to access recent history
-    weatherParamsObj.past_days = Math.max(daysAgo, 1).toString();
-    weatherParamsObj.forecast_days = "1";
-  } else {
-    weatherParamsObj.start_date = dateStr;
-    weatherParamsObj.end_date = dateStr;
-  }
   const weatherParams = new URLSearchParams(weatherParamsObj);
 
   try {
@@ -184,46 +188,54 @@ export async function fetchHistoricalConditions(
     const marineData: OpenMeteoMarineResponse | null = marineResponse.ok ? await marineResponse.json() : null;
     const weatherData = weatherResponse.ok ? await weatherResponse.json() : null;
 
-    // Use marine times if available, otherwise weather times
-    const times: string[] = marineData?.hourly?.time || weatherData?.hourly?.time || [];
-    if (times.length === 0) return null;
-
+    // Find closest hour index in each dataset independently
+    // (marine and weather may have different time arrays)
     const targetMs = date.getTime();
-    let closestIndex = 0;
-    let minDiff = Infinity;
 
-    times.forEach((time: string, index: number) => {
-      const diff = Math.abs(new Date(time).getTime() - targetMs);
-      if (diff < minDiff) {
-        minDiff = diff;
-        closestIndex = index;
-      }
-    });
+    const findClosestIndex = (timeArray: string[]): number => {
+      let best = 0;
+      let minDiff = Infinity;
+      timeArray.forEach((time, i) => {
+        const diff = Math.abs(new Date(time).getTime() - targetMs);
+        if (diff < minDiff) {
+          minDiff = diff;
+          best = i;
+        }
+      });
+      return best;
+    }
+
+    const marineTimes = marineData?.hourly?.time || [];
+    const weatherTimes = weatherData?.hourly?.time || [];
+    if (marineTimes.length === 0 && weatherTimes.length === 0) return null;
+
+    const mi = marineTimes.length > 0 ? findClosestIndex(marineTimes) : -1;
+    const wi = weatherTimes.length > 0 ? findClosestIndex(weatherTimes) : -1;
 
     return {
-      waveHeight: marineData?.hourly?.wave_height?.[closestIndex] ?? null,
-      wavePeriod: marineData?.hourly?.wave_period?.[closestIndex] ?? null,
-      waveDirection: marineData?.hourly?.wave_direction?.[closestIndex] ?? null,
-      primarySwellHeight: marineData?.hourly?.swell_wave_height?.[closestIndex] ?? null,
-      primarySwellPeriod: marineData?.hourly?.swell_wave_period?.[closestIndex] ?? null,
-      primarySwellDirection: marineData?.hourly?.swell_wave_direction?.[closestIndex] ?? null,
-      secondarySwellHeight: marineData?.hourly?.secondary_swell_wave_height?.[closestIndex] ?? null,
-      secondarySwellPeriod: marineData?.hourly?.secondary_swell_wave_period?.[closestIndex] ?? null,
-      secondarySwellDirection: marineData?.hourly?.secondary_swell_wave_direction?.[closestIndex] ?? null,
-      windWaveHeight: marineData?.hourly?.wind_wave_height?.[closestIndex] ?? null,
-      windWavePeriod: marineData?.hourly?.wind_wave_period?.[closestIndex] ?? null,
-      windWaveDirection: marineData?.hourly?.wind_wave_direction?.[closestIndex] ?? null,
-      windSpeed: weatherData?.hourly?.wind_speed_10m?.[closestIndex] ?? null,
-      windDirection: weatherData?.hourly?.wind_direction_10m?.[closestIndex] ?? null,
-      windGust: weatherData?.hourly?.wind_gusts_10m?.[closestIndex] ?? null,
-      airTemp: weatherData?.hourly?.temperature_2m?.[closestIndex] ?? null,
-      seaSurfaceTemp: weatherData?.hourly?.sea_surface_temperature?.[closestIndex] ?? null,
-      humidity: weatherData?.hourly?.relative_humidity_2m?.[closestIndex] ?? null,
-      precipitation: weatherData?.hourly?.precipitation?.[closestIndex] ?? null,
-      pressureMsl: weatherData?.hourly?.pressure_msl?.[closestIndex] ?? null,
-      cloudCover: weatherData?.hourly?.cloud_cover?.[closestIndex] ?? null,
-      visibility: weatherData?.hourly?.visibility?.[closestIndex] ?? null,
-      timestamp: new Date(times[closestIndex]),
+      waveHeight: mi >= 0 ? (marineData!.hourly.wave_height?.[mi] ?? null) : null,
+      wavePeriod: mi >= 0 ? (marineData!.hourly.wave_period?.[mi] ?? null) : null,
+      waveDirection: mi >= 0 ? (marineData!.hourly.wave_direction?.[mi] ?? null) : null,
+      primarySwellHeight: mi >= 0 ? (marineData!.hourly.swell_wave_height?.[mi] ?? null) : null,
+      primarySwellPeriod: mi >= 0 ? (marineData!.hourly.swell_wave_period?.[mi] ?? null) : null,
+      primarySwellDirection: mi >= 0 ? (marineData!.hourly.swell_wave_direction?.[mi] ?? null) : null,
+      secondarySwellHeight: mi >= 0 ? (marineData!.hourly.secondary_swell_wave_height?.[mi] ?? null) : null,
+      secondarySwellPeriod: mi >= 0 ? (marineData!.hourly.secondary_swell_wave_period?.[mi] ?? null) : null,
+      secondarySwellDirection: mi >= 0 ? (marineData!.hourly.secondary_swell_wave_direction?.[mi] ?? null) : null,
+      windWaveHeight: mi >= 0 ? (marineData!.hourly.wind_wave_height?.[mi] ?? null) : null,
+      windWavePeriod: mi >= 0 ? (marineData!.hourly.wind_wave_period?.[mi] ?? null) : null,
+      windWaveDirection: mi >= 0 ? (marineData!.hourly.wind_wave_direction?.[mi] ?? null) : null,
+      windSpeed: wi >= 0 ? (weatherData!.hourly.wind_speed_10m?.[wi] ?? null) : null,
+      windDirection: wi >= 0 ? (weatherData!.hourly.wind_direction_10m?.[wi] ?? null) : null,
+      windGust: wi >= 0 ? (weatherData!.hourly.wind_gusts_10m?.[wi] ?? null) : null,
+      airTemp: wi >= 0 ? (weatherData!.hourly.temperature_2m?.[wi] ?? null) : null,
+      seaSurfaceTemp: wi >= 0 ? (weatherData!.hourly.sea_surface_temperature?.[wi] ?? null) : null,
+      humidity: wi >= 0 ? (weatherData!.hourly.relative_humidity_2m?.[wi] ?? null) : null,
+      precipitation: wi >= 0 ? (weatherData!.hourly.precipitation?.[wi] ?? null) : null,
+      pressureMsl: wi >= 0 ? (weatherData!.hourly.pressure_msl?.[wi] ?? null) : null,
+      cloudCover: wi >= 0 ? (weatherData!.hourly.cloud_cover?.[wi] ?? null) : null,
+      visibility: wi >= 0 ? (weatherData!.hourly.visibility?.[wi] ?? null) : null,
+      timestamp: new Date(marineTimes[mi] || weatherTimes[wi]),
     };
   } catch (error) {
     console.error("Error fetching historical conditions:", error);
