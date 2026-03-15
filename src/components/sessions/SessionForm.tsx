@@ -85,6 +85,7 @@ interface SessionDraft {
   notes: string;
   photoUrls: string[];
   expanded: boolean;
+  activePhotoIndex: number;
 }
 
 function deriveSessionDraft(group: PhotoGroup, spots: SurfSpot[], defaultSpotId?: string): SessionDraft {
@@ -117,7 +118,7 @@ function deriveSessionDraft(group: PhotoGroup, spots: SurfSpot[], defaultSpotId?
     .map((p) => p.photoUrl)
     .filter((url) => !url.startsWith("blob:"));
 
-  return { spotId, date, startTime, endTime, rating: 3, notes: "", photoUrls, expanded: false };
+  return { spotId, date, startTime, endTime, rating: 3, notes: "", photoUrls, expanded: false, activePhotoIndex: 0 };
 }
 
 export function SessionForm({ spots, defaultSpotId }: SessionFormProps) {
@@ -274,6 +275,7 @@ export function SessionForm({ spots, defaultSpotId }: SessionFormProps) {
       notes: "",
       photoUrls: [],
       expanded: true,
+      activePhotoIndex: 0,
     }]);
     setStep("details");
   };
@@ -605,216 +607,247 @@ export function SessionForm({ spots, defaultSpotId }: SessionFormProps) {
     );
   }
 
-  // ---- STEP 2: Session Details (one card per session) ----
+  // ---- STEP 2: Session Details (one section per session) ----
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <StepIndicator />
 
-      {sessionDrafts.map((draft, idx) => (
-        <Card key={idx}>
-          {/* Clickable header to expand/collapse */}
-          <button
-            type="button"
-            onClick={() => toggleDraftExpanded(idx)}
-            className="w-full text-left"
-          >
-            <CardHeader className="pb-3">
+      {sessionDrafts.map((draft, idx) => {
+        const hasPhotos = draft.photoUrls.length > 0;
+        const activePhoto = draft.photoUrls[draft.activePhotoIndex] || draft.photoUrls[0];
+
+        return (
+          <div key={idx} className="space-y-4">
+            {/* Session label for multi-session */}
+            {sessionDrafts.length > 1 && (
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 min-w-0">
-                  {/* Photo thumbnails */}
-                  {draft.photoUrls.length > 0 && (
-                    <div className="flex -space-x-1.5 flex-shrink-0">
-                      {draft.photoUrls.slice(0, 3).map((url, i) => (
-                        <div
-                          key={i}
-                          className="w-10 h-10 rounded-md overflow-hidden border-2 border-background flex-shrink-0"
-                          style={{ zIndex: 3 - i }}
-                        >
-                          <img src={url} alt="" className="w-full h-full object-cover" />
-                        </div>
-                      ))}
-                      {draft.photoUrls.length > 3 && (
-                        <div
-                          className="w-10 h-10 rounded-md border-2 border-background bg-muted flex items-center justify-center flex-shrink-0 text-xs font-medium text-muted-foreground"
-                          style={{ zIndex: 0 }}
-                        >
-                          +{draft.photoUrls.length - 3}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <div className="min-w-0">
-                    <CardTitle className="text-base">
-                      Session {sessionDrafts.length > 1 ? idx + 1 : ""}
-                      {draft.spotId && (
-                        <span className="font-normal text-muted-foreground ml-1">
-                          - {spots.find((s) => s.id === draft.spotId)?.name}
-                        </span>
-                      )}
-                    </CardTitle>
-                    <CardDescription className="text-xs mt-0.5">
-                      {format(draft.date, "MMM d, yyyy")} at {draft.startTime}
-                      {draft.endTime && ` - ${draft.endTime}`}
-                      {" / "}
-                      {draft.photoUrls.length} photo{draft.photoUrls.length !== 1 ? "s" : ""}
-                    </CardDescription>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {/* Rating stars (compact) */}
-                  <div className="flex items-center">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <svg
-                        key={i}
-                        className={`w-3 h-3 ${i < draft.rating ? "text-yellow-400" : "text-muted-foreground/30"}`}
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                      </svg>
-                    ))}
-                  </div>
-                  <svg
-                    className={cn("w-4 h-4 text-muted-foreground transition-transform", draft.expanded && "rotate-180")}
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
-            </CardHeader>
-          </button>
-
-          {/* Expandable details form */}
-          {draft.expanded && (
-            <CardContent className="space-y-6 pt-0">
-              {/* Spot Selection */}
-              <div className="space-y-2">
-                <Label>Surf Spot</Label>
-                <Select value={draft.spotId} onValueChange={(v) => updateDraft(idx, { spotId: v })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a spot" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {spots.map((spot) => (
-                      <SelectItem key={spot.id} value={spot.id}>
-                        {spot.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Date */}
-              <div className="space-y-2">
-                <Label>Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn("w-full justify-start text-left font-normal")}
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-4 w-4">
-                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                        <line x1="16" y1="2" x2="16" y2="6" />
-                        <line x1="8" y1="2" x2="8" y2="6" />
-                        <line x1="3" y1="10" x2="21" y2="10" />
-                      </svg>
-                      {format(draft.date, "PPP")}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={draft.date}
-                      onSelect={(d) => d && updateDraft(idx, { date: d })}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              {/* Time */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Start Time</Label>
-                  <Input
-                    type="time"
-                    value={draft.startTime}
-                    onChange={(e) => updateDraft(idx, { startTime: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>End Time (optional)</Label>
-                  <Input
-                    type="time"
-                    value={draft.endTime}
-                    onChange={(e) => updateDraft(idx, { endTime: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              {/* Rating */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label>Rating</Label>
-                  <div className="flex items-center gap-1">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => updateDraft(idx, { rating: i + 1 })}
-                        className="focus:outline-none"
-                      >
-                        <svg
-                          className={`w-6 h-6 transition-colors ${
-                            i < draft.rating ? "text-yellow-400" : "text-muted-foreground/40 hover:text-yellow-200"
-                          }`}
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <Slider
-                  value={[draft.rating]}
-                  onValueChange={([v]) => updateDraft(idx, { rating: v })}
-                  min={1}
-                  max={5}
-                  step={1}
-                />
-              </div>
-
-              {/* Notes */}
-              <div className="space-y-2">
-                <Label>Notes (optional)</Label>
-                <Textarea
-                  placeholder="How was the session? Any memorable waves?"
-                  value={draft.notes}
-                  onChange={(e) => updateDraft(idx, { notes: e.target.value })}
-                  rows={3}
-                />
-              </div>
-
-              {/* Remove session button (only if multiple) */}
-              {sessionDrafts.length > 1 && (
+                <h2 className="text-lg font-semibold">Session {idx + 1}</h2>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
                   onClick={() => removeDraft(idx)}
-                  className="text-destructive hover:text-destructive"
+                  className="text-destructive hover:text-destructive text-xs"
                 >
-                  Remove this session
+                  Remove
                 </Button>
-              )}
-            </CardContent>
-          )}
-        </Card>
-      ))}
+              </div>
+            )}
+
+            {/* Hero photo with overlay info */}
+            {hasPhotos && (
+              <div className="space-y-2">
+                <div className="relative rounded-2xl overflow-hidden">
+                  <img
+                    src={activePhoto}
+                    alt="Session photo"
+                    className="w-full h-[280px] sm:h-[360px] object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+
+                  {/* Spot name + date overlay at bottom */}
+                  <div className="absolute bottom-0 left-0 right-0 p-5">
+                    <p className="text-white/80 text-sm">
+                      {format(draft.date, "MMMM d, yyyy")} at {draft.startTime}
+                      {draft.endTime && ` - ${draft.endTime}`}
+                    </p>
+                    {draft.spotId && (
+                      <p className="text-white text-xl font-bold mt-0.5">
+                        {spots.find((s) => s.id === draft.spotId)?.name}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Navigation arrows for multi-photo */}
+                  {draft.photoUrls.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateDraft(idx, {
+                            activePhotoIndex: (draft.activePhotoIndex - 1 + draft.photoUrls.length) % draft.photoUrls.length,
+                          })
+                        }
+                        className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/40 rounded-full flex items-center justify-center hover:bg-black/60 transition-colors"
+                      >
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateDraft(idx, {
+                            activePhotoIndex: (draft.activePhotoIndex + 1) % draft.photoUrls.length,
+                          })
+                        }
+                        className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/40 rounded-full flex items-center justify-center hover:bg-black/60 transition-colors"
+                      >
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                      <div className="absolute top-3 right-3 bg-black/50 rounded-full px-2 py-0.5 text-xs text-white">
+                        {draft.activePhotoIndex + 1} / {draft.photoUrls.length}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Thumbnail strip for multi-photo */}
+                {draft.photoUrls.length > 1 && (
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {draft.photoUrls.map((url, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => updateDraft(idx, { activePhotoIndex: i })}
+                        className={cn(
+                          "flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden transition-all",
+                          i === draft.activePhotoIndex
+                            ? "ring-2 ring-primary opacity-100"
+                            : "opacity-50 hover:opacity-80"
+                        )}
+                      >
+                        <img src={url} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Details form */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Session Details</CardTitle>
+                <CardDescription>
+                  {hasPhotos
+                    ? "Auto-filled from photo metadata. Adjust as needed."
+                    : "Log your surf session. Conditions will be automatically fetched."}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Spot Selection */}
+                <div className="space-y-2">
+                  <Label>Surf Spot</Label>
+                  <Select value={draft.spotId} onValueChange={(v) => updateDraft(idx, { spotId: v })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a spot" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {spots.map((spot) => (
+                        <SelectItem key={spot.id} value={spot.id}>
+                          {spot.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Date */}
+                <div className="space-y-2">
+                  <Label>Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn("w-full justify-start text-left font-normal")}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-4 w-4">
+                          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                          <line x1="16" y1="2" x2="16" y2="6" />
+                          <line x1="8" y1="2" x2="8" y2="6" />
+                          <line x1="3" y1="10" x2="21" y2="10" />
+                        </svg>
+                        {format(draft.date, "PPP")}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={draft.date}
+                        onSelect={(d) => d && updateDraft(idx, { date: d })}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Time */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Start Time</Label>
+                    <Input
+                      type="time"
+                      value={draft.startTime}
+                      onChange={(e) => updateDraft(idx, { startTime: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>End Time (optional)</Label>
+                    <Input
+                      type="time"
+                      value={draft.endTime}
+                      onChange={(e) => updateDraft(idx, { endTime: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                {/* Rating */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label>Rating</Label>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => updateDraft(idx, { rating: i + 1 })}
+                          className="focus:outline-none"
+                        >
+                          <svg
+                            className={`w-6 h-6 transition-colors ${
+                              i < draft.rating ? "text-yellow-400" : "text-muted-foreground/40 hover:text-yellow-200"
+                            }`}
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <Slider
+                    value={[draft.rating]}
+                    onValueChange={([v]) => updateDraft(idx, { rating: v })}
+                    min={1}
+                    max={5}
+                    step={1}
+                  />
+                </div>
+
+                {/* Notes */}
+                <div className="space-y-2">
+                  <Label>Notes (optional)</Label>
+                  <Textarea
+                    placeholder="How was the session? Any memorable waves?"
+                    value={draft.notes}
+                    onChange={(e) => updateDraft(idx, { notes: e.target.value })}
+                    rows={3}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Divider between sessions */}
+            {sessionDrafts.length > 1 && idx < sessionDrafts.length - 1 && (
+              <div className="border-t" />
+            )}
+          </div>
+        );
+      })}
 
       {/* Submit */}
       <div className="flex gap-4">
