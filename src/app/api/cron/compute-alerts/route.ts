@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, surfSpots, surfSessions, sessionConditions, spotForecasts, spotAlerts } from "@/lib/db";
-import { eq, gte, and, inArray, sql } from "drizzle-orm";
+import { db, surfSpots, surfSessions, sessionConditions, spotForecasts, spotAlerts, users, conditionProfiles } from "@/lib/db";
+import { eq, gte, and, inArray, isNull, sql } from "drizzle-orm";
+import { sendAlertSMS } from "@/lib/sms/send-alert-sms";
 import { fetchMarineForecast } from "@/lib/api/open-meteo";
 import { fetchTideTimeline, warmStationCache } from "@/lib/api/noaa-tides";
 import {
   generateAlerts,
+  generateProfileAlerts,
   parseSessionConditions,
   parseForecastConditions,
   type SessionForMatching,
   type ForecastHour,
+  type ComputedProfileAlert,
 } from "@/lib/matching/condition-matcher";
+import { buildProfileForMatching, isProfileActiveForMonth } from "@/lib/matching/profile-utils";
 import { ConditionWeights, DEFAULT_CONDITION_WEIGHTS, HourlyForecast, MarineConditions } from "@/types";
 
 export const maxDuration = 300; // 5 minutes for cron processing
@@ -26,6 +30,8 @@ export async function GET(request: NextRequest) {
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const cronStart = Date.now();
 
   try {
     // Pre-warm the NOAA station cache (2.6MB) before processing spots,
@@ -66,10 +72,25 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // --- SMS notifications ---
+    let smsSent = 0;
+    try {
+      const elapsed = Date.now() - cronStart;
+      // Skip SMS if cron has been running >4 minutes (safety margin for 5min timeout)
+      if (elapsed < 4 * 60 * 1000) {
+        smsSent = await sendPendingSMSAlerts();
+      } else {
+        console.log("[sms] Skipping SMS — cron nearing timeout");
+      }
+    } catch (error) {
+      console.error("[sms] SMS block failed (non-fatal):", error);
+    }
+
     return NextResponse.json({
       success: true,
       spotsProcessed: allSpots.length,
       alertsGenerated: totalAlerts,
+      smsSent,
     });
   } catch (error) {
     console.error("Error computing alerts:", error);
@@ -109,8 +130,18 @@ async function processSpot(spot: {
   }>;
 }): Promise<number> {
   const sessionsWithConditions = spot.surfSessions.filter(s => s.conditions && !s.ignored);
-  if (sessionsWithConditions.length === 0) {
-    console.log(`[alerts] Spot "${spot.id}": skipped — no sessions with conditions`);
+
+  // Load active profiles for this spot
+  const activeProfiles = await db.query.conditionProfiles.findMany({
+    where: and(
+      eq(conditionProfiles.spotId, spot.id),
+      eq(conditionProfiles.isActive, true)
+    ),
+  });
+
+  // Need either sessions or profiles to generate alerts
+  if (sessionsWithConditions.length === 0 && activeProfiles.length === 0) {
+    console.log(`[alerts] Spot "${spot.id}": skipped — no sessions or profiles`);
     return 0;
   }
 
@@ -126,16 +157,6 @@ async function processSpot(spot: {
   }
   const { hourly: forecast, utcOffsetSeconds } = forecastResult;
 
-  // Parse sessions for matching
-  const sessionsForMatching: SessionForMatching[] = sessionsWithConditions.map(s => ({
-    id: s.id,
-    date: s.date,
-    rating: s.rating,
-    notes: s.notes,
-    photoUrl: s.photos?.[0]?.photoUrl || s.photoUrl,
-    conditions: parseSessionConditions(s.conditions!),
-  }));
-
   // Parse forecast hours
   const forecastHours: ForecastHour[] = forecast.map(fh => ({
     time: fh.time,
@@ -145,18 +166,99 @@ async function processSpot(spot: {
   }));
 
   const weights: ConditionWeights = (spot.conditionWeights as ConditionWeights) ?? DEFAULT_CONDITION_WEIGHTS;
+  const now = new Date();
 
-  console.log(`[alerts] Spot "${spot.id}": ${sessionsWithConditions.length} sessions (ratings: ${sessionsWithConditions.map(s => s.rating).join(',')}), ${forecastHours.length} forecast hours, utcOffset=${utcOffsetSeconds}`);
+  // --- Session-based alerts ---
+  let sessionAlerts: ReturnType<typeof generateAlerts> = [];
+  if (sessionsWithConditions.length > 0) {
+    const sessionsForMatching: SessionForMatching[] = sessionsWithConditions.map(s => ({
+      id: s.id,
+      date: s.date,
+      rating: s.rating,
+      notes: s.notes,
+      photoUrl: s.photos?.[0]?.photoUrl || s.photoUrl,
+      conditions: parseSessionConditions(s.conditions!),
+    }));
 
-  const alerts = generateAlerts(forecastHours, sessionsForMatching, weights, 70, new Date(), utcOffsetSeconds, weights.swellExposure);
+    console.log(`[alerts] Spot "${spot.id}": ${sessionsWithConditions.length} sessions (ratings: ${sessionsWithConditions.map(s => s.rating).join(',')}), ${forecastHours.length} forecast hours, utcOffset=${utcOffsetSeconds}`);
+    sessionAlerts = generateAlerts(forecastHours, sessionsForMatching, weights, 70, now, utcOffsetSeconds, weights.swellExposure);
+  }
 
-  if (alerts.length > 0) {
-    console.log(`[alerts] Spot "${spot.id}": generated ${alerts.length} alerts, top score=${alerts[0].effectiveScore.toFixed(1)}`);
+  // --- Profile-based alerts ---
+  let profileAlerts: ComputedProfileAlert[] = [];
+  if (activeProfiles.length > 0) {
+    // Filter profiles by active months
+    const currentMonth = new Date(now.getTime() + utcOffsetSeconds * 1000).getMonth() + 1;
+    const monthFilteredProfiles = activeProfiles.filter(p =>
+      isProfileActiveForMonth(p.activeMonths as number[] | null, currentMonth)
+    );
+
+    if (monthFilteredProfiles.length > 0) {
+      const profilesForMatching = monthFilteredProfiles.map(p => buildProfileForMatching(p));
+      console.log(`[alerts] Spot "${spot.id}": ${profilesForMatching.length} active profiles`);
+      profileAlerts = generateProfileAlerts(forecastHours, profilesForMatching, weights, 70, now, utcOffsetSeconds, weights.swellExposure);
+    }
+  }
+
+  // --- Merge: keep the best score per (forecastHour, timeWindow) key ---
+  type MergedAlert = {
+    forecastHour: Date;
+    timeWindow: string;
+    matchScore: number;
+    confidenceScore: number;
+    effectiveScore: number;
+    matchedSessionId: string | null;
+    matchedProfileId: string | null;
+    matchDetails: unknown;
+    forecastSnapshot: unknown;
+  };
+
+  const mergedMap = new Map<string, MergedAlert>();
+
+  for (const alert of sessionAlerts) {
+    const key = `${alert.forecastHour.toISOString()}:${alert.timeWindow}`;
+    const existing = mergedMap.get(key);
+    if (!existing || alert.effectiveScore > existing.effectiveScore) {
+      mergedMap.set(key, {
+        forecastHour: alert.forecastHour,
+        timeWindow: alert.timeWindow,
+        matchScore: alert.matchScore,
+        confidenceScore: alert.confidenceScore,
+        effectiveScore: alert.effectiveScore,
+        matchedSessionId: alert.matchedSession.id,
+        matchedProfileId: null,
+        matchDetails: alert.matchDetails,
+        forecastSnapshot: alert.forecastSnapshot,
+      });
+    }
+  }
+
+  for (const alert of profileAlerts) {
+    const key = `${alert.forecastHour.toISOString()}:${alert.timeWindow}`;
+    const existing = mergedMap.get(key);
+    if (!existing || alert.effectiveScore > existing.effectiveScore) {
+      mergedMap.set(key, {
+        forecastHour: alert.forecastHour,
+        timeWindow: alert.timeWindow,
+        matchScore: alert.matchScore,
+        confidenceScore: alert.confidenceScore,
+        effectiveScore: alert.effectiveScore,
+        matchedSessionId: null,
+        matchedProfileId: alert.matchedProfile.id,
+        matchDetails: alert.matchDetails,
+        forecastSnapshot: alert.forecastSnapshot,
+      });
+    }
+  }
+
+  const mergedAlerts = Array.from(mergedMap.values());
+  const totalCount = mergedAlerts.length;
+
+  if (totalCount > 0) {
+    const topScore = Math.max(...mergedAlerts.map(a => a.effectiveScore));
+    console.log(`[alerts] Spot "${spot.id}": generated ${totalCount} alerts (${sessionAlerts.length} session, ${profileAlerts.length} profile), top score=${topScore.toFixed(1)}`);
   } else {
-    // Log the best score that didn't meet threshold for debugging
-    const debugAlerts = generateAlerts(forecastHours, sessionsForMatching, weights, 0, new Date(), utcOffsetSeconds, weights.swellExposure);
-    const bestScore = debugAlerts.length > 0 ? debugAlerts[0].effectiveScore.toFixed(1) : 'N/A';
-    console.log(`[alerts] Spot "${spot.id}": 0 alerts (best score below threshold: ${bestScore}/70)`);
+    console.log(`[alerts] Spot "${spot.id}": 0 alerts`);
   }
 
   // Expire old alerts that are no longer relevant
@@ -164,8 +266,7 @@ async function processSpot(spot: {
     where: and(eq(spotAlerts.spotId, spot.id), eq(spotAlerts.status, "active")),
   });
 
-  // Use full timestamp for dedup key (matches the unique index)
-  const newKeys = new Set(alerts.map(a =>
+  const newKeys = new Set(mergedAlerts.map(a =>
     `${a.forecastHour.toISOString()}:${a.timeWindow}`
   ));
 
@@ -180,9 +281,9 @@ async function processSpot(spot: {
       .where(inArray(spotAlerts.id, toExpire.map(a => a.id)));
   }
 
-  // Batch upsert all alerts
-  if (alerts.length > 0) {
-    const values = alerts.map(alert => ({
+  // Batch upsert all merged alerts
+  if (mergedAlerts.length > 0) {
+    const values = mergedAlerts.map(alert => ({
       spotId: spot.id,
       userId: spot.userId,
       forecastHour: alert.forecastHour,
@@ -190,7 +291,8 @@ async function processSpot(spot: {
       matchScore: alert.matchScore.toFixed(2),
       confidenceScore: alert.confidenceScore.toFixed(2),
       effectiveScore: alert.effectiveScore.toFixed(2),
-      matchedSessionId: alert.matchedSession.id,
+      matchedSessionId: alert.matchedSessionId,
+      matchedProfileId: alert.matchedProfileId,
       matchDetails: alert.matchDetails,
       forecastSnapshot: alert.forecastSnapshot,
       status: "active" as const,
@@ -204,6 +306,7 @@ async function processSpot(spot: {
         confidenceScore: sql`excluded.confidence_score`,
         effectiveScore: sql`excluded.effective_score`,
         matchedSessionId: sql`excluded.matched_session_id`,
+        matchedProfileId: sql`excluded.matched_profile_id`,
         matchDetails: sql`excluded.match_details`,
         forecastSnapshot: sql`excluded.forecast_snapshot`,
         status: sql`excluded.status`,
@@ -212,7 +315,7 @@ async function processSpot(spot: {
     });
   }
 
-  return alerts.length;
+  return totalCount;
 }
 
 /**
@@ -281,4 +384,84 @@ async function getOrFetchForecast(
     }
     return null;
   }
+}
+
+/**
+ * Send SMS for unsent active alerts whose forecast hour is still in the future.
+ * Groups alerts by user, sends one text per user, then marks them as sent.
+ */
+async function sendPendingSMSAlerts(): Promise<number> {
+  const now = new Date();
+
+  // Get unsent, active, future alerts with spot names
+  const pendingAlerts = await db
+    .select({
+      alertId: spotAlerts.id,
+      userId: spotAlerts.userId,
+      spotName: surfSpots.name,
+      timeWindow: spotAlerts.timeWindow,
+      forecastHour: spotAlerts.forecastHour,
+      effectiveScore: spotAlerts.effectiveScore,
+    })
+    .from(spotAlerts)
+    .innerJoin(surfSpots, eq(spotAlerts.spotId, surfSpots.id))
+    .where(
+      and(
+        eq(spotAlerts.status, "active"),
+        isNull(spotAlerts.smsSentAt),
+        gte(spotAlerts.forecastHour, now)
+      )
+    );
+
+  if (pendingAlerts.length === 0) return 0;
+
+  // Group by user
+  const byUser = new Map<string, typeof pendingAlerts>();
+  for (const alert of pendingAlerts) {
+    const existing = byUser.get(alert.userId) || [];
+    existing.push(alert);
+    byUser.set(alert.userId, existing);
+  }
+
+  let totalSent = 0;
+
+  for (const [userId, userAlerts] of byUser) {
+    // Fetch user's phone + smsEnabled
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+      columns: { phoneNumber: true, smsEnabled: true },
+    });
+
+    if (!user?.smsEnabled || !user.phoneNumber) continue;
+
+    // Sort by effectiveScore descending
+    const sorted = userAlerts.sort(
+      (a, b) => parseFloat(b.effectiveScore) - parseFloat(a.effectiveScore)
+    );
+
+    const success = await sendAlertSMS(
+      user.phoneNumber,
+      sorted.map((a) => ({
+        spotName: a.spotName,
+        timeWindow: a.timeWindow,
+        forecastHour: a.forecastHour,
+        effectiveScore: parseFloat(a.effectiveScore),
+      }))
+    );
+
+    if (success) {
+      const alertIds = userAlerts.map((a) => a.alertId);
+      await db
+        .update(spotAlerts)
+        .set({ smsSentAt: now })
+        .where(inArray(spotAlerts.id, alertIds));
+      totalSent += alertIds.length;
+    }
+  }
+
+  if (totalSent > 0) {
+    console.log(`[sms] Marked ${totalSent} alerts as sent`);
+  }
+
+  return totalSent;
 }

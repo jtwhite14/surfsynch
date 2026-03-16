@@ -135,6 +135,42 @@ export interface MatchDetails {
   forecastConfidence: number;    // decay factor from days out
 }
 
+// Condition profile types
+export interface ConditionProfileResponse {
+  id: string;
+  spotId: string;
+  name: string;
+  sortOrder: number;
+  isActive: boolean;
+  targetSwellHeight: number | null;
+  targetSwellPeriod: number | null;
+  targetSwellDirection: number | null;
+  targetWindSpeed: number | null;
+  targetWindDirection: number | null;
+  targetTideHeight: number | null;
+  activeMonths: number[] | null;
+  reinforcementCount: number;
+  source: 'manual' | 'auto_generated';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ProfileForMatching {
+  id: string;
+  name: string;
+  conditions: {
+    swellHeight: number | null;
+    swellPeriod: number | null;
+    swellDirection: number | null;
+    windSpeed: number | null;
+    windDirection: number | null;
+    tideHeight: number | null;
+    waveEnergy: number | null;
+  };
+  specifiedVars: Set<string>;
+  reinforcementCount: number;
+}
+
 // Prediction types
 export interface ConditionMatch {
   sessionId: string;
@@ -157,12 +193,16 @@ export interface SpotAlertResponse {
   matchScore: number;
   confidenceScore: number;
   effectiveScore: number;
-  matchedSession: {
+  matchedSession?: {
     id: string;
     date: Date;
     rating: number;
     notes: string | null;
     photoUrl: string | null;
+  };
+  matchedProfile?: {
+    id: string;
+    name: string;
   };
   matchDetails: MatchDetails;
   forecastSnapshot: MarineConditions;

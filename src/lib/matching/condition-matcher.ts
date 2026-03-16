@@ -1,5 +1,6 @@
-import { MarineConditions, ConditionWeights, DEFAULT_CONDITION_WEIGHTS, MatchDetails, TimeWindow, CardinalDirection, PreferredWaveSize, PreferredSwellPeriod, PreferredWind } from "@/types";
+import { MarineConditions, ConditionWeights, DEFAULT_CONDITION_WEIGHTS, MatchDetails, TimeWindow, CardinalDirection, PreferredWaveSize, PreferredSwellPeriod, PreferredWind, ProfileForMatching } from "@/types";
 import { calculateDirectionAttenuation, calculateWaveEnergy } from "@/lib/wave-energy";
+import { getReinforcementConfidence, isProfileActiveForMonth } from "@/lib/matching/profile-utils";
 
 // ── Gaussian similarity ──
 
@@ -231,18 +232,24 @@ function getTidePreferenceMultiplier(tideHeight: number | null, pref: string | s
 // ── Core matching ──
 
 /**
- * Compare forecast conditions against a past session's conditions.
+ * Compare forecast conditions against a past session's (or profile's) conditions.
  * Returns raw similarity score (0-100) and per-variable details.
+ *
+ * @param profileSpecifiedVars - Optional set of variable names specified by a profile.
+ *   For profile-based matching: coverage is computed as matchedPairs / profileSpecifiedCount
+ *   (not /7), and preference multipliers are skipped for profile-specified vars.
  */
 export function computeSimilarity(
   forecast: ParsedConditions,
   session: ParsedConditions,
-  weights: ConditionWeights = DEFAULT_CONDITION_WEIGHTS
+  weights: ConditionWeights = DEFAULT_CONDITION_WEIGHTS,
+  profileSpecifiedVars?: Set<string>
 ): { score: number; details: MatchDetails; coverage: number } {
   let weightedSum = 0;
   let totalWeight = 0;
   let nonNullCount = 0;
-  const totalVars = 7;
+  const isProfileMatch = profileSpecifiedVars != null && profileSpecifiedVars.size > 0;
+  const totalVars = isProfileMatch ? profileSpecifiedVars!.size : 7;
 
   // Per-variable similarities
   const details: MatchDetails = {
@@ -262,7 +269,10 @@ export function computeSimilarity(
   if (forecast.swellHeight != null && session.swellHeight != null) {
     const sigma = SIGMAS.swellHeight(session.swellHeight);
     let sim = gaussianSimilarity(forecast.swellHeight, session.swellHeight, sigma);
-    sim *= getPreferenceMultiplier(forecast.swellHeight, weights.preferredWaveSize, WAVE_SIZE_RANGES);
+    // Skip preference multiplier for profile-specified vars
+    if (!isProfileMatch || !profileSpecifiedVars!.has("swellHeight")) {
+      sim *= getPreferenceMultiplier(forecast.swellHeight, weights.preferredWaveSize, WAVE_SIZE_RANGES);
+    }
     sim = Math.min(1, sim); // cap at 1 after bonus
     details.swellHeight = sim;
     weightedSum += weights.swellHeight * sim;
@@ -273,7 +283,9 @@ export function computeSimilarity(
   // Swell period + period preference
   if (forecast.swellPeriod != null && session.swellPeriod != null) {
     let sim = gaussianSimilarity(forecast.swellPeriod, session.swellPeriod, SIGMAS.swellPeriod);
-    sim *= getPreferenceMultiplier(forecast.swellPeriod, weights.preferredSwellPeriod, SWELL_PERIOD_RANGES);
+    if (!isProfileMatch || !profileSpecifiedVars!.has("swellPeriod")) {
+      sim *= getPreferenceMultiplier(forecast.swellPeriod, weights.preferredSwellPeriod, SWELL_PERIOD_RANGES);
+    }
     sim = Math.min(1, sim);
     details.swellPeriod = sim;
     weightedSum += weights.swellPeriod * sim;
@@ -293,7 +305,9 @@ export function computeSimilarity(
   // Wind speed + wind preference
   if (forecast.windSpeed != null && session.windSpeed != null) {
     let sim = gaussianSimilarity(forecast.windSpeed, session.windSpeed, SIGMAS.windSpeed);
-    sim *= getWindPreferenceMultiplier(forecast.windSpeed, weights.preferredWind);
+    if (!isProfileMatch || !profileSpecifiedVars!.has("windSpeed")) {
+      sim *= getWindPreferenceMultiplier(forecast.windSpeed, weights.preferredWind);
+    }
     sim = Math.min(1, sim);
     details.windSpeed = sim;
     weightedSum += weights.windSpeed * sim;
@@ -313,7 +327,9 @@ export function computeSimilarity(
   // Tide height + tide preference
   if (forecast.tideHeight != null && session.tideHeight != null) {
     let sim = gaussianSimilarity(forecast.tideHeight, session.tideHeight, SIGMAS.tideHeight);
-    sim *= getTidePreferenceMultiplier(forecast.tideHeight, weights.preferredTide);
+    if (!isProfileMatch || !profileSpecifiedVars!.has("tideHeight")) {
+      sim *= getTidePreferenceMultiplier(forecast.tideHeight, weights.preferredTide);
+    }
     sim = Math.min(1, sim);
     details.tideHeight = sim;
     weightedSum += weights.tideHeight * sim;
@@ -334,8 +350,10 @@ export function computeSimilarity(
   const coverage = nonNullCount / totalVars;
   details.coverage = coverage;
 
-  // Require at least 50% coverage
-  if (coverage < 0.5 || totalWeight === 0) {
+  // For profile matching: require minimum 2 absolute matched pairs and >=50% coverage
+  // For session matching: require at least 50% coverage (3.5 of 7)
+  const minAbsoluteCount = isProfileMatch ? 2 : 0;
+  if (coverage < 0.5 || totalWeight === 0 || nonNullCount < minAbsoluteCount) {
     return { score: 0, details, coverage };
   }
 
@@ -515,5 +533,110 @@ export function generateAlerts(
   }
 
   // Sort by effective score descending
+  return Array.from(grouped.values()).sort((a, b) => b.effectiveScore - a.effectiveScore);
+}
+
+// ── Profile-based alert generation ──
+
+export interface ComputedProfileAlert {
+  forecastHour: Date;
+  timeWindow: TimeWindow;
+  matchScore: number;
+  confidenceScore: number;
+  effectiveScore: number;
+  matchedProfile: { id: string; name: string };
+  matchDetails: MatchDetails;
+  forecastSnapshot: MarineConditions;
+}
+
+/**
+ * Generate alerts for a spot by comparing forecast hours to condition profiles.
+ * Parallel to generateAlerts but uses profile-specific logic:
+ * - No seasonal filtering (profiles use activeMonths instead)
+ * - Reinforcement-count confidence instead of rating boost
+ * - Profile-aware coverage calculation
+ * - Skip preference multipliers for profile-specified variables
+ */
+export function generateProfileAlerts(
+  forecastHours: ForecastHour[],
+  profiles: ProfileForMatching[],
+  weights: ConditionWeights = DEFAULT_CONDITION_WEIGHTS,
+  threshold: number = 70,
+  now: Date = new Date(),
+  utcOffsetSeconds: number = 0,
+  swellExposure?: CardinalDirection[]
+): ComputedProfileAlert[] {
+  if (profiles.length === 0) return [];
+
+  const nowLocalMs = now.getTime() + utcOffsetSeconds * 1000;
+
+  // Note: ProfileForMatching doesn't carry activeMonths, so caller must pre-filter.
+
+  const allCandidates: ComputedProfileAlert[] = [];
+
+  for (const fh of forecastHours) {
+    const localHour = getLocalHourFromTimeString(fh.time);
+    if (!isDaylightHour(localHour)) continue;
+    if (fh.timestamp.getTime() + 3600000 <= nowLocalMs) continue;
+
+    const swellDir = fh.conditions.swellDirection;
+    const attenuation = calculateDirectionAttenuation(swellDir, swellExposure);
+    if (attenuation < 0.25) continue;
+
+    const daysOut = (fh.timestamp.getTime() - nowLocalMs) / (1000 * 60 * 60 * 24);
+    const forecastConfidence = getForecastConfidence(daysOut);
+
+    let bestForThisHour: ComputedProfileAlert | null = null;
+
+    for (const profile of profiles) {
+      const { score, details, coverage } = computeSimilarity(
+        fh.conditions,
+        profile.conditions,
+        weights,
+        profile.specifiedVars
+      );
+
+      if (coverage < 0.5) continue;
+
+      const reinforcementConfidence = getReinforcementConfidence(profile.reinforcementCount);
+      const exposurePenalty = attenuation < 1.0 ? Math.sqrt(attenuation) : 1.0;
+      const effectiveScore = score * forecastConfidence * reinforcementConfidence * exposurePenalty;
+
+      details.ratingBoost = reinforcementConfidence;
+      details.forecastConfidence = forecastConfidence;
+
+      if (effectiveScore >= threshold) {
+        if (!bestForThisHour || effectiveScore > bestForThisHour.effectiveScore) {
+          bestForThisHour = {
+            forecastHour: fh.timestamp,
+            timeWindow: getTimeWindow(localHour),
+            matchScore: score,
+            confidenceScore: score * forecastConfidence,
+            effectiveScore,
+            matchedProfile: { id: profile.id, name: profile.name },
+            matchDetails: details,
+            forecastSnapshot: fh.fullConditions,
+          };
+        }
+      }
+    }
+
+    if (bestForThisHour) {
+      allCandidates.push(bestForThisHour);
+    }
+  }
+
+  // Group by local date + time window, keep best per group
+  const grouped = new Map<string, ComputedProfileAlert>();
+  for (const alert of allCandidates) {
+    const fh = forecastHours.find(f => f.timestamp.getTime() === alert.forecastHour.getTime());
+    const localDate = fh ? getLocalDateFromTimeString(fh.time) : alert.forecastHour.toISOString().split('T')[0];
+    const key = `${localDate}:${alert.timeWindow}`;
+    const existing = grouped.get(key);
+    if (!existing || alert.effectiveScore > existing.effectiveScore) {
+      grouped.set(key, alert);
+    }
+  }
+
   return Array.from(grouped.values()).sort((a, b) => b.effectiveScore - a.effectiveScore);
 }

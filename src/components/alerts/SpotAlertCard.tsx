@@ -113,10 +113,12 @@ export function SpotAlertCard({ spotId, sessionCount, alerts: prefetchedAlerts }
   const snapshot = activeAlert.forecastSnapshot as MarineConditions;
   const conditionsText = buildConditionsText(snapshot);
 
-  const sessionDate = new Date(activeAlert.matchedSession.date);
-  const monthsAgo = Math.floor((Date.now() - sessionDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
+  const hasSession = !!activeAlert.matchedSession;
+  const hasProfile = !!activeAlert.matchedProfile;
+  const sessionDate = hasSession ? new Date(activeAlert.matchedSession!.date) : null;
+  const monthsAgo = sessionDate ? Math.floor((Date.now() - sessionDate.getTime()) / (1000 * 60 * 60 * 24 * 30)) : Infinity;
   const isRecent = monthsAgo <= 6;
-  const isHighRated = activeAlert.matchedSession.rating >= 4;
+  const isHighRated = hasSession && activeAlert.matchedSession!.rating >= 4;
 
   return (
     <div
@@ -149,21 +151,25 @@ export function SpotAlertCard({ spotId, sessionCount, alerts: prefetchedAlerts }
 
       <p className="text-sm mt-1.5 leading-snug">
         <span className="font-medium">{dayLabel} {timeLabel}</span>
-        {isHighRated && isRecent ? (
+        {hasProfile ? (
+          <span>
+            {" "}matches your <span className="text-primary font-medium">{activeAlert.matchedProfile!.name}</span> profile
+          </span>
+        ) : isHighRated && isRecent && hasSession ? (
           <span>
             {" "}looks like your{" "}
             <Link
-              href={`/sessions/${activeAlert.matchedSession.id}`}
+              href={`/sessions/${activeAlert.matchedSession!.id}`}
               className="text-primary hover:underline inline-flex items-center gap-0.5"
             >
-              {ratingStars(activeAlert.matchedSession.rating)} session on {formatDate(sessionDate)}
+              {ratingStars(activeAlert.matchedSession!.rating)} session on {formatDate(sessionDate!)}
               <ChevronRight className="size-3" />
             </Link>
           </span>
-        ) : isHighRated ? (
+        ) : isHighRated && hasSession ? (
           <span>
             {" "}is shaping up well — similar to conditions you rated{" "}
-            <span className="text-primary">{ratingStars(activeAlert.matchedSession.rating)}</span>
+            <span className="text-primary">{ratingStars(activeAlert.matchedSession!.rating)}</span>
           </span>
         ) : (
           <span> looks surfable</span>

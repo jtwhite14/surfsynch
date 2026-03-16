@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, surfSpots, spotAlerts, surfSessions } from "@/lib/db";
+import { db, surfSpots, spotAlerts, surfSessions, conditionProfiles } from "@/lib/db";
 import { eq, and, desc } from "drizzle-orm";
 import type { SpotAlertResponse } from "@/types";
 
@@ -51,6 +51,7 @@ export async function GET(
             },
           },
         },
+        matchedProfile: true,
       },
     });
 
@@ -67,13 +68,17 @@ export async function GET(
         matchScore: parseFloat(a.matchScore),
         confidenceScore: parseFloat(a.confidenceScore),
         effectiveScore: parseFloat(a.effectiveScore),
-        matchedSession: {
+        matchedSession: a.matchedSession ? {
           id: a.matchedSession.id,
           date: a.matchedSession.date,
           rating: a.matchedSession.rating,
           notes: a.matchedSession.notes,
           photoUrl: a.matchedSession.photos?.[0]?.photoUrl || a.matchedSession.photoUrl,
-        },
+        } : undefined,
+        matchedProfile: a.matchedProfile ? {
+          id: a.matchedProfile.id,
+          name: a.matchedProfile.name,
+        } : undefined,
         matchDetails: a.matchDetails as SpotAlertResponse['matchDetails'],
         forecastSnapshot: a.forecastSnapshot as SpotAlertResponse['forecastSnapshot'],
         status: a.status as SpotAlertResponse['status'],

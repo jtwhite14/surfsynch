@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, surfSpots, surfSessions, sessionConditions, spotForecasts, spotAlerts } from "@/lib/db";
-import { eq, and, gte, inArray } from "drizzle-orm";
+import { db, surfSpots, surfSessions, sessionConditions, spotForecasts, spotAlerts, conditionProfiles } from "@/lib/db";
+import { eq, and, gte, inArray, sql } from "drizzle-orm";
 import { fetchMarineForecast } from "@/lib/api/open-meteo";
 import { fetchTideTimeline } from "@/lib/api/noaa-tides";
 import {
   generateAlerts,
+  generateProfileAlerts,
   parseSessionConditions,
   parseForecastConditions,
   type SessionForMatching,
   type ForecastHour,
+  type ComputedProfileAlert,
 } from "@/lib/matching/condition-matcher";
+import { buildProfileForMatching, isProfileActiveForMonth } from "@/lib/matching/profile-utils";
 import { ConditionWeights, DEFAULT_CONDITION_WEIGHTS, HourlyForecast, MarineConditions } from "@/types";
 
 /**
@@ -52,10 +55,19 @@ export async function POST(
     }
 
     const sessionsWithConditions = spot.surfSessions.filter(s => s.conditions && !s.ignored);
-    if (sessionsWithConditions.length === 0) {
+
+    // Load active profiles
+    const activeProfiles = await db.query.conditionProfiles.findMany({
+      where: and(
+        eq(conditionProfiles.spotId, id),
+        eq(conditionProfiles.isActive, true)
+      ),
+    });
+
+    if (sessionsWithConditions.length === 0 && activeProfiles.length === 0) {
       return NextResponse.json({
         success: true,
-        message: "No rated sessions with conditions data",
+        message: "No rated sessions or profiles with conditions data",
         alertsGenerated: 0,
       });
     }
@@ -86,33 +98,14 @@ export async function POST(
     }
 
     // Cache forecast
-    const cachedForecast = await db.query.spotForecasts.findFirst({
-      where: eq(spotForecasts.spotId, id),
+    await db.insert(spotForecasts).values({
+      spotId: id,
+      forecastData: forecast,
+      fetchedAt: new Date(),
+    }).onConflictDoUpdate({
+      target: [spotForecasts.spotId],
+      set: { forecastData: forecast, fetchedAt: new Date() },
     });
-
-    if (cachedForecast) {
-      await db.update(spotForecasts)
-        .set({ forecastData: forecast, fetchedAt: new Date() })
-        .where(eq(spotForecasts.id, cachedForecast.id));
-    } else {
-      await db.insert(spotForecasts).values({
-        spotId: id,
-        forecastData: forecast,
-      }).onConflictDoUpdate({
-        target: [spotForecasts.spotId],
-        set: { forecastData: forecast, fetchedAt: new Date() },
-      });
-    }
-
-    // Parse sessions
-    const sessionsForMatching: SessionForMatching[] = sessionsWithConditions.map(s => ({
-      id: s.id,
-      date: s.date,
-      rating: s.rating,
-      notes: s.notes,
-      photoUrl: s.photos?.[0]?.photoUrl || s.photoUrl,
-      conditions: parseSessionConditions(s.conditions!),
-    }));
 
     // Parse forecast hours
     const forecastHours: ForecastHour[] = forecast.hourly.map(fh => ({
@@ -123,20 +116,100 @@ export async function POST(
     }));
 
     const weights: ConditionWeights = (spot.conditionWeights as ConditionWeights) ?? DEFAULT_CONDITION_WEIGHTS;
-    const alerts = generateAlerts(forecastHours, sessionsForMatching, weights, 70, new Date(), forecast.utcOffsetSeconds, weights.swellExposure);
+    const now = new Date();
 
-    // Expire old alerts
-    const existing = await db.query.spotAlerts.findMany({
-      where: and(eq(spotAlerts.spotId, id), eq(spotAlerts.status, "active")),
-    });
-    if (existing.length > 0) {
-      await db.update(spotAlerts)
-        .set({ status: "expired", updatedAt: new Date() })
-        .where(inArray(spotAlerts.id, existing.map(a => a.id)));
+    // Session-based alerts
+    let sessionAlerts: ReturnType<typeof generateAlerts> = [];
+    if (sessionsWithConditions.length > 0) {
+      const sessionsForMatching: SessionForMatching[] = sessionsWithConditions.map(s => ({
+        id: s.id,
+        date: s.date,
+        rating: s.rating,
+        notes: s.notes,
+        photoUrl: s.photos?.[0]?.photoUrl || s.photoUrl,
+        conditions: parseSessionConditions(s.conditions!),
+      }));
+      sessionAlerts = generateAlerts(forecastHours, sessionsForMatching, weights, 70, now, forecast.utcOffsetSeconds, weights.swellExposure);
     }
 
-    // Insert new alerts
-    for (const alert of alerts) {
+    // Profile-based alerts
+    let profileAlerts: ComputedProfileAlert[] = [];
+    if (activeProfiles.length > 0) {
+      const currentMonth = new Date(now.getTime() + forecast.utcOffsetSeconds * 1000).getMonth() + 1;
+      const monthFiltered = activeProfiles.filter(p =>
+        isProfileActiveForMonth(p.activeMonths as number[] | null, currentMonth)
+      );
+      if (monthFiltered.length > 0) {
+        const profilesForMatching = monthFiltered.map(p => buildProfileForMatching(p));
+        profileAlerts = generateProfileAlerts(forecastHours, profilesForMatching, weights, 70, now, forecast.utcOffsetSeconds, weights.swellExposure);
+      }
+    }
+
+    // Merge: keep best per (forecastHour, timeWindow)
+    type MergedAlert = {
+      forecastHour: Date;
+      timeWindow: string;
+      matchScore: number;
+      confidenceScore: number;
+      effectiveScore: number;
+      matchedSessionId: string | null;
+      matchedProfileId: string | null;
+      matchDetails: unknown;
+      forecastSnapshot: unknown;
+    };
+
+    const mergedMap = new Map<string, MergedAlert>();
+
+    for (const alert of sessionAlerts) {
+      const key = `${alert.forecastHour.toISOString()}:${alert.timeWindow}`;
+      const existing = mergedMap.get(key);
+      if (!existing || alert.effectiveScore > existing.effectiveScore) {
+        mergedMap.set(key, {
+          forecastHour: alert.forecastHour,
+          timeWindow: alert.timeWindow,
+          matchScore: alert.matchScore,
+          confidenceScore: alert.confidenceScore,
+          effectiveScore: alert.effectiveScore,
+          matchedSessionId: alert.matchedSession.id,
+          matchedProfileId: null,
+          matchDetails: alert.matchDetails,
+          forecastSnapshot: alert.forecastSnapshot,
+        });
+      }
+    }
+
+    for (const alert of profileAlerts) {
+      const key = `${alert.forecastHour.toISOString()}:${alert.timeWindow}`;
+      const existing = mergedMap.get(key);
+      if (!existing || alert.effectiveScore > existing.effectiveScore) {
+        mergedMap.set(key, {
+          forecastHour: alert.forecastHour,
+          timeWindow: alert.timeWindow,
+          matchScore: alert.matchScore,
+          confidenceScore: alert.confidenceScore,
+          effectiveScore: alert.effectiveScore,
+          matchedSessionId: null,
+          matchedProfileId: alert.matchedProfile.id,
+          matchDetails: alert.matchDetails,
+          forecastSnapshot: alert.forecastSnapshot,
+        });
+      }
+    }
+
+    const mergedAlerts = Array.from(mergedMap.values());
+
+    // Expire old alerts
+    const existingDbAlerts = await db.query.spotAlerts.findMany({
+      where: and(eq(spotAlerts.spotId, id), eq(spotAlerts.status, "active")),
+    });
+    if (existingDbAlerts.length > 0) {
+      await db.update(spotAlerts)
+        .set({ status: "expired", updatedAt: new Date() })
+        .where(inArray(spotAlerts.id, existingDbAlerts.map(a => a.id)));
+    }
+
+    // Insert merged alerts
+    for (const alert of mergedAlerts) {
       await db.insert(spotAlerts).values({
         spotId: id,
         userId: session.user.id,
@@ -145,7 +218,8 @@ export async function POST(
         matchScore: alert.matchScore.toFixed(2),
         confidenceScore: alert.confidenceScore.toFixed(2),
         effectiveScore: alert.effectiveScore.toFixed(2),
-        matchedSessionId: alert.matchedSession.id,
+        matchedSessionId: alert.matchedSessionId,
+        matchedProfileId: alert.matchedProfileId,
         matchDetails: alert.matchDetails,
         forecastSnapshot: alert.forecastSnapshot,
         status: "active",
@@ -156,7 +230,8 @@ export async function POST(
           matchScore: alert.matchScore.toFixed(2),
           confidenceScore: alert.confidenceScore.toFixed(2),
           effectiveScore: alert.effectiveScore.toFixed(2),
-          matchedSessionId: alert.matchedSession.id,
+          matchedSessionId: sql`excluded.matched_session_id`,
+          matchedProfileId: sql`excluded.matched_profile_id`,
           matchDetails: alert.matchDetails,
           forecastSnapshot: alert.forecastSnapshot,
           status: "active",
@@ -167,16 +242,16 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      sessionsAnalyzed: sessionsForMatching.length,
+      sessionsAnalyzed: sessionsWithConditions.length,
+      profilesAnalyzed: activeProfiles.length,
       forecastHoursScored: forecastHours.length,
-      alertsGenerated: alerts.length,
-      alerts: alerts.map(a => ({
+      alertsGenerated: mergedAlerts.length,
+      alerts: mergedAlerts.map(a => ({
         forecastHour: a.forecastHour,
         timeWindow: a.timeWindow,
         effectiveScore: Math.round(a.effectiveScore),
         matchScore: Math.round(a.matchScore),
-        matchedSessionDate: a.matchedSession.date,
-        matchedSessionRating: a.matchedSession.rating,
+        source: a.matchedProfileId ? "profile" : "session",
       })),
     });
   } catch (error) {

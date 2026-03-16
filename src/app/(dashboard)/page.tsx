@@ -24,6 +24,7 @@ import {
   SlidersHorizontal,
   BellOff,
   Bell,
+  Target,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -37,6 +38,7 @@ import { SpotAlertCard } from "@/components/alerts/SpotAlertCard";
 import { ForecastScores } from "@/components/alerts/ForecastScores";
 import { SpotPaneSessionDetail } from "@/components/spots/SpotPaneSessionDetail";
 import { SpotPaneEditSpot } from "@/components/spots/SpotPaneEditSpot";
+import { SpotPaneProfiles } from "@/components/profiles/SpotPaneProfiles";
 import type { SurfSpot } from "@/lib/db/schema";
 import type { SurfSessionWithConditions } from "@/types";
 
@@ -71,7 +73,7 @@ export default function DashboardPage() {
   const [loadingSpotSessions, setLoadingSpotSessions] = useState(false);
   const [isDeletingSpot, setIsDeletingSpot] = useState(false);
   const [showAllSessions, setShowAllSessions] = useState(false);
-  const [paneView, setPaneView] = useState<"spot" | "session" | "edit">("spot");
+  const [paneView, setPaneView] = useState<"spot" | "session" | "edit" | "profiles">("spot");
   const [viewingSession, setViewingSession] = useState<SurfSessionWithConditions | null>(null);
   const [alertSpotIds, setAlertSpotIds] = useState<Set<string>>(new Set());
   const [alertSummaries, setAlertSummaries] = useState<Array<{ spotId: string; spotName: string; effectiveScore: number; forecastHour: string; timeWindow: string; conditions: string }>>([]);
@@ -456,6 +458,11 @@ export default function DashboardPage() {
                 handleBackToSpot();
               }}
             />
+          ) : paneView === "profiles" ? (
+            <SpotPaneProfiles
+              spotId={selectedSpot.id}
+              onBack={handleBackToSpot}
+            />
           ) : paneView === "edit" ? (
             <SpotPaneEditSpot
               spot={selectedSpot}
@@ -486,6 +493,10 @@ export default function DashboardPage() {
                       <DropdownMenuItem onClick={() => setPaneView("edit")}>
                         <Pencil className="size-3.5 mr-2" />
                         Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setPaneView("profiles")}>
+                        <Target className="size-3.5 mr-2" />
+                        Condition Profiles
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={handleToggleSilence}>
                         {selectedSpot.alertsSilenced ? (
@@ -600,6 +611,17 @@ export default function DashboardPage() {
                     ) : (
                       <SpotAlertCard spotId={selectedSpot.id} sessionCount={spotSessions.length} />
                     )}
+
+                    {/* Condition Profiles */}
+                    <button
+                      onClick={() => setPaneView("profiles")}
+                      className="w-full rounded-lg border border-dashed border-muted-foreground/30 px-3 py-2.5 text-left hover:border-muted-foreground/50 transition-colors"
+                    >
+                      <p className="text-xs text-muted-foreground">
+                        Define your ideal conditions to get alerts without needing past sessions.{" "}
+                        <span className="text-primary font-medium">Condition Profiles</span>
+                      </p>
+                    </button>
 
                     {/* Alert tuning nudge */}
                     {!selectedSpot.conditionWeights && (

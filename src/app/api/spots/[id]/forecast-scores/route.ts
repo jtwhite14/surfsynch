@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, surfSpots, surfSessions, spotForecasts } from "@/lib/db";
+import { db, surfSpots, surfSessions, spotForecasts, conditionProfiles } from "@/lib/db";
 import { eq, and, gte } from "drizzle-orm";
 import { fetchMarineForecast } from "@/lib/api/open-meteo";
 import { fetchTideTimeline } from "@/lib/api/noaa-tides";
@@ -17,8 +17,9 @@ import {
   type SessionForMatching,
   type ForecastHour,
 } from "@/lib/matching/condition-matcher";
+import { buildProfileForMatching, getReinforcementConfidence, isProfileActiveForMonth } from "@/lib/matching/profile-utils";
 import { calculateDirectionAttenuation } from "@/lib/wave-energy";
-import { ConditionWeights, DEFAULT_CONDITION_WEIGHTS, HourlyForecast, MarineConditions, MatchDetails, TimeWindow } from "@/types";
+import { ConditionWeights, DEFAULT_CONDITION_WEIGHTS, HourlyForecast, MarineConditions, MatchDetails, TimeWindow, ProfileForMatching } from "@/types";
 
 const FORECAST_CACHE_TTL = 3 * 60 * 60 * 1000; // 3 hours
 
@@ -79,13 +80,21 @@ export async function GET(
     const sessionsWithConditions = spot.surfSessions.filter(s => s.conditions && !s.ignored);
     const ignoredCount = spot.surfSessions.filter(s => s.ignored).length;
 
-    if (sessionsWithConditions.length === 0) {
+    // Load active profiles
+    const activeProfiles = await db.query.conditionProfiles.findMany({
+      where: and(
+        eq(conditionProfiles.spotId, id),
+        eq(conditionProfiles.isActive, true)
+      ),
+    });
+
+    if (sessionsWithConditions.length === 0 && activeProfiles.length === 0) {
       return NextResponse.json({
         days: [],
         sessionCount: 0,
         ignoredCount,
         threshold: 70,
-        message: "No rated sessions with conditions data",
+        message: "No rated sessions or profiles with conditions data",
       });
     }
 
@@ -131,6 +140,12 @@ export async function GET(
       conditions: parseSessionConditions(s.conditions!),
     }));
 
+    // Build profiles for matching (filter by active months)
+    const currentMonth = new Date(nowLocalMs).getMonth() + 1;
+    const profilesForMatching: ProfileForMatching[] = activeProfiles
+      .filter(p => isProfileActiveForMonth(p.activeMonths as number[] | null, currentMonth))
+      .map(p => buildProfileForMatching(p));
+
     const forecastHours: ForecastHour[] = forecast.hourly.map(fh => ({
       time: fh.time,
       timestamp: new Date(fh.timestamp),
@@ -138,7 +153,7 @@ export async function GET(
       fullConditions: fh as MarineConditions,
     }));
 
-    // Score every daylight forecast hour against all sessions
+    // Score every daylight forecast hour against all sessions AND profiles
     // Group by date + time window, keeping the best score
     const dayWindowMap = new Map<string, WindowScore>();
 
@@ -158,7 +173,6 @@ export async function GET(
       const attenuation = calculateDirectionAttenuation(swellDir, swellExposure);
 
       if (attenuation < 0.25) {
-        // Blocked by exposure — record this if nothing better exists
         if (!dayWindowMap.has(key)) {
           dayWindowMap.set(key, {
             window: timeWindow,
@@ -178,6 +192,7 @@ export async function GET(
       const daysOut = (fh.timestamp.getTime() - nowLocalMs) / (1000 * 60 * 60 * 24);
       const forecastConfidence = getForecastConfidence(daysOut);
 
+      // Score against sessions
       for (const sess of sessionsForMatching) {
         const { score, details, coverage } = computeSimilarity(
           fh.conditions,
@@ -225,6 +240,40 @@ export async function GET(
           });
         }
       }
+
+      // Score against profiles
+      for (const profile of profilesForMatching) {
+        const { score, details, coverage } = computeSimilarity(
+          fh.conditions,
+          profile.conditions,
+          weights,
+          profile.specifiedVars
+        );
+
+        if (coverage < 0.5) continue;
+
+        const reinforcementConfidence = getReinforcementConfidence(profile.reinforcementCount);
+        const exposurePenalty = attenuation < 1.0 ? Math.sqrt(attenuation) : 1.0;
+        const effectiveScore = score * forecastConfidence * reinforcementConfidence * exposurePenalty;
+
+        details.ratingBoost = reinforcementConfidence;
+        details.forecastConfidence = forecastConfidence;
+
+        const existing = dayWindowMap.get(key);
+        if (!existing || effectiveScore > existing.bestScore) {
+          dayWindowMap.set(key, {
+            window: timeWindow,
+            bestScore: effectiveScore,
+            matchScore: score,
+            forecastConfidence,
+            ratingBoost: reinforcementConfidence,
+            matchedSessionRating: null,
+            matchDetails: details,
+            forecastSnapshot: fh.fullConditions,
+            blocked: null,
+          });
+        }
+      }
     }
 
     // Group by date, limit to 5 days
@@ -256,6 +305,7 @@ export async function GET(
       days,
       sessionCount: sessionsWithConditions.length,
       seasonalSessionCount: filteredSessions.length,
+      profileCount: profilesForMatching.length,
       ignoredCount,
       threshold: 70,
     });

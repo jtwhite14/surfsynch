@@ -57,6 +57,20 @@
       "when": 1773610223316,
       "tag": "0007_bored_queen_noir",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1773622887109,
+      "tag": "0008_add-sms-fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1773623588278,
+      "tag": "0009_square_rick_jones",
+      "breakpoints": true
     }
   ]
 }

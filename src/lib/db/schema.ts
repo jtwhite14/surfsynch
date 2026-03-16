@@ -22,6 +22,7 @@ export const users = pgTable("users", {
   emailVerified: timestamp("email_verified"),
   image: text("image"),
   phoneNumber: varchar("phone_number", { length: 20 }),
+  smsEnabled: boolean("sms_enabled").default(false).notNull(),
   homeLatitude: decimal("home_latitude", { precision: 10, scale: 7 }),
   homeLongitude: decimal("home_longitude", { precision: 10, scale: 7 }),
   googleRefreshToken: text("google_refresh_token"),
@@ -205,6 +206,35 @@ export const spotForecasts = pgTable("spot_forecasts", {
   uniqueIndex("uq_spot_forecasts_spot").on(table.spotId),
 ]);
 
+// Condition Profiles table (user-configured ideal condition targets per spot)
+export const conditionProfiles = pgTable("condition_profiles", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  spotId: uuid("spot_id")
+    .notNull()
+    .references(() => surfSpots.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").default(true).notNull(),
+  targetSwellHeight: decimal("target_swell_height", { precision: 5, scale: 2 }),
+  targetSwellPeriod: decimal("target_swell_period", { precision: 5, scale: 2 }),
+  targetSwellDirection: decimal("target_swell_direction", { precision: 5, scale: 2 }),
+  targetWindSpeed: decimal("target_wind_speed", { precision: 5, scale: 2 }),
+  targetWindDirection: decimal("target_wind_direction", { precision: 5, scale: 2 }),
+  targetTideHeight: decimal("target_tide_height", { precision: 6, scale: 3 }),
+  activeMonths: jsonb("active_months"), // e.g., [6,7,8,9] for Jun-Sep. Null = all months.
+  reinforcementCount: integer("reinforcement_count").notNull().default(0),
+  lastReinforcedAt: timestamp("last_reinforced_at"),
+  source: varchar("source", { length: 20 }).notNull().default("manual"), // 'manual' | 'auto_generated'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_condition_profiles_spot_active").on(table.spotId, table.isActive),
+  index("idx_condition_profiles_user").on(table.userId),
+]);
+
 // Spot Alerts table (computed alerts for forecast matching)
 export const spotAlerts = pgTable("spot_alerts", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -220,13 +250,15 @@ export const spotAlerts = pgTable("spot_alerts", {
   confidenceScore: decimal("confidence_score", { precision: 5, scale: 2 }).notNull(),
   effectiveScore: decimal("effective_score", { precision: 5, scale: 2 }).notNull(),
   matchedSessionId: uuid("matched_session_id")
-    .notNull()
     .references(() => surfSessions.id, { onDelete: "cascade" }),
+  matchedProfileId: uuid("matched_profile_id")
+    .references(() => conditionProfiles.id, { onDelete: "set null" }),
   matchDetails: jsonb("match_details").notNull(), // per-variable similarity scores
   forecastSnapshot: jsonb("forecast_snapshot").notNull(), // matched hour + context
   status: varchar("status", { length: 20 }).notNull().default("active"), // active | dismissed | expired | confirmed
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  smsSentAt: timestamp("sms_sent_at"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
   index("idx_spot_alerts_active").on(table.spotId, table.userId, table.status),
@@ -280,6 +312,7 @@ export const surfSpotsRelations = relations(surfSpots, ({ one, many }) => ({
   surfSessions: many(surfSessions),
   forecasts: many(spotForecasts),
   alerts: many(spotAlerts),
+  conditionProfiles: many(conditionProfiles),
 }));
 
 export const surfSessionsRelations = relations(surfSessions, ({ one, many }) => ({
@@ -343,6 +376,17 @@ export const spotForecastsRelations = relations(spotForecasts, ({ one }) => ({
   }),
 }));
 
+export const conditionProfilesRelations = relations(conditionProfiles, ({ one }) => ({
+  spot: one(surfSpots, {
+    fields: [conditionProfiles.spotId],
+    references: [surfSpots.id],
+  }),
+  user: one(users, {
+    fields: [conditionProfiles.userId],
+    references: [users.id],
+  }),
+}));
+
 export const spotAlertsRelations = relations(spotAlerts, ({ one }) => ({
   spot: one(surfSpots, {
     fields: [spotAlerts.spotId],
@@ -355,6 +399,10 @@ export const spotAlertsRelations = relations(spotAlerts, ({ one }) => ({
   matchedSession: one(surfSessions, {
     fields: [spotAlerts.matchedSessionId],
     references: [surfSessions.id],
+  }),
+  matchedProfile: one(conditionProfiles, {
+    fields: [spotAlerts.matchedProfileId],
+    references: [conditionProfiles.id],
   }),
 }));
 
@@ -419,6 +467,8 @@ export type UploadPhoto = typeof uploadPhotos.$inferSelect;
 export type NewUploadPhoto = typeof uploadPhotos.$inferInsert;
 export type SpotAlert = typeof spotAlerts.$inferSelect;
 export type NewSpotAlert = typeof spotAlerts.$inferInsert;
+export type ConditionProfile = typeof conditionProfiles.$inferSelect;
+export type NewConditionProfile = typeof conditionProfiles.$inferInsert;
 export type Surfboard = typeof surfboards.$inferSelect;
 export type NewSurfboard = typeof surfboards.$inferInsert;
 export type Wetsuit = typeof wetsuits.$inferSelect;
