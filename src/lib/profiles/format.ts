@@ -15,6 +15,8 @@ export function formatProfile(p: typeof conditionProfiles.$inferSelect): Conditi
     targetWindDirection: p.targetWindDirection ? parseFloat(p.targetWindDirection) : null,
     targetTideHeight: p.targetTideHeight ? parseFloat(p.targetTideHeight) : null,
     activeMonths: p.activeMonths as number[] | null,
+    consistency: p.consistency as 'low' | 'medium' | 'high',
+    qualityCeiling: p.qualityCeiling,
     reinforcementCount: p.reinforcementCount,
     source: p.source as 'manual' | 'auto_generated',
     createdAt: p.createdAt,

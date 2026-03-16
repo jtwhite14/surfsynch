@@ -149,6 +149,8 @@ export interface ConditionProfileResponse {
   targetWindDirection: number | null;
   targetTideHeight: number | null;
   activeMonths: number[] | null;
+  consistency: 'low' | 'medium' | 'high';
+  qualityCeiling: number; // 1-5
   reinforcementCount: number;
   source: 'manual' | 'auto_generated';
   createdAt: Date;
@@ -169,6 +171,8 @@ export interface ProfileForMatching {
   };
   specifiedVars: Set<string>;
   reinforcementCount: number;
+  consistency: 'low' | 'medium' | 'high';
+  qualityCeiling: number; // 1-5
 }
 
 // Prediction types

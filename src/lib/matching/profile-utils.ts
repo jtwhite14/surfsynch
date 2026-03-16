@@ -60,6 +60,8 @@ export function buildProfileForMatching(profile: {
   targetWindDirection: string | null;
   targetTideHeight: string | null;
   reinforcementCount: number;
+  consistency: string;
+  qualityCeiling: number;
 }): ProfileForMatching {
   const { conditions, specifiedVars } = profileToConditions(profile);
   return {
@@ -68,6 +70,8 @@ export function buildProfileForMatching(profile: {
     conditions,
     specifiedVars,
     reinforcementCount: profile.reinforcementCount,
+    consistency: profile.consistency as 'low' | 'medium' | 'high',
+    qualityCeiling: profile.qualityCeiling,
   };
 }
 

@@ -225,6 +225,8 @@ export const conditionProfiles = pgTable("condition_profiles", {
   targetWindDirection: decimal("target_wind_direction", { precision: 5, scale: 2 }),
   targetTideHeight: decimal("target_tide_height", { precision: 6, scale: 3 }),
   activeMonths: jsonb("active_months"), // e.g., [6,7,8,9] for Jun-Sep. Null = all months.
+  consistency: varchar("consistency", { length: 10 }).notNull().default("medium"), // 'low' | 'medium' | 'high'
+  qualityCeiling: integer("quality_ceiling").notNull().default(3), // 1-5 scale
   reinforcementCount: integer("reinforcement_count").notNull().default(0),
   lastReinforcedAt: timestamp("last_reinforced_at"),
   source: varchar("source", { length: 20 }).notNull().default("manual"), // 'manual' | 'auto_generated'

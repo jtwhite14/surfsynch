@@ -71,6 +71,8 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEdit
       : []
   );
   const [activeMonths, setActiveMonths] = useState<number[]>(profile?.activeMonths ?? []);
+  const [consistency, setConsistency] = useState<string>(profile?.consistency ?? "medium");
+  const [qualityCeiling, setQualityCeiling] = useState<number>(profile?.qualityCeiling ?? 3);
 
   // Advanced overrides
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -141,6 +143,8 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEdit
           name: name.trim(),
           ...targets,
           activeMonths: activeMonths.length > 0 ? activeMonths : null,
+          consistency,
+          qualityCeiling,
         }),
       });
 
@@ -300,6 +304,60 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEdit
                 }`}
               >
                 {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Consistency */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-muted-foreground">
+            Consistency <span className="text-xs text-muted-foreground/60">(how often conditions align)</span>
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {([
+              { value: "low", label: "Rare" },
+              { value: "medium", label: "Sometimes" },
+              { value: "high", label: "Often" },
+            ] as const).map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setConsistency(opt.value)}
+                className={`px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  consistency === opt.value
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-accent"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Quality Ceiling */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-muted-foreground">
+            Quality ceiling <span className="text-xs text-muted-foreground/60">(how good when it works)</span>
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {([
+              { value: 1, label: "Poor" },
+              { value: 2, label: "Fair" },
+              { value: 3, label: "Good" },
+              { value: 4, label: "Great" },
+              { value: 5, label: "Epic" },
+            ] as const).map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setQualityCeiling(opt.value)}
+                className={`px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  qualityCeiling === opt.value
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-accent"
+                }`}
+              >
+                {opt.label}
               </button>
             ))}
           </div>

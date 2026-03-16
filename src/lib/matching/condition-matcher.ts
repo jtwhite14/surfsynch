@@ -545,6 +545,8 @@ export interface ComputedProfileAlert {
   confidenceScore: number;
   effectiveScore: number;
   matchedProfile: { id: string; name: string };
+  qualityCeiling: number; // 1-5
+  consistency: 'low' | 'medium' | 'high';
   matchDetails: MatchDetails;
   forecastSnapshot: MarineConditions;
 }
@@ -600,7 +602,9 @@ export function generateProfileAlerts(
 
       const reinforcementConfidence = getReinforcementConfidence(profile.reinforcementCount);
       const exposurePenalty = attenuation < 1.0 ? Math.sqrt(attenuation) : 1.0;
-      const effectiveScore = score * forecastConfidence * reinforcementConfidence * exposurePenalty;
+      // Quality ceiling boost: ceiling 3 = 1.0x (neutral), 5 = 1.1x, 1 = 0.9x
+      const ceilingMultiplier = 1.0 + (profile.qualityCeiling - 3) * 0.05;
+      const effectiveScore = score * forecastConfidence * reinforcementConfidence * exposurePenalty * ceilingMultiplier;
 
       details.ratingBoost = reinforcementConfidence;
       details.forecastConfidence = forecastConfidence;
@@ -614,6 +618,8 @@ export function generateProfileAlerts(
             confidenceScore: score * forecastConfidence,
             effectiveScore,
             matchedProfile: { id: profile.id, name: profile.name },
+            qualityCeiling: profile.qualityCeiling,
+            consistency: profile.consistency,
             matchDetails: details,
             forecastSnapshot: fh.fullConditions,
           };

@@ -86,6 +86,8 @@ export async function POST(
       targetWindDirection,
       targetTideHeight,
       activeMonths,
+      consistency,
+      qualityCeiling,
       source,
     } = body;
 
@@ -118,6 +120,8 @@ export async function POST(
       targetWindDirection: targetWindDirection?.toString() ?? null,
       targetTideHeight: targetTideHeight?.toString() ?? null,
       activeMonths: activeMonths ?? null,
+      consistency: ["low", "medium", "high"].includes(consistency) ? consistency : "medium",
+      qualityCeiling: typeof qualityCeiling === "number" && qualityCeiling >= 1 && qualityCeiling <= 5 ? qualityCeiling : 3,
       source: source === "auto_generated" ? "auto_generated" : "manual",
     }).returning();
 

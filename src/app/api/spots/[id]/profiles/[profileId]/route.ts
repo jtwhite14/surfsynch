@@ -73,6 +73,12 @@ export async function PUT(
     if (body.isActive !== undefined) updates.isActive = body.isActive;
     if (body.sortOrder !== undefined) updates.sortOrder = body.sortOrder;
     if (body.activeMonths !== undefined) updates.activeMonths = body.activeMonths;
+    if (body.consistency !== undefined && ["low", "medium", "high"].includes(body.consistency)) {
+      updates.consistency = body.consistency;
+    }
+    if (body.qualityCeiling !== undefined && typeof body.qualityCeiling === "number" && body.qualityCeiling >= 1 && body.qualityCeiling <= 5) {
+      updates.qualityCeiling = body.qualityCeiling;
+    }
 
     // Track whether targets changed (for reinforcement reset)
     let targetsChanged = false;
