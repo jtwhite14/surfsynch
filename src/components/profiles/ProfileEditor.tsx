@@ -92,6 +92,11 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEdit
       ? [degToCardinal(profile.targetSwellDirection)]
       : []
   );
+  const [windDirection, setWindDirection] = useState<CardinalDirection[]>(
+    profile?.targetWindDirection != null
+      ? [degToCardinal(profile.targetWindDirection)]
+      : []
+  );
   const [activeMonths, setActiveMonths] = useState<number[]>(profile?.activeMonths ?? []);
   const [consistency, setConsistency] = useState<string>(profile?.consistency ?? "medium");
   const [qualityCeiling, setQualityCeiling] = useState<number>(profile?.qualityCeiling ?? 3);
@@ -158,7 +163,7 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEdit
       targetSwellPeriod: swellPeriod.length > 0 ? avgMidpoints(swellPeriod, SWELL_PERIOD_MIDPOINTS) : null,
       targetSwellDirection: swellDirection.length > 0 ? avgCardinalDeg(swellDirection) : null,
       targetWindSpeed: windCondition.length > 0 ? avgMidpoints(windCondition, WIND_SPEED_MIDPOINTS) : null,
-      targetWindDirection: null,
+      targetWindDirection: windDirection.length > 0 ? avgCardinalDeg(windDirection) : null,
       targetTideHeight: tideLevel.length > 0 ? avgMidpoints(tideLevel, TIDE_HEIGHT_MIDPOINTS) : null,
     };
   }
@@ -342,6 +347,18 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEdit
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Wind Direction */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-sm font-medium text-muted-foreground">Wind direction</label>
+                <ImportanceDots value={weightToLevel(wWindDir)} onChange={(level) => { setWWindDir(levelToWeight(level)); setActivePreset(null); }} />
+              </div>
+              <SwellExposurePicker
+                value={windDirection}
+                onChange={setWindDirection}
+              />
             </div>
 
             {/* Tide */}
