@@ -70,19 +70,23 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEdit
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Categorical selections
-  const [waveSize, setWaveSize] = useState<string | null>(
-    profile ? numericToCategory(profile.targetSwellHeight, WAVE_SIZE_MIDPOINTS) : null
-  );
-  const [swellPeriod, setSwellPeriod] = useState<string | null>(
-    profile ? numericToCategory(profile.targetSwellPeriod, SWELL_PERIOD_MIDPOINTS) : null
-  );
-  const [windCondition, setWindCondition] = useState<string | null>(
-    profile ? numericToCategory(profile.targetWindSpeed, WIND_SPEED_MIDPOINTS) : null
-  );
-  const [tideLevel, setTideLevel] = useState<string | null>(
-    profile ? numericToCategory(profile.targetTideHeight, TIDE_HEIGHT_MIDPOINTS) : null
-  );
+  // Categorical selections (multi-select)
+  const [waveSize, setWaveSize] = useState<string[]>(() => {
+    const cat = profile ? numericToCategory(profile.targetSwellHeight, WAVE_SIZE_MIDPOINTS) : null;
+    return cat ? [cat] : [];
+  });
+  const [swellPeriod, setSwellPeriod] = useState<string[]>(() => {
+    const cat = profile ? numericToCategory(profile.targetSwellPeriod, SWELL_PERIOD_MIDPOINTS) : null;
+    return cat ? [cat] : [];
+  });
+  const [windCondition, setWindCondition] = useState<string[]>(() => {
+    const cat = profile ? numericToCategory(profile.targetWindSpeed, WIND_SPEED_MIDPOINTS) : null;
+    return cat ? [cat] : [];
+  });
+  const [tideLevel, setTideLevel] = useState<string[]>(() => {
+    const cat = profile ? numericToCategory(profile.targetTideHeight, TIDE_HEIGHT_MIDPOINTS) : null;
+    return cat ? [cat] : [];
+  });
   const [swellDirection, setSwellDirection] = useState<CardinalDirection[]>(
     profile?.targetSwellDirection != null
       ? [degToCardinal(profile.targetSwellDirection)]
@@ -113,8 +117,8 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEdit
   const [advWindDir, setAdvWindDir] = useState(profile?.targetWindDirection?.toString() ?? "");
   const [advTideHeight, setAdvTideHeight] = useState(profile?.targetTideHeight?.toString() ?? "");
 
-  function togglePill<T extends string>(current: T | null, value: T): T | null {
-    return current === value ? null : value;
+  function togglePill<T extends string>(current: T[], value: T): T[] {
+    return current.includes(value) ? current.filter(v => v !== value) : [...current, value];
   }
 
   function toggleMonth(month: number) {
@@ -150,12 +154,12 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEdit
     }
 
     return {
-      targetSwellHeight: waveSize ? WAVE_SIZE_MIDPOINTS[waveSize] : null,
-      targetSwellPeriod: swellPeriod ? SWELL_PERIOD_MIDPOINTS[swellPeriod] : null,
-      targetSwellDirection: swellDirection.length > 0 ? cardinalToDeg(swellDirection[0]) : null,
-      targetWindSpeed: windCondition ? WIND_SPEED_MIDPOINTS[windCondition] : null,
+      targetSwellHeight: waveSize.length > 0 ? avgMidpoints(waveSize, WAVE_SIZE_MIDPOINTS) : null,
+      targetSwellPeriod: swellPeriod.length > 0 ? avgMidpoints(swellPeriod, SWELL_PERIOD_MIDPOINTS) : null,
+      targetSwellDirection: swellDirection.length > 0 ? avgCardinalDeg(swellDirection) : null,
+      targetWindSpeed: windCondition.length > 0 ? avgMidpoints(windCondition, WIND_SPEED_MIDPOINTS) : null,
       targetWindDirection: null,
-      targetTideHeight: tideLevel ? TIDE_HEIGHT_MIDPOINTS[tideLevel] : null,
+      targetTideHeight: tideLevel.length > 0 ? avgMidpoints(tideLevel, TIDE_HEIGHT_MIDPOINTS) : null,
     };
   }
 
@@ -271,7 +275,7 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEdit
                     key={opt.value}
                     onClick={() => setWaveSize(togglePill(waveSize, opt.value))}
                     className={`px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                      waveSize === opt.value
+                      waveSize.includes(opt.value)
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted text-muted-foreground hover:bg-accent"
                     }`}
@@ -294,7 +298,7 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEdit
                     key={opt.value}
                     onClick={() => setSwellPeriod(togglePill(swellPeriod, opt.value))}
                     className={`px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                      swellPeriod === opt.value
+                      swellPeriod.includes(opt.value)
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted text-muted-foreground hover:bg-accent"
                     }`}
@@ -313,15 +317,7 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEdit
               </div>
               <SwellExposurePicker
                 value={swellDirection}
-                onChange={(dirs) => {
-                  // Single-select: keep only the most recently picked direction
-                  if (dirs.length > 1) {
-                    const newest = dirs.filter(d => !swellDirection.includes(d));
-                    setSwellDirection(newest.length > 0 ? [newest[0]] : [dirs[dirs.length - 1]]);
-                  } else {
-                    setSwellDirection(dirs);
-                  }
-                }}
+                onChange={setSwellDirection}
               />
             </div>
 
@@ -337,7 +333,7 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEdit
                     key={opt.value}
                     onClick={() => setWindCondition(togglePill(windCondition, opt.value))}
                     className={`px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                      windCondition === opt.value
+                      windCondition.includes(opt.value)
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted text-muted-foreground hover:bg-accent"
                     }`}
@@ -360,7 +356,7 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEdit
                     key={opt.value}
                     onClick={() => setTideLevel(togglePill(tideLevel, opt.value))}
                     className={`px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                      tideLevel === opt.value
+                      tideLevel.includes(opt.value)
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted text-muted-foreground hover:bg-accent"
                     }`}
@@ -552,4 +548,21 @@ function degToCardinal(deg: number): CardinalDirection {
   const dirs: CardinalDirection[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
   const idx = Math.round(((deg % 360) + 360) % 360 / 45) % 8;
   return dirs[idx];
+}
+
+function avgMidpoints(keys: string[], midpoints: Record<string, number>): number {
+  const values = keys.map(k => midpoints[k]).filter(v => v != null);
+  return values.reduce((sum, v) => sum + v, 0) / values.length;
+}
+
+function avgCardinalDeg(dirs: CardinalDirection[]): number {
+  if (dirs.length === 1) return cardinalToDeg(dirs[0]);
+  // Circular average to handle 0°/360° boundary
+  let sinSum = 0, cosSum = 0;
+  for (const d of dirs) {
+    const rad = cardinalToDeg(d) * Math.PI / 180;
+    sinSum += Math.sin(rad);
+    cosSum += Math.cos(rad);
+  }
+  return ((Math.atan2(sinSum, cosSum) * 180 / Math.PI) + 360) % 360;
 }
