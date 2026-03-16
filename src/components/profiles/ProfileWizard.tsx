@@ -567,23 +567,21 @@ export function ProfileWizard({
   }
 
   return (
-    <div className="absolute inset-0 z-30 pointer-events-none flex flex-col items-center justify-center">
-      {/* Close button - top right */}
-      <button
-        onClick={handleCancel}
-        className="pointer-events-auto absolute top-4 right-4 z-40 rounded-full p-2 bg-background/90 backdrop-blur-sm shadow-lg border hover:bg-accent transition-colors"
-      >
-        <X className="size-4" />
-      </button>
-
-      {/* Floating card - positioned above center so spot pin is visible below */}
-      <div className="pointer-events-auto w-[90vw] max-w-[380px] -mt-32 sm:-mt-40">
+    <div className="absolute inset-0 z-30 pointer-events-none flex flex-col items-center">
+      {/* Floating card — sits in upper portion so spot pin stays visible at center */}
+      <div className="pointer-events-auto w-[90vw] max-w-[380px] mt-[12vh] sm:mt-[15vh]">
         <div className="rounded-xl border bg-background/95 backdrop-blur-sm shadow-2xl overflow-hidden">
-          {/* Question */}
-          <div className="px-5 pt-5 pb-3">
-            <h3 className="text-base font-semibold text-foreground leading-snug">
+          {/* Question + close button */}
+          <div className="px-5 pt-4 pb-3 flex items-start gap-3">
+            <h3 className="text-base font-semibold text-foreground leading-snug flex-1">
               {STEP_QUESTIONS[currentStep]}
             </h3>
+            <button
+              onClick={handleCancel}
+              className="rounded-md p-1 -mt-0.5 -mr-1 hover:bg-accent transition-colors shrink-0"
+            >
+              <X className="size-4 text-muted-foreground" />
+            </button>
           </div>
 
           {/* Content */}

@@ -22,7 +22,7 @@ interface SpotPaneProfilesProps {
   onDirectionEditStop?: () => void;
   directionEditState?: { field: string; selected: CardinalDirection[]; mode: "target" | "exclusion" } | null;
   /** Open the map-centered wizard instead of inline ProfileEditor */
-  onWizardOpen?: (profile?: ConditionProfileResponse) => void;
+  onWizardOpen?: (profile: ConditionProfileResponse | undefined, defaultName: string) => void;
 }
 
 type View = "list" | "create" | "edit";
@@ -193,14 +193,14 @@ export function SpotPaneProfiles({ spotId, onBack, onDirectionEditStart, onDirec
   // When view switches to create/edit, open the wizard overlay instead
   useEffect(() => {
     if (view === "create" && onWizardOpen) {
-      onWizardOpen(undefined);
+      onWizardOpen(undefined, `Profile ${profiles.length + 1}`);
       setView("list");
     } else if (view === "edit" && editingProfile && onWizardOpen) {
-      onWizardOpen(editingProfile);
+      onWizardOpen(editingProfile, editingProfile.name);
       setView("list");
       setEditingProfile(null);
     }
-  }, [view, editingProfile, onWizardOpen]);
+  }, [view, editingProfile, onWizardOpen, profiles.length]);
 
   return (
     <div className="flex flex-col h-full">

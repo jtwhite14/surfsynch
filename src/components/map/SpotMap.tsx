@@ -42,6 +42,8 @@ interface SpotMapProps {
     mode: "target" | "exclusion";
     onChange: (dirs: CardinalDirection[]) => void;
   } | null;
+  /** When set, replaces the normal marker for this spot with a minimal white dot */
+  wizardSpotId?: string;
 }
 
 const DEFAULT_VIEW_STATE = {
@@ -66,6 +68,7 @@ export default function SpotMap({
   sharedSpots,
   onSharedSpotClick,
   directionEdit,
+  wizardSpotId,
 }: SpotMapProps) {
   const mapRef = useRef<MapRef>(null);
   const [viewState, setViewState] = useState(initialViewState);
@@ -224,6 +227,21 @@ export default function SpotMap({
         // Individual spot
         const spot = spotById[(props as SpotProperties).spotId];
         if (!spot) return null;
+
+        // During wizard mode, show a minimal white dot instead of the full marker
+        if (wizardSpotId === spot.id) {
+          return (
+            <Marker
+              key={spot.id}
+              longitude={longitude}
+              latitude={latitude}
+              anchor="center"
+            >
+              <div className="w-3 h-3 rounded-full bg-white border-2 border-white/60 shadow-lg" />
+            </Marker>
+          );
+        }
+
         return (
           <Marker
             key={spot.id}

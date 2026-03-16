@@ -108,6 +108,7 @@ export default function DashboardPage() {
   const [profileWizard, setProfileWizard] = useState<{
     spotId: string;
     profile?: ConditionProfileResponse;
+    defaultName: string;
   } | null>(null);
 
   // Missing location prompt
@@ -476,6 +477,7 @@ export default function DashboardPage() {
           mode: directionEdit.mode,
           onChange: (dirs) => setDirectionEdit(prev => prev ? { ...prev, selected: dirs } : null),
         } : undefined}
+        wizardSpotId={profileWizard?.spotId}
       />
 
       {/* Spots needing attention banner */}
@@ -568,10 +570,11 @@ export default function DashboardPage() {
               }}
               onDirectionEditStop={() => setDirectionEdit(null)}
               directionEditState={directionEdit}
-              onWizardOpen={(editProfile) => {
+              onWizardOpen={(editProfile, defaultName) => {
                 setProfileWizard({
                   spotId: selectedSpot.id,
                   profile: editProfile,
+                  defaultName,
                 });
               }}
             />
@@ -1134,7 +1137,7 @@ export default function DashboardPage() {
         <ProfileWizard
           spotId={profileWizard.spotId}
           profile={profileWizard.profile}
-          defaultName={`Profile`}
+          defaultName={profileWizard.defaultName}
           onSave={(saved) => {
             setProfileWizard(null);
             setDirectionEdit(null);
