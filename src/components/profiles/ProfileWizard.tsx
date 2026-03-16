@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ChevronLeft, Loader2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { CardinalDirection, ConditionProfileResponse } from "@/types";
+import type { CardinalDirection, ConditionProfileResponse, ExclusionZones } from "@/types";
 import { WEIGHT_PRESETS } from "@/types";
 import {
   WAVE_SIZE_MIDPOINTS,
@@ -48,7 +48,8 @@ const PERIOD_OPTIONS = [
 
 const WIND_OPTIONS = [
   { value: "glassy", label: "Light/Glassy" },
-  { value: "offshore", label: "Offshore" },
+  { value: "medium", label: "Medium" },
+  { value: "hard", label: "Hard" },
 ];
 
 const TIDE_OPTIONS = [
@@ -146,6 +147,9 @@ const STEP_QUESTIONS: Record<Step, string> = {
   season: "When does this spot work best?",
 };
 
+// Steps that have an exclusion ("doesn't work") section
+const STEPS_WITH_EXCLUSIONS: Step[] = ["waveSize", "swellPeriod", "swellDirection", "windSpeed", "windDirection", "tide"];
+
 export function ProfileWizard({
   spotId,
   profile,
@@ -196,6 +200,18 @@ export function ProfileWizard({
   const [consistency, setConsistency] = useState<string>(profile?.consistency ?? "medium");
   const [qualityCeiling, setQualityCeiling] = useState<number>(profile?.qualityCeiling ?? 3);
 
+  // Exclusion zones
+  const exc = profile?.exclusions;
+  const [excludeSwellDir, setExcludeSwellDir] = useState<CardinalDirection[]>(exc?.swellDirection ?? []);
+  const [excludeWindDir, setExcludeWindDir] = useState<CardinalDirection[]>(exc?.windDirection ?? []);
+  const [excludeWaveSize, setExcludeWaveSize] = useState<string[]>(exc?.swellHeight ?? []);
+  const [excludeSwellPeriod, setExcludeSwellPeriod] = useState<string[]>(exc?.swellPeriod ?? []);
+  const [excludeWindSpeed, setExcludeWindSpeed] = useState<string[]>(exc?.windSpeed ?? []);
+  const [excludeTide, setExcludeTide] = useState<string[]>(exc?.tideHeight ?? []);
+
+  // Exclusion UI open state per step
+  const [excOpen, setExcOpen] = useState(false);
+
   // Importance weights
   const [wSwellHeight, setWSwellHeight] = useState(profile?.weightSwellHeight ?? 0.8);
   const [wSwellPeriod, setWSwellPeriod] = useState(profile?.weightSwellPeriod ?? 0.7);
@@ -211,6 +227,7 @@ export function ProfileWizard({
   const isFirst = stepIndex === 0;
   const isLast = stepIndex === STEPS.length - 1;
   const isCompassStep = currentStep === "swellDirection" || currentStep === "windDirection";
+  const hasExclusions = STEPS_WITH_EXCLUSIONS.includes(currentStep);
 
   // Toggle helpers
   function togglePill<T extends string>(current: T[], value: T): T[] {
@@ -254,6 +271,8 @@ export function ProfileWizard({
     } else {
       onDirectionEditStop?.();
     }
+    // Close exclusion section when changing steps
+    setExcOpen(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep]);
 
@@ -263,6 +282,8 @@ export function ProfileWizard({
     const { field, selected } = directionEditState;
     if (field === "swellDirection") setSwellDirection(selected);
     if (field === "windDirection") setWindDirection(selected);
+    if (field === "excludeSwellDir") setExcludeSwellDir(selected);
+    if (field === "excludeWindDir") setExcludeWindDir(selected);
   }, [directionEditState]);
 
   function goNext() {
@@ -286,6 +307,17 @@ export function ProfileWizard({
       setError(null);
       setStepIndex(idx);
     }
+  }
+
+  function buildExclusions(): ExclusionZones | null {
+    const zones: ExclusionZones = {};
+    if (excludeSwellDir.length > 0) zones.swellDirection = excludeSwellDir;
+    if (excludeWindDir.length > 0) zones.windDirection = excludeWindDir;
+    if (excludeWaveSize.length > 0) zones.swellHeight = excludeWaveSize;
+    if (excludeSwellPeriod.length > 0) zones.swellPeriod = excludeSwellPeriod;
+    if (excludeWindSpeed.length > 0) zones.windSpeed = excludeWindSpeed;
+    if (excludeTide.length > 0) zones.tideHeight = excludeTide;
+    return Object.keys(zones).length > 0 ? zones : null;
   }
 
   async function handleSave() {
@@ -332,6 +364,7 @@ export function ProfileWizard({
             windDirection,
             tideLevel,
           },
+          exclusions: buildExclusions(),
           activeMonths: activeMonths.length > 0 ? activeMonths : null,
           consistency,
           qualityCeiling,
@@ -362,6 +395,119 @@ export function ProfileWizard({
   function handleCancel() {
     onDirectionEditStop?.();
     onCancel();
+  }
+
+  // Get exclusion content for the current step
+  function renderExclusionContent() {
+    switch (currentStep) {
+      case "waveSize":
+        return (
+          <div className="flex flex-wrap gap-2">
+            {WAVE_SIZE_OPTIONS.map(opt => (
+              <ExclusionPill key={opt.value} active={excludeWaveSize.includes(opt.value)} onClick={() => setExcludeWaveSize(togglePill(excludeWaveSize, opt.value))}>
+                {opt.label}
+              </ExclusionPill>
+            ))}
+          </div>
+        );
+      case "swellPeriod":
+        return (
+          <div className="flex flex-wrap gap-2">
+            {PERIOD_OPTIONS.map(opt => (
+              <ExclusionPill key={opt.value} active={excludeSwellPeriod.includes(opt.value)} onClick={() => setExcludeSwellPeriod(togglePill(excludeSwellPeriod, opt.value))}>
+                {opt.label}
+              </ExclusionPill>
+            ))}
+          </div>
+        );
+      case "swellDirection":
+        return (
+          <>
+            <p className="text-xs text-muted-foreground mb-2">
+              Tap compass wedges on the map (shown in red)
+            </p>
+            {excludeSwellDir.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {excludeSwellDir.map(d => (
+                  <span key={d} className="px-2 py-0.5 rounded-full text-xs font-medium border border-destructive text-destructive bg-destructive/10">
+                    {d}
+                  </span>
+                ))}
+              </div>
+            )}
+          </>
+        );
+      case "windSpeed":
+        return (
+          <div className="flex flex-wrap gap-2">
+            {[...WIND_OPTIONS, { value: "onshore", label: "Onshore" }].map(opt => (
+              <ExclusionPill key={opt.value} active={excludeWindSpeed.includes(opt.value)} onClick={() => setExcludeWindSpeed(togglePill(excludeWindSpeed, opt.value))}>
+                {opt.label}
+              </ExclusionPill>
+            ))}
+          </div>
+        );
+      case "windDirection":
+        return (
+          <>
+            <p className="text-xs text-muted-foreground mb-2">
+              Tap compass wedges on the map (shown in red)
+            </p>
+            {excludeWindDir.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {excludeWindDir.map(d => (
+                  <span key={d} className="px-2 py-0.5 rounded-full text-xs font-medium border border-destructive text-destructive bg-destructive/10">
+                    {d}
+                  </span>
+                ))}
+              </div>
+            )}
+          </>
+        );
+      case "tide":
+        return (
+          <div className="flex flex-wrap gap-2">
+            {TIDE_OPTIONS.map(opt => (
+              <ExclusionPill key={opt.value} active={excludeTide.includes(opt.value)} onClick={() => setExcludeTide(togglePill(excludeTide, opt.value))}>
+                {opt.label}
+              </ExclusionPill>
+            ))}
+          </div>
+        );
+      default:
+        return null;
+    }
+  }
+
+  // Check if current step has active exclusions
+  function currentStepHasExclusions(): boolean {
+    switch (currentStep) {
+      case "waveSize": return excludeWaveSize.length > 0;
+      case "swellPeriod": return excludeSwellPeriod.length > 0;
+      case "swellDirection": return excludeSwellDir.length > 0;
+      case "windSpeed": return excludeWindSpeed.length > 0;
+      case "windDirection": return excludeWindDir.length > 0;
+      case "tide": return excludeTide.length > 0;
+      default: return false;
+    }
+  }
+
+  // Handle toggling exclusion section — for compass directions, switch the map overlay mode
+  function handleExcToggle() {
+    const opening = !excOpen;
+    setExcOpen(opening);
+
+    if (isCompassStep && onDirectionEditStart) {
+      if (opening) {
+        // Switch compass to exclusion mode
+        const field = currentStep === "swellDirection" ? "excludeSwellDir" : "excludeWindDir";
+        const selected = currentStep === "swellDirection" ? excludeSwellDir : excludeWindDir;
+        onDirectionEditStart({ field, selected, mode: "exclusion" });
+      } else {
+        // Switch back to target mode
+        startCompass(currentStep);
+      }
+    }
   }
 
   // Render the step content
@@ -569,7 +715,7 @@ export function ProfileWizard({
   return (
     <div className="absolute inset-0 z-30 pointer-events-none flex flex-col items-center">
       {/* Floating card — sits in upper portion so spot pin stays visible at center */}
-      <div className="pointer-events-auto w-[90vw] max-w-[380px] mt-[12vh] sm:mt-[15vh]">
+      <div className="pointer-events-auto w-[420px] max-w-[92vw] mt-[12vh] sm:mt-[15vh]">
         <div className="rounded-xl border bg-background/95 backdrop-blur-sm shadow-2xl overflow-hidden">
           {/* Question + close button */}
           <div className="px-5 pt-4 pb-3 flex items-start gap-3">
@@ -584,13 +730,35 @@ export function ProfileWizard({
             </button>
           </div>
 
-          {/* Content */}
-          <div className="px-5 pb-4">
+          {/* Content — fixed min-height so card stays consistent */}
+          <div className="px-5 pb-3 min-h-[120px]">
             {renderStepContent()}
             {error && (
               <p className="text-sm text-destructive mt-2">{error}</p>
             )}
           </div>
+
+          {/* Exclusion section ("Doesn't work") */}
+          {hasExclusions && (
+            <div className="mx-5 mb-3 rounded-md border border-destructive/25 overflow-hidden">
+              <button
+                type="button"
+                className="w-full flex items-center gap-1.5 px-3 py-2 text-left hover:bg-destructive/5 transition-colors"
+                onClick={handleExcToggle}
+              >
+                <ChevronRight className={`size-3 text-destructive/60 shrink-0 transition-transform duration-200 ${excOpen ? 'rotate-90' : ''}`} />
+                <span className="text-xs font-medium text-destructive/70 flex-1">Doesn&apos;t work</span>
+                {!excOpen && currentStepHasExclusions() && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-destructive/50" />
+                )}
+              </button>
+              {excOpen && (
+                <div className="px-3 pb-3 pt-1 border-t border-destructive/15">
+                  {renderExclusionContent()}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Footer: progress dots + nav */}
           <div className="px-5 pb-4 flex items-center gap-3">
@@ -683,6 +851,32 @@ function WizardPill({
         "px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
         active
           ? "border border-primary text-primary bg-primary/10"
+          : "bg-muted text-muted-foreground hover:bg-accent"
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+/* ── Red exclusion pill ── */
+
+function ExclusionPill({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
+        active
+          ? "border border-destructive text-destructive bg-destructive/10"
           : "bg-muted text-muted-foreground hover:bg-accent"
       )}
     >

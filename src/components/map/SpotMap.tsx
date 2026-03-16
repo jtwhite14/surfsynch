@@ -228,8 +228,10 @@ export default function SpotMap({
         const spot = spotById[(props as SpotProperties).spotId];
         if (!spot) return null;
 
-        // During wizard mode, show a minimal white dot instead of the full marker
+        // During wizard mode: show white dot when compass is not active,
+        // hide entirely when compass is active (compass overlay has its own center dot)
         if (wizardSpotId === spot.id) {
+          if (directionEdit) return null; // compass overlay provides the dot
           return (
             <Marker
               key={spot.id}

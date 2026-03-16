@@ -439,7 +439,7 @@ export default function DashboardPage() {
       const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
       return isMobile ? undefined : { left: typeof window !== "undefined" ? window.innerWidth * 0.5 : 700 };
     },
-    [selectedSpot]
+    [selectedSpot, profileWizard]
   );
 
   if (loading) {
