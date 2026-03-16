@@ -228,9 +228,9 @@ export default function SpotMap({
         const spot = spotById[(props as SpotProperties).spotId];
         if (!spot) return null;
 
-        // During wizard mode: show white dot when compass is not active,
-        // hide entirely when compass is active (compass overlay has its own center dot)
-        if (wizardSpotId === spot.id) {
+        // During wizard mode: hide all other spots, show dot for the active spot
+        if (wizardSpotId) {
+          if (spot.id !== wizardSpotId) return null; // hide other spots
           if (directionEdit) return null; // compass overlay provides the dot
           return (
             <Marker
@@ -239,8 +239,8 @@ export default function SpotMap({
               latitude={latitude}
               anchor="center"
             >
-              <svg width="8" height="8" viewBox="0 0 8 8">
-                <circle cx="4" cy="4" r="4" fill="hsl(var(--primary))" fillOpacity={0.6} />
+              <svg width="12" height="12" viewBox="0 0 12 12">
+                <circle cx="6" cy="6" r="6" fill="hsl(var(--primary))" />
               </svg>
             </Marker>
           );
