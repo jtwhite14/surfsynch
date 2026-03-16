@@ -88,44 +88,67 @@ export function SpotPaneProfiles({ spotId, onBack }: SpotPaneProfilesProps) {
     try {
       // Fetch sessions with high ratings
       const res = await fetch(`/api/sessions?spotId=${spotId}&limit=50`);
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Failed to fetch sessions");
+      }
       const data = await res.json();
       const sessions = (data.sessions || []).filter(
-        (s: { rating: number; ignored: boolean; conditions?: unknown }) =>
-          s.rating >= 4 && !s.ignored && s.conditions
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (s: any) => s.rating >= 3 && !s.ignored && s.conditions
       );
 
       if (sessions.length === 0) {
-        toast.error("No sessions rated 4+ stars to generate from");
+        toast.error("No sessions rated 3+ stars with conditions to generate from");
         return;
       }
 
-      // Compute averages
-      const sums = { swellHeight: 0, swellPeriod: 0, windSpeed: 0, tideHeight: 0 };
-      const counts = { swellHeight: 0, swellPeriod: 0, windSpeed: 0, tideHeight: 0 };
+      // Compute averages (fall back to waveHeight/wavePeriod if primary swell is null)
+      const sums = { swellHeight: 0, swellPeriod: 0, windSpeed: 0, tideHeight: 0, swellDirSin: 0, swellDirCos: 0 };
+      const counts = { swellHeight: 0, swellPeriod: 0, windSpeed: 0, tideHeight: 0, swellDir: 0 };
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       for (const s of sessions) {
         const c = s.conditions;
-        if (c?.primarySwellHeight) { sums.swellHeight += parseFloat(c.primarySwellHeight); counts.swellHeight++; }
-        if (c?.primarySwellPeriod) { sums.swellPeriod += parseFloat(c.primarySwellPeriod); counts.swellPeriod++; }
-        if (c?.windSpeed) { sums.windSpeed += parseFloat(c.windSpeed); counts.windSpeed++; }
-        if (c?.tideHeight) { sums.tideHeight += parseFloat(c.tideHeight); counts.tideHeight++; }
+        const height = parseFloat(c?.primarySwellHeight) || parseFloat(c?.waveHeight) || NaN;
+        if (!isNaN(height)) { sums.swellHeight += height; counts.swellHeight++; }
+        const period = parseFloat(c?.primarySwellPeriod) || parseFloat(c?.wavePeriod) || NaN;
+        if (!isNaN(period)) { sums.swellPeriod += period; counts.swellPeriod++; }
+        const wind = parseFloat(c?.windSpeed);
+        if (!isNaN(wind)) { sums.windSpeed += wind; counts.windSpeed++; }
+        const tide = parseFloat(c?.tideHeight);
+        if (!isNaN(tide)) { sums.tideHeight += tide; counts.tideHeight++; }
+        const dir = parseFloat(c?.primarySwellDirection) || parseFloat(c?.waveDirection) || NaN;
+        if (!isNaN(dir)) {
+          const rad = dir * Math.PI / 180;
+          sums.swellDirSin += Math.sin(rad);
+          sums.swellDirCos += Math.cos(rad);
+          counts.swellDir++;
+        }
       }
 
-      // Map to closest category midpoints
       const avgHeight = counts.swellHeight > 0 ? sums.swellHeight / counts.swellHeight : null;
       const avgPeriod = counts.swellPeriod > 0 ? sums.swellPeriod / counts.swellPeriod : null;
       const avgWind = counts.windSpeed > 0 ? sums.windSpeed / counts.windSpeed : null;
       const avgTide = counts.tideHeight > 0 ? sums.tideHeight / counts.tideHeight : null;
+      const avgDir = counts.swellDir > 0
+        ? ((Math.atan2(sums.swellDirSin / counts.swellDir, sums.swellDirCos / counts.swellDir) * 180 / Math.PI) + 360) % 360
+        : null;
 
       const targets: Record<string, number | null> = {
         targetSwellHeight: avgHeight,
         targetSwellPeriod: avgPeriod,
-        targetSwellDirection: null,
+        targetSwellDirection: avgDir,
         targetWindSpeed: avgWind,
         targetWindDirection: null,
         targetTideHeight: avgTide,
       };
+
+      const specifiedCount = Object.values(targets).filter(v => v != null).length;
+      if (specifiedCount < 2) {
+        toast.error(`Only ${specifiedCount} condition available from ${sessions.length} sessions — need at least 2`);
+        return;
+      }
 
       // Build name from conditions
       const heightLabel = avgHeight != null ? closestMidpointKey(avgHeight, WAVE_SIZE_MIDPOINTS) : null;
@@ -146,13 +169,13 @@ export function SpotPaneProfiles({ spotId, onBack }: SpotPaneProfilesProps) {
       });
 
       if (!createRes.ok) {
-        const err = await createRes.json();
-        throw new Error(err.error || "Failed to create");
+        const errData = await createRes.json().catch(() => null);
+        throw new Error(errData?.error || "Failed to create profile");
       }
 
       const created = await createRes.json();
       setProfiles(prev => [...prev, created.profile]);
-      toast.success("Profile generated from your best sessions");
+      toast.success(`Profile generated from ${sessions.length} best sessions`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to generate profile");
     } finally {
