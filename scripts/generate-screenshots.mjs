@@ -56,7 +56,16 @@ const SHARED_STYLES = `
 
 // Mapbox Static API image for the map background
 // Center: -119.55, 34.38 | Zoom: 10.5 | Size: 1380x900 @2x
-const STATIC_MAP_URL = `https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/-119.55,34.38,10.5,0/1280x900@2x?access_token=${MAPBOX_TOKEN}`;
+// Real Santa Barbara surf spots
+const SPOTS = [
+  { name: "Rincon Point",  lat: 34.3725, lng: -119.478,  color: "#dab94e", selected: true },
+  { name: "Hammonds",      lat: 34.4173, lng: -119.6298, color: "#dab94e", alert: true },
+  { name: "Leadbetter",    lat: 34.4001, lng: -119.6996, color: "#dab94e" },
+  { name: "Campus Point",  lat: 34.4033, lng: -119.8462, color: "#dab94e" },
+  { name: "El Capitan",    lat: 34.4572, lng: -120.0228, color: "#3b82f6" }, // shared spot
+];
+// Center map to fit all spots: avg lng ≈ -119.775, avg lat ≈ 34.41, zoom 10
+const STATIC_MAP_URL = `https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/-119.78,34.41,10,0/1280x900@2x?access_token=${MAPBOX_TOKEN}`;
 // Will be populated at runtime with base64 data URI
 let MAP_DATA_URI = "";
 
@@ -242,21 +251,26 @@ ${SHARED_STYLES}
     <div class="map-area">
       <img class="map-img" src="__MAP_DATA_URI__" alt="map" />
 
-      <!-- Spot markers positioned on the satellite image -->
-      <div class="marker selected" style="top: 52%; left: 58%;">
+      <!-- Spot markers at real surf spot coordinates -->
+      <!-- Rincon Point (34.3725, -119.478) — selected -->
+      <div class="marker selected" style="top: 53.7%; left: 67.2%;">
         <div class="marker-pin"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg></div>
       </div>
-      <div class="marker" style="top: 32%; left: 42%;">
+      <!-- Hammonds (34.4173, -119.6298) — alert -->
+      <div class="marker" style="top: 49.3%; left: 58.5%;">
         <div class="marker-pin"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg></div>
         <div class="marker-alert"></div>
       </div>
-      <div class="marker" style="top: 38%; left: 22%;">
+      <!-- Leadbetter (34.4001, -119.6996) -->
+      <div class="marker" style="top: 51.0%; left: 54.6%;">
         <div class="marker-pin"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg></div>
       </div>
-      <div class="marker" style="top: 28%; left: 7%;">
+      <!-- Campus Point (34.4033, -119.8462) -->
+      <div class="marker" style="top: 50.7%; left: 46.2%;">
         <div class="marker-pin"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg></div>
       </div>
-      <div class="marker marker-shared" style="top: 62%; left: 38%;">
+      <!-- El Capitan (34.4572, -120.0228) — shared (blue) -->
+      <div class="marker marker-shared" style="top: 45.4%; left: 36.2%;">
         <div class="marker-pin"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg></div>
       </div>
 
@@ -556,8 +570,8 @@ ${SHARED_STYLES}
         <div class="session-card">
           <div class="card-header">
             <div class="card-spot">
-              <div class="spot-avatar">T</div>
-              <div><div class="spot-name">Trestles</div><div class="spot-date">Mar 12, 2026</div></div>
+              <div class="spot-avatar">H</div>
+              <div><div class="spot-name">Hammonds</div><div class="spot-date">Mar 12, 2026</div></div>
             </div>
             <div class="stars">
               ${[1,2,3,4,5].map(i => `<div class="star ${i <= 4 ? 'filled' : 'empty'}"><svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>`).join('')}
@@ -579,8 +593,8 @@ ${SHARED_STYLES}
         <div class="session-card">
           <div class="card-header">
             <div class="card-spot">
-              <div class="spot-avatar">B</div>
-              <div><div class="spot-name">Blacks Beach</div><div class="spot-date">Mar 9, 2026</div></div>
+              <div class="spot-avatar">L</div>
+              <div><div class="spot-name">Leadbetter</div><div class="spot-date">Mar 9, 2026</div></div>
             </div>
             <div class="stars">
               ${[1,2,3,4,5].map(i => `<div class="star ${i <= 3 ? 'filled' : 'empty'}"><svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>`).join('')}
@@ -625,8 +639,8 @@ ${SHARED_STYLES}
         <div class="session-card">
           <div class="card-header">
             <div class="card-spot">
-              <div class="spot-avatar">S</div>
-              <div><div class="spot-name">Salt Creek</div><div class="spot-date">Mar 2, 2026</div></div>
+              <div class="spot-avatar">C</div>
+              <div><div class="spot-name">Campus Point</div><div class="spot-date">Mar 2, 2026</div></div>
             </div>
             <div class="stars">
               ${[1,2,3,4,5].map(i => `<div class="star ${i <= 3 ? 'filled' : 'empty'}"><svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>`).join('')}
@@ -648,8 +662,8 @@ ${SHARED_STYLES}
         <div class="session-card">
           <div class="card-header">
             <div class="card-spot">
-              <div class="spot-avatar">W</div>
-              <div><div class="spot-name">Windansea</div><div class="spot-date">Feb 27, 2026</div></div>
+              <div class="spot-avatar">E</div>
+              <div><div class="spot-name">El Capitan</div><div class="spot-date">Feb 27, 2026</div></div>
             </div>
             <div class="stars">
               ${[1,2,3,4,5].map(i => `<div class="star ${i <= 5 ? 'filled' : 'empty'}"><svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>`).join('')}
