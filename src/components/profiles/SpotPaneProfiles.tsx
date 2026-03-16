@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { ArrowLeft, Plus, Loader2, Trash2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { ProfileEditor, type DirectionEditRequest } from "./ProfileEditor";
+import type { DirectionEditRequest } from "./ProfileEditor";
 import type { CardinalDirection, ConditionProfileResponse } from "@/types";
 import {
   WAVE_SIZE_MIDPOINTS,
@@ -21,11 +21,13 @@ interface SpotPaneProfilesProps {
   onDirectionEditStart?: (req: DirectionEditRequest) => void;
   onDirectionEditStop?: () => void;
   directionEditState?: { field: string; selected: CardinalDirection[]; mode: "target" | "exclusion" } | null;
+  /** Open the map-centered wizard instead of inline ProfileEditor */
+  onWizardOpen?: (profile?: ConditionProfileResponse) => void;
 }
 
 type View = "list" | "create" | "edit";
 
-export function SpotPaneProfiles({ spotId, onBack, onDirectionEditStart, onDirectionEditStop, directionEditState }: SpotPaneProfilesProps) {
+export function SpotPaneProfiles({ spotId, onBack, onDirectionEditStart, onDirectionEditStop, directionEditState, onWizardOpen }: SpotPaneProfilesProps) {
   const [profiles, setProfiles] = useState<ConditionProfileResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>("list");
@@ -188,33 +190,17 @@ export function SpotPaneProfiles({ spotId, onBack, onDirectionEditStart, onDirec
     }
   };
 
-  if (view === "create") {
-    return (
-      <ProfileEditor
-        spotId={spotId}
-        defaultName={`Profile ${profiles.length + 1}`}
-        onSave={handleSave}
-        onCancel={() => { setView("list"); onDirectionEditStop?.(); }}
-        onDirectionEditStart={onDirectionEditStart}
-        onDirectionEditStop={onDirectionEditStop}
-        directionEditState={directionEditState}
-      />
-    );
-  }
-
-  if (view === "edit" && editingProfile) {
-    return (
-      <ProfileEditor
-        spotId={spotId}
-        profile={editingProfile}
-        onSave={handleSave}
-        onCancel={() => { setView("list"); setEditingProfile(null); onDirectionEditStop?.(); }}
-        onDirectionEditStart={onDirectionEditStart}
-        onDirectionEditStop={onDirectionEditStop}
-        directionEditState={directionEditState}
-      />
-    );
-  }
+  // When view switches to create/edit, open the wizard overlay instead
+  useEffect(() => {
+    if (view === "create" && onWizardOpen) {
+      onWizardOpen(undefined);
+      setView("list");
+    } else if (view === "edit" && editingProfile && onWizardOpen) {
+      onWizardOpen(editingProfile);
+      setView("list");
+      setEditingProfile(null);
+    }
+  }, [view, editingProfile, onWizardOpen]);
 
   return (
     <div className="flex flex-col h-full">

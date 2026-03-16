@@ -39,12 +39,13 @@ import { WeeklyForecast } from "@/components/forecast/WeeklyForecast";
 import { SpotPaneSessionDetail } from "@/components/spots/SpotPaneSessionDetail";
 import { SpotPaneEditSpot } from "@/components/spots/SpotPaneEditSpot";
 import { SpotPaneProfiles } from "@/components/profiles/SpotPaneProfiles";
+import { ProfileWizard } from "@/components/profiles/ProfileWizard";
 import { SpotSharePanel } from "@/components/sharing/SpotSharePanel";
 import { IncomingInvites } from "@/components/sharing/IncomingInvites";
 import { SharedSpotsList } from "@/components/sharing/SharedSpotsList";
 import { SharedSpotPane } from "@/components/sharing/SharedSpotPane";
 import type { SurfSpot } from "@/lib/db/schema";
-import type { SurfSessionWithConditions, SharedSpotView, CardinalDirection } from "@/types";
+import type { SurfSessionWithConditions, SharedSpotView, CardinalDirection, ConditionProfileResponse } from "@/types";
 
 const SpotMap = dynamic(() => import("@/components/map/SpotMap"), {
   ssr: false,
@@ -101,6 +102,12 @@ export default function DashboardPage() {
     field: string;
     selected: CardinalDirection[];
     mode: "target" | "exclusion";
+  } | null>(null);
+
+  // Profile wizard (map-centered step-by-step editor)
+  const [profileWizard, setProfileWizard] = useState<{
+    spotId: string;
+    profile?: ConditionProfileResponse;
   } | null>(null);
 
   // Missing location prompt
@@ -423,8 +430,10 @@ export default function DashboardPage() {
 
   // When the spot detail pane is open, pad flyTo so the spot centers in the visible area
   // On mobile (<640px), the pane covers the full width so no padding needed
+  // When wizard is open, no padding - we want the spot centered
   const flyToPadding = useMemo(
     () => {
+      if (profileWizard) return undefined;
       if (!selectedSpot) return undefined;
       const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
       return isMobile ? undefined : { left: typeof window !== "undefined" ? window.innerWidth * 0.5 : 700 };
@@ -523,8 +532,8 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Spot detail pane */}
-      {selectedSpot && addSpotMode === "idle" && (
+      {/* Spot detail pane — hidden when profile wizard is active */}
+      {selectedSpot && addSpotMode === "idle" && !profileWizard && (
         <div className="absolute inset-0 sm:inset-auto sm:top-4 sm:left-4 sm:bottom-4 z-20 w-full sm:w-[50vw] sm:max-w-[800px] flex flex-col sm:rounded-lg border bg-background/95 sm:bg-background/90 backdrop-blur-sm shadow-lg overflow-hidden">
           {paneView === "session" && viewingSession ? (
             <SpotPaneSessionDetail
@@ -559,6 +568,12 @@ export default function DashboardPage() {
               }}
               onDirectionEditStop={() => setDirectionEdit(null)}
               directionEditState={directionEdit}
+              onWizardOpen={(editProfile) => {
+                setProfileWizard({
+                  spotId: selectedSpot.id,
+                  profile: editProfile,
+                });
+              }}
             />
           ) : paneView === "edit" ? (
             <SpotPaneEditSpot
@@ -1112,6 +1127,36 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Profile wizard overlay — map-centered step-by-step editor */}
+      {profileWizard && selectedSpot && (
+        <ProfileWizard
+          spotId={profileWizard.spotId}
+          profile={profileWizard.profile}
+          defaultName={`Profile`}
+          onSave={(saved) => {
+            setProfileWizard(null);
+            setDirectionEdit(null);
+            // Refresh profiles list by toggling pane view
+            setPaneView("spot");
+            setTimeout(() => setPaneView("profiles"), 0);
+          }}
+          onCancel={() => {
+            setProfileWizard(null);
+            setDirectionEdit(null);
+          }}
+          onDirectionEditStart={(req) => {
+            setDirectionEdit({
+              spotId: profileWizard.spotId,
+              field: req.field,
+              selected: req.selected,
+              mode: req.mode,
+            });
+          }}
+          onDirectionEditStop={() => setDirectionEdit(null)}
+          directionEditState={directionEdit}
+        />
       )}
     </div>
   );
