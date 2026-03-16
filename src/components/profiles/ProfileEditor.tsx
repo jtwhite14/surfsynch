@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { SwellExposurePicker } from "@/components/spots/SwellExposurePicker";
 import type { CardinalDirection, ConditionProfileResponse } from "@/types";
+import { WEIGHT_PRESETS } from "@/types";
 import {
   WAVE_SIZE_MIDPOINTS,
   SWELL_PERIOD_MIDPOINTS,
@@ -47,6 +48,23 @@ const TIDE_OPTIONS = [
   { value: "high", label: "High" },
 ];
 
+// Weight level ↔ numeric value conversions
+function weightToLevel(value: number): number {
+  if (value === 0) return 4; // Any
+  if (value <= 0.45) return 0;
+  if (value <= 0.8) return 1;
+  if (value <= 1.2) return 2;
+  return 3; // Critical
+}
+
+function levelToWeight(level: number): number {
+  if (level === 0) return 0.3;
+  if (level === 1) return 0.6;
+  if (level === 2) return 1.0;
+  if (level === 3) return 1.5;
+  return 0; // Any/idk
+}
+
 export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEditorProps) {
   const [name, setName] = useState(profile?.name ?? "");
   const [saving, setSaving] = useState(false);
@@ -74,6 +92,18 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEdit
   const [consistency, setConsistency] = useState<string>(profile?.consistency ?? "medium");
   const [qualityCeiling, setQualityCeiling] = useState<number>(profile?.qualityCeiling ?? 3);
 
+  // Importance weights
+  const [wSwellHeight, setWSwellHeight] = useState(profile?.weightSwellHeight ?? 0.8);
+  const [wSwellPeriod, setWSwellPeriod] = useState(profile?.weightSwellPeriod ?? 0.7);
+  const [wSwellDir, setWSwellDir] = useState(profile?.weightSwellDirection ?? 0.9);
+  const [wWindSpeed, setWWindSpeed] = useState(profile?.weightWindSpeed ?? 0.7);
+  const [wWindDir, setWWindDir] = useState(profile?.weightWindDirection ?? 0.6);
+  const [wTideHeight, setWTideHeight] = useState(profile?.weightTideHeight ?? 0.5);
+  const [wWaveEnergy, setWWaveEnergy] = useState(profile?.weightWaveEnergy ?? 0.8);
+
+  // Spot type preset
+  const [activePreset, setActivePreset] = useState<string | null>(null);
+
   // Advanced overrides
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [advSwellHeight, setAdvSwellHeight] = useState(profile?.targetSwellHeight?.toString() ?? "");
@@ -91,6 +121,20 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEdit
     setActiveMonths(prev =>
       prev.includes(month) ? prev.filter(m => m !== month) : [...prev, month]
     );
+  }
+
+  function applyPreset(presetKey: string) {
+    const preset = WEIGHT_PRESETS[presetKey];
+    if (!preset) return;
+    const w = preset.weights;
+    if (w.swellHeight != null) setWSwellHeight(w.swellHeight);
+    if (w.swellPeriod != null) setWSwellPeriod(w.swellPeriod);
+    if (w.swellDirection != null) setWSwellDir(w.swellDirection);
+    if (w.tideHeight != null) setWTideHeight(w.tideHeight);
+    if (w.windSpeed != null) setWWindSpeed(w.windSpeed);
+    if (w.windDirection != null) setWWindDir(w.windDirection);
+    if (w.waveEnergy != null) setWWaveEnergy(w.waveEnergy);
+    setActivePreset(presetKey);
   }
 
   function buildTargets() {
@@ -145,6 +189,13 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEdit
           activeMonths: activeMonths.length > 0 ? activeMonths : null,
           consistency,
           qualityCeiling,
+          weightSwellHeight: wSwellHeight,
+          weightSwellPeriod: wSwellPeriod,
+          weightSwellDirection: wSwellDir,
+          weightTideHeight: wTideHeight,
+          weightWindSpeed: wWindSpeed,
+          weightWindDirection: wWindDir,
+          weightWaveEnergy: wWaveEnergy,
         }),
       });
 
@@ -186,11 +237,34 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEdit
           />
         </div>
 
+        {/* Spot type presets */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-muted-foreground">Spot type preset</label>
+          <div className="flex flex-wrap gap-1.5">
+            {Object.entries(WEIGHT_PRESETS).map(([key, preset]) => (
+              <button
+                key={key}
+                onClick={() => applyPreset(key)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  activePreset === key
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-accent"
+                }`}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {!showAdvanced && (
           <>
             {/* Wave Size */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Wave size</label>
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-sm font-medium text-muted-foreground">Wave size</label>
+                <ImportanceDots value={weightToLevel(wSwellHeight)} onChange={(level) => { setWSwellHeight(levelToWeight(level)); setActivePreset(null); }} />
+              </div>
               <div className="flex flex-wrap gap-2">
                 {WAVE_SIZE_OPTIONS.map(opt => (
                   <button
@@ -210,7 +284,10 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEdit
 
             {/* Swell Period */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Swell period</label>
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-sm font-medium text-muted-foreground">Swell period</label>
+                <ImportanceDots value={weightToLevel(wSwellPeriod)} onChange={(level) => { setWSwellPeriod(levelToWeight(level)); setActivePreset(null); }} />
+              </div>
               <div className="flex flex-wrap gap-2">
                 {PERIOD_OPTIONS.map(opt => (
                   <button
@@ -230,7 +307,10 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEdit
 
             {/* Swell Direction */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Swell direction</label>
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-sm font-medium text-muted-foreground">Swell direction</label>
+                <ImportanceDots value={weightToLevel(wSwellDir)} onChange={(level) => { setWSwellDir(levelToWeight(level)); setActivePreset(null); }} />
+              </div>
               <SwellExposurePicker
                 value={swellDirection}
                 onChange={(dirs) => {
@@ -247,7 +327,10 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEdit
 
             {/* Wind */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Wind</label>
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-sm font-medium text-muted-foreground">Wind</label>
+                <ImportanceDots value={weightToLevel(wWindSpeed)} onChange={(level) => { setWWindSpeed(levelToWeight(level)); setActivePreset(null); }} />
+              </div>
               <div className="flex flex-wrap gap-2">
                 {WIND_OPTIONS.map(opt => (
                   <button
@@ -267,7 +350,10 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEdit
 
             {/* Tide */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Tide</label>
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-sm font-medium text-muted-foreground">Tide</label>
+                <ImportanceDots value={weightToLevel(wTideHeight)} onChange={(level) => { setWTideHeight(levelToWeight(level)); setActivePreset(null); }} />
+              </div>
               <div className="flex flex-wrap gap-2">
                 {TIDE_OPTIONS.map(opt => (
                   <button
@@ -413,6 +499,43 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEdit
           {saving ? <Loader2 className="size-4 animate-spin" /> : profile ? "Save" : "Create"}
         </Button>
       </div>
+    </div>
+  );
+}
+
+function ImportanceDots({
+  value,
+  onChange,
+}: {
+  value: number; // 0 = low, 1 = medium, 2 = high, 3 = critical, 4 = any/idk
+  onChange: (level: number) => void;
+}) {
+  const labels = ["Low", "Med", "High", "Critical", "Any"];
+
+  return (
+    <div className="flex items-center gap-1">
+      {[0, 1, 2, 3, 4].map(level => {
+        const isActive = value === level;
+        const levelLabel = labels[level];
+        return (
+          <button
+            key={level}
+            onClick={() => onChange(level)}
+            className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+              isActive
+                ? level === 3
+                  ? "bg-orange-500 text-white"
+                  : level === 4
+                    ? "bg-muted text-muted-foreground ring-1 ring-border"
+                    : "bg-primary text-primary-foreground"
+                : "bg-muted/50 text-muted-foreground/60 hover:bg-muted hover:text-muted-foreground"
+            }`}
+            title={`Priority: ${levelLabel}`}
+          >
+            {levelLabel}
+          </button>
+        );
+      })}
     </div>
   );
 }

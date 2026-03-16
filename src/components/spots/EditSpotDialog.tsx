@@ -13,9 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { AlertTuningSection } from "@/components/alerts/AlertTuning";
 import type { SurfSpot } from "@/lib/db/schema";
-import type { ConditionWeights } from "@/types";
 
 interface EditSpotDialogProps {
   spot: SurfSpot;
@@ -60,10 +58,6 @@ export function EditSpotDialog({ spot, open, onOpenChange, onSave }: EditSpotDia
     }
   }
 
-  function handleWeightsSave(weights: ConditionWeights) {
-    onSave({ ...spot, conditionWeights: weights });
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl w-[calc(100vw-2rem)] max-h-[calc(100vh-3rem)] overflow-y-auto">
@@ -94,8 +88,6 @@ export function EditSpotDialog({ spot, open, onOpenChange, onSave }: EditSpotDia
               />
             </div>
           </div>
-
-          <AlertTuningSection spotId={spot.id} onSave={handleWeightsSave} />
         </div>
 
         <div className="flex gap-2 pt-2 border-t mt-1">

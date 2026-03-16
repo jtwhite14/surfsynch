@@ -594,7 +594,7 @@ export function generateProfileAlerts(
       const { score, details, coverage } = computeSimilarity(
         fh.conditions,
         profile.conditions,
-        weights,
+        profile.weights,
         profile.specifiedVars
       );
 

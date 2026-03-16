@@ -21,7 +21,6 @@ import {
   Trash2,
   MapPin,
   AlertTriangle,
-  SlidersHorizontal,
   BellOff,
   Bell,
   Target,
@@ -101,12 +100,11 @@ export default function DashboardPage() {
   const [dismissedLocationBanner, setDismissedLocationBanner] = useState(false);
 
   const spotsNeedingAttention = useMemo(() => {
-    const items: { spot: SurfSpot; missingLocation: boolean; missingTuning: boolean }[] = [];
+    const items: { spot: SurfSpot; missingLocation: boolean }[] = [];
     for (const s of spots) {
       const missingLocation = parseFloat(s.latitude) === 0 && parseFloat(s.longitude) === 0;
-      const missingTuning = !s.conditionWeights;
-      if (missingLocation || missingTuning) {
-        items.push({ spot: s, missingLocation, missingTuning });
+      if (missingLocation) {
+        items.push({ spot: s, missingLocation });
       }
     }
     return items;
@@ -119,10 +117,6 @@ export default function DashboardPage() {
     setAddSpotMode("fixing-picking");
   };
 
-  const handleFixTuning = async (spot: SurfSpot) => {
-    await handleSpotClick(spot);
-    setPaneView("edit");
-  };
 
   const handleCancelFixLocation = () => {
     setAddSpotMode("idle");
@@ -450,7 +444,7 @@ export default function DashboardPage() {
                   Complete your spots to get accurate alerts and conditions.
                 </p>
                 <div className="mt-3 space-y-2">
-                  {spotsNeedingAttention.map(({ spot, missingLocation, missingTuning }) => (
+                  {spotsNeedingAttention.map(({ spot, missingLocation }) => (
                     <div key={spot.id} className="rounded-md border border-dashed px-3 py-2 space-y-1.5">
                       <p className="text-sm font-medium truncate">{spot.name}</p>
                       <div className="flex flex-wrap gap-1.5">
@@ -461,15 +455,6 @@ export default function DashboardPage() {
                           >
                             <MapPin className="size-3" />
                             <span>Set location</span>
-                          </button>
-                        )}
-                        {missingTuning && (
-                          <button
-                            onClick={() => handleFixTuning(spot)}
-                            className="inline-flex items-center gap-1.5 rounded-full bg-accent/50 px-2.5 py-1 text-xs hover:bg-accent transition-colors"
-                          >
-                            <SlidersHorizontal className="size-3" />
-                            <span>Set up alerts</span>
                           </button>
                         )}
                       </div>
@@ -679,18 +664,6 @@ export default function DashboardPage() {
                       </p>
                     </button>
 
-                    {/* Alert tuning nudge */}
-                    {!selectedSpot.conditionWeights && (
-                      <button
-                        onClick={() => setPaneView("edit")}
-                        className="w-full rounded-lg border border-dashed border-muted-foreground/30 px-3 py-2.5 text-left hover:border-muted-foreground/50 transition-colors"
-                      >
-                        <p className="text-xs text-muted-foreground">
-                          Set your spot type to improve alert accuracy.{" "}
-                          <span className="text-primary font-medium">Set up alerts</span>
-                        </p>
-                      </button>
-                    )}
 
                     {/* 5-day forecast score breakdown */}
                     <ForecastScores spotId={selectedSpot.id} />

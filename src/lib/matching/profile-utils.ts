@@ -1,6 +1,7 @@
 import { calculateWaveEnergy } from "@/lib/wave-energy";
 import type { ParsedConditions } from "./condition-matcher";
-import type { ProfileForMatching } from "@/types";
+import type { ConditionWeights, ProfileForMatching } from "@/types";
+import { DEFAULT_CONDITION_WEIGHTS } from "@/types";
 
 /**
  * Convert a condition profile's target values to ParsedConditions for matching.
@@ -62,8 +63,25 @@ export function buildProfileForMatching(profile: {
   reinforcementCount: number;
   consistency: string;
   qualityCeiling: number;
+  weightSwellHeight?: string;
+  weightSwellPeriod?: string;
+  weightSwellDirection?: string;
+  weightTideHeight?: string;
+  weightWindSpeed?: string;
+  weightWindDirection?: string;
+  weightWaveEnergy?: string;
 }): ProfileForMatching {
   const { conditions, specifiedVars } = profileToConditions(profile);
+  const weights: ConditionWeights = {
+    ...DEFAULT_CONDITION_WEIGHTS,
+    swellHeight: safeParseFloat(profile.weightSwellHeight ?? null) ?? DEFAULT_CONDITION_WEIGHTS.swellHeight,
+    swellPeriod: safeParseFloat(profile.weightSwellPeriod ?? null) ?? DEFAULT_CONDITION_WEIGHTS.swellPeriod,
+    swellDirection: safeParseFloat(profile.weightSwellDirection ?? null) ?? DEFAULT_CONDITION_WEIGHTS.swellDirection,
+    tideHeight: safeParseFloat(profile.weightTideHeight ?? null) ?? DEFAULT_CONDITION_WEIGHTS.tideHeight,
+    windSpeed: safeParseFloat(profile.weightWindSpeed ?? null) ?? DEFAULT_CONDITION_WEIGHTS.windSpeed,
+    windDirection: safeParseFloat(profile.weightWindDirection ?? null) ?? DEFAULT_CONDITION_WEIGHTS.windDirection,
+    waveEnergy: safeParseFloat(profile.weightWaveEnergy ?? null) ?? DEFAULT_CONDITION_WEIGHTS.waveEnergy,
+  };
   return {
     id: profile.id,
     name: profile.name,
@@ -72,6 +90,7 @@ export function buildProfileForMatching(profile: {
     reinforcementCount: profile.reinforcementCount,
     consistency: profile.consistency as 'low' | 'medium' | 'high',
     qualityCeiling: profile.qualityCeiling,
+    weights,
   };
 }
 

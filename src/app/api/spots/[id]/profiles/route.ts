@@ -7,6 +7,10 @@ import { formatProfile } from "@/lib/profiles/format";
 
 const MAX_PROFILES_PER_SPOT = 10;
 
+function clampWeight(v: number): number {
+  return Math.max(0, Math.min(2, v));
+}
+
 /**
  * GET: List all profiles for a spot.
  */
@@ -89,6 +93,13 @@ export async function POST(
       consistency,
       qualityCeiling,
       source,
+      weightSwellHeight,
+      weightSwellPeriod,
+      weightSwellDirection,
+      weightTideHeight,
+      weightWindSpeed,
+      weightWindDirection,
+      weightWaveEnergy,
     } = body;
 
     if (!name || typeof name !== "string" || name.trim().length === 0) {
@@ -123,6 +134,13 @@ export async function POST(
       consistency: ["low", "medium", "high"].includes(consistency) ? consistency : "medium",
       qualityCeiling: typeof qualityCeiling === "number" && qualityCeiling >= 1 && qualityCeiling <= 5 ? qualityCeiling : 3,
       source: source === "auto_generated" ? "auto_generated" : "manual",
+      ...(typeof weightSwellHeight === "number" && { weightSwellHeight: clampWeight(weightSwellHeight).toString() }),
+      ...(typeof weightSwellPeriod === "number" && { weightSwellPeriod: clampWeight(weightSwellPeriod).toString() }),
+      ...(typeof weightSwellDirection === "number" && { weightSwellDirection: clampWeight(weightSwellDirection).toString() }),
+      ...(typeof weightTideHeight === "number" && { weightTideHeight: clampWeight(weightTideHeight).toString() }),
+      ...(typeof weightWindSpeed === "number" && { weightWindSpeed: clampWeight(weightWindSpeed).toString() }),
+      ...(typeof weightWindDirection === "number" && { weightWindDirection: clampWeight(weightWindDirection).toString() }),
+      ...(typeof weightWaveEnergy === "number" && { weightWaveEnergy: clampWeight(weightWaveEnergy).toString() }),
     }).returning();
 
     return NextResponse.json({ profile: formatProfile(profile) }, { status: 201 });

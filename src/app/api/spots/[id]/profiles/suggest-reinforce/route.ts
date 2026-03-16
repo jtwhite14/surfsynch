@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, surfSpots, surfSessions, conditionProfiles } from "@/lib/db";
+import { db, surfSessions, conditionProfiles } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { parseSessionConditions, computeSimilarity } from "@/lib/matching/condition-matcher";
 import { buildProfileForMatching } from "@/lib/matching/profile-utils";
-import { DEFAULT_CONDITION_WEIGHTS } from "@/types";
 
 /**
  * GET: Suggest which profile to reinforce with a given session.
@@ -64,14 +63,9 @@ export async function GET(
     let bestScore = 0;
     let bestProfile: typeof profiles[0] | null = null;
 
-    const spot = await db.query.surfSpots.findFirst({
-      where: eq(surfSpots.id, spotId),
-    });
-    const weights = (spot?.conditionWeights as typeof DEFAULT_CONDITION_WEIGHTS) ?? DEFAULT_CONDITION_WEIGHTS;
-
     for (const profile of profiles) {
       const pfm = buildProfileForMatching(profile);
-      const { score } = computeSimilarity(sessionConds, pfm.conditions, weights, pfm.specifiedVars);
+      const { score } = computeSimilarity(sessionConds, pfm.conditions, pfm.weights, pfm.specifiedVars);
       if (score > bestScore) {
         bestScore = score;
         bestProfile = profile;

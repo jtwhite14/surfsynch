@@ -246,7 +246,7 @@ export async function GET(
         const { score, details, coverage } = computeSimilarity(
           fh.conditions,
           profile.conditions,
-          weights,
+          profile.weights,
           profile.specifiedVars
         );
 

@@ -105,6 +105,17 @@ export async function PUT(
       updates.lastReinforcedAt = null;
     }
 
+    // Weight fields (don't trigger reinforcement reset)
+    const weightFields = [
+      "weightSwellHeight", "weightSwellPeriod", "weightSwellDirection",
+      "weightTideHeight", "weightWindSpeed", "weightWindDirection", "weightWaveEnergy",
+    ] as const;
+    for (const field of weightFields) {
+      if (typeof body[field] === "number") {
+        updates[field] = Math.max(0, Math.min(2, body[field])).toString();
+      }
+    }
+
     // Validate at least 2 targets remain specified after update
     const merged = { ...existing };
     for (const field of targetFields) {

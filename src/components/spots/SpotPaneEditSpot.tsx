@@ -7,9 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
-import { AlertTuningSection } from "@/components/alerts/AlertTuning";
 import type { SurfSpot } from "@/lib/db/schema";
-import type { ConditionWeights } from "@/types";
 
 interface SpotPaneEditSpotProps {
   spot: SurfSpot;
@@ -51,10 +49,6 @@ export function SpotPaneEditSpot({ spot, onBack, onSave }: SpotPaneEditSpotProps
     }
   }
 
-  function handleWeightsSave(weights: ConditionWeights) {
-    onSave({ ...spot, conditionWeights: weights });
-  }
-
   return (
     <>
       {/* Header */}
@@ -94,8 +88,6 @@ export function SpotPaneEditSpot({ spot, onBack, onSave }: SpotPaneEditSpotProps
             />
           </div>
         </div>
-
-        <AlertTuningSection spotId={spot.id} onSave={handleWeightsSave} />
 
         <div className="flex gap-2 pt-2 border-t">
           <Button variant="outline" className="flex-1" onClick={onBack}>
