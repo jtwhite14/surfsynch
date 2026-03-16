@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { ArrowLeft, Plus, Loader2, Trash2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { ProfileEditor } from "./ProfileEditor";
-import type { ConditionProfileResponse } from "@/types";
+import { ProfileEditor, type DirectionEditRequest } from "./ProfileEditor";
+import type { CardinalDirection, ConditionProfileResponse } from "@/types";
 import {
   WAVE_SIZE_MIDPOINTS,
   SWELL_PERIOD_MIDPOINTS,
@@ -18,11 +18,14 @@ import {
 interface SpotPaneProfilesProps {
   spotId: string;
   onBack: () => void;
+  onDirectionEditStart?: (req: DirectionEditRequest) => void;
+  onDirectionEditStop?: () => void;
+  directionEditState?: { field: string; selected: CardinalDirection[]; mode: "target" | "exclusion" } | null;
 }
 
 type View = "list" | "create" | "edit";
 
-export function SpotPaneProfiles({ spotId, onBack }: SpotPaneProfilesProps) {
+export function SpotPaneProfiles({ spotId, onBack, onDirectionEditStart, onDirectionEditStop, directionEditState }: SpotPaneProfilesProps) {
   const [profiles, setProfiles] = useState<ConditionProfileResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>("list");
@@ -34,7 +37,9 @@ export function SpotPaneProfiles({ spotId, onBack }: SpotPaneProfilesProps) {
       const res = await fetch(`/api/spots/${spotId}/profiles`);
       if (!res.ok) throw new Error();
       const data = await res.json();
-      setProfiles(data.profiles || []);
+      const loaded = data.profiles || [];
+      setProfiles(loaded);
+      if (loaded.length === 0) setView("create");
     } catch {
       toast.error("Failed to load profiles");
     } finally {
@@ -187,8 +192,12 @@ export function SpotPaneProfiles({ spotId, onBack }: SpotPaneProfilesProps) {
     return (
       <ProfileEditor
         spotId={spotId}
+        defaultName={`Profile ${profiles.length + 1}`}
         onSave={handleSave}
-        onCancel={() => setView("list")}
+        onCancel={() => { setView("list"); onDirectionEditStop?.(); }}
+        onDirectionEditStart={onDirectionEditStart}
+        onDirectionEditStop={onDirectionEditStop}
+        directionEditState={directionEditState}
       />
     );
   }
@@ -199,7 +208,10 @@ export function SpotPaneProfiles({ spotId, onBack }: SpotPaneProfilesProps) {
         spotId={spotId}
         profile={editingProfile}
         onSave={handleSave}
-        onCancel={() => { setView("list"); setEditingProfile(null); }}
+        onCancel={() => { setView("list"); setEditingProfile(null); onDirectionEditStop?.(); }}
+        onDirectionEditStart={onDirectionEditStart}
+        onDirectionEditStop={onDirectionEditStop}
+        directionEditState={directionEditState}
       />
     );
   }

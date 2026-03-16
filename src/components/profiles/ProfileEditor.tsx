@@ -26,6 +26,7 @@ export interface DirectionEditRequest {
 interface ProfileEditorProps {
   spotId: string;
   profile?: ConditionProfileResponse;
+  defaultName?: string;
   onSave: (profile: ConditionProfileResponse) => void;
   onCancel: () => void;
   /** Request the parent to show direction editing on the map */
@@ -84,8 +85,8 @@ const IMPORTANCE_LEVELS = [
   { label: "Any", style: "bg-muted text-muted-foreground ring-1 ring-border" },
 ] as const;
 
-export function ProfileEditor({ spotId, profile, onSave, onCancel, onDirectionEditStart, onDirectionEditStop, directionEditState }: ProfileEditorProps) {
-  const [name, setName] = useState(profile?.name ?? "");
+export function ProfileEditor({ spotId, profile, defaultName, onSave, onCancel, onDirectionEditStart, onDirectionEditStop, directionEditState }: ProfileEditorProps) {
+  const [name, setName] = useState(profile?.name ?? defaultName ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -205,19 +206,17 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel, onDirectionEd
     onDirectionEditStart?.({ field, selected, mode });
   }
 
-  /** Called from parent when map wedges are toggled */
-  function handleMapDirectionChange(field: DirectionEditRequest["field"], dirs: CardinalDirection[]) {
+  // Sync direction state from map overlay changes
+  useEffect(() => {
+    if (!directionEditState) return;
+    const { field, selected } = directionEditState;
     switch (field) {
-      case "swellDirection": setSwellDirection(dirs); break;
-      case "windDirection": setWindDirection(dirs); break;
-      case "excludeSwellDir": setExcludeSwellDir(dirs); break;
-      case "excludeWindDir": setExcludeWindDir(dirs); break;
+      case "swellDirection": setSwellDirection(selected); break;
+      case "windDirection": setWindDirection(selected); break;
+      case "excludeSwellDir": setExcludeSwellDir(selected); break;
+      case "excludeWindDir": setExcludeWindDir(selected); break;
     }
-  }
-
-  // Expose for parent to call via ref or callback
-  // We use a stable reference pattern through the onDirectionEditStart callback
-  (ProfileEditor as unknown as Record<string, unknown>)._handleMapDirectionChange = handleMapDirectionChange;
+  }, [directionEditState]);
 
   async function handleSave() {
     if (!name.trim()) {

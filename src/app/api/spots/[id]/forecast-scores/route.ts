@@ -10,6 +10,7 @@ import {
   parseSessionConditions,
   parseForecastConditions,
   computeSimilarity,
+  checkExclusionVeto,
   getForecastConfidence,
   getRatingBoost,
   isDaylightHour,
@@ -243,6 +244,9 @@ export async function GET(
 
       // Score against profiles
       for (const profile of profilesForMatching) {
+        // Exclusion zone hard veto
+        if (checkExclusionVeto(fh.conditions, profile.exclusions)) continue;
+
         const { score, details, coverage } = computeSimilarity(
           fh.conditions,
           profile.conditions,
