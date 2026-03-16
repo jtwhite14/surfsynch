@@ -61,7 +61,9 @@ export default function DashboardPage() {
   const [spots, setSpots] = useState<SurfSpot[]>([]);
   const [sessions, setSessions] = useState<SurfSessionWithConditions[]>([]);
   const [loading, setLoading] = useState(true);
-  const [panelOpen, setPanelOpen] = useState(true);
+  const [alertsPanelOpen, setAlertsPanelOpen] = useState(true);
+  const [sessionsPanelOpen, setSessionsPanelOpen] = useState(true);
+  const [sessionsTab, setSessionsTab] = useState<"sessions" | "spots">("sessions");
 
   const [homeLocation, setHomeLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
@@ -82,7 +84,6 @@ export default function DashboardPage() {
   const [viewingSession, setViewingSession] = useState<SurfSessionWithConditions | null>(null);
   const [alertSpotIds, setAlertSpotIds] = useState<Set<string>>(new Set());
   const [alertSummaries, setAlertSummaries] = useState<Array<{ spotId: string; spotName: string; effectiveScore: number; forecastHour: string; timeWindow: string; conditions: string }>>([]);
-  const [panelTab, setPanelTab] = useState<"sessions" | "alerts">("alerts");
   const [spotProfileCounts, setSpotProfileCounts] = useState<Record<string, number>>({});
 
   // Sharing state
@@ -825,85 +826,29 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Recent Sessions / Alerts panel — visible when no spot is selected */}
-      {!selectedSpot && !selectedSharedSpot && addSpotMode === "idle" && (sessions.length > 0 || alertSummaries.length > 0 || sharedSpots.length > 0) && (
-        <div className="absolute bottom-4 left-4 right-4 sm:bottom-auto sm:right-auto sm:top-4 z-10 sm:w-80">
+      {/* Alerts + Sessions/Spots panels — visible when no spot is selected */}
+      {!selectedSpot && !selectedSharedSpot && addSpotMode === "idle" && (sessions.length > 0 || alertSummaries.length > 0 || sharedSpots.length > 0 || spots.length > 0) && (
+        <div className="absolute bottom-4 left-4 right-4 sm:bottom-auto sm:right-auto sm:top-4 z-10 sm:w-80 flex flex-col gap-3">
+          {/* Alerts panel */}
           <div className="rounded-lg border bg-background/90 backdrop-blur-sm shadow-lg overflow-hidden">
-            {/* Tab header */}
             <div className="flex items-center border-b">
-              <button
-                onClick={() => { setPanelTab("alerts"); setPanelOpen(true); }}
-                className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors relative ${
-                  panelTab === "alerts" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
+              <span className="flex-1 px-4 py-2.5 text-sm font-medium text-foreground">
                 Alerts
                 {alertSummaries.length > 0 && (
                   <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary/20 text-primary text-[10px] font-bold">
                     {alertSummaries.length}
                   </span>
                 )}
-              </button>
+              </span>
               <button
-                onClick={() => { setPanelTab("sessions"); setPanelOpen(true); }}
-                className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
-                  panelTab === "sessions" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Sessions
-              </button>
-              <button
-                onClick={() => setPanelOpen((o) => !o)}
+                onClick={() => setAlertsPanelOpen((o) => !o)}
                 className="px-3 py-2.5 hover:bg-accent/50 transition-colors"
               >
-                {panelOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                {alertsPanelOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
               </button>
             </div>
 
-            {panelOpen && panelTab === "sessions" && (
-              <div className="max-h-80 overflow-y-auto">
-                {sessions.map((session) => {
-                  const photo = session.photos?.[0]?.photoUrl || session.photoUrl;
-                  return (
-                    <Link
-                      key={session.id}
-                      href={`/sessions/${session.id}`}
-                      className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/50 transition-colors"
-                    >
-                      {photo && (
-                        <img
-                          src={photo}
-                          alt=""
-                          className="w-10 h-10 rounded object-cover shrink-0"
-                        />
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">
-                          {session.spot?.name || "Unknown Spot"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{formatDate(session.date)}</p>
-                      </div>
-                      <div className="flex items-center shrink-0">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <svg
-                            key={i}
-                            className={`w-2.5 h-2.5 ${
-                              i < session.rating ? "text-yellow-400" : "text-muted-foreground/30"
-                            }`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-
-            {panelOpen && panelTab === "alerts" && (
+            {alertsPanelOpen && (
               <div className="max-h-80 overflow-y-auto">
                 {alertSummaries.length === 0 ? (
                   <div className="px-4 py-6 text-center">
@@ -939,7 +884,6 @@ export default function DashboardPage() {
                     );
                   })
                 )}
-                {/* Shared spots in alerts tab */}
                 {sharedSpots.length > 0 && (
                   <>
                     <div className="border-t" />
@@ -952,6 +896,113 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
+
+          {/* Sessions / Spots panel */}
+          {(sessions.length > 0 || spots.length > 0) && (
+            <div className="rounded-lg border bg-background/90 backdrop-blur-sm shadow-lg overflow-hidden">
+              <div className="flex items-center border-b">
+                <button
+                  onClick={() => { setSessionsTab("sessions"); setSessionsPanelOpen(true); }}
+                  className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
+                    sessionsTab === "sessions" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Sessions
+                </button>
+                <button
+                  onClick={() => { setSessionsTab("spots"); setSessionsPanelOpen(true); }}
+                  className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
+                    sessionsTab === "spots" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Spots
+                </button>
+                <button
+                  onClick={() => setSessionsPanelOpen((o) => !o)}
+                  className="px-3 py-2.5 hover:bg-accent/50 transition-colors"
+                >
+                  {sessionsPanelOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                </button>
+              </div>
+
+              {sessionsPanelOpen && sessionsTab === "sessions" && (
+                <div className="max-h-80 overflow-y-auto">
+                  {sessions.length === 0 ? (
+                    <div className="px-4 py-6 text-center">
+                      <p className="text-sm text-muted-foreground">No sessions yet</p>
+                    </div>
+                  ) : (
+                    sessions.map((session) => {
+                      const photo = session.photos?.[0]?.photoUrl || session.photoUrl;
+                      return (
+                        <Link
+                          key={session.id}
+                          href={`/sessions/${session.id}`}
+                          className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/50 transition-colors"
+                        >
+                          {photo && (
+                            <img
+                              src={photo}
+                              alt=""
+                              className="w-10 h-10 rounded object-cover shrink-0"
+                            />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium truncate">
+                              {session.spot?.name || "Unknown Spot"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{formatDate(session.date)}</p>
+                          </div>
+                          <div className="flex items-center shrink-0">
+                            {Array.from({ length: 5 }).map((_, i) => (
+                              <svg
+                                key={i}
+                                className={`w-2.5 h-2.5 ${
+                                  i < session.rating ? "text-yellow-400" : "text-muted-foreground/30"
+                                }`}
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                              </svg>
+                            ))}
+                          </div>
+                        </Link>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+
+              {sessionsPanelOpen && sessionsTab === "spots" && (
+                <div className="max-h-80 overflow-y-auto">
+                  {spots.length === 0 ? (
+                    <div className="px-4 py-6 text-center">
+                      <p className="text-sm text-muted-foreground">No spots yet</p>
+                    </div>
+                  ) : (
+                    spots.map((spot) => (
+                      <button
+                        key={spot.id}
+                        onClick={() => handleSpotClick(spot)}
+                        className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/50 transition-colors w-full text-left"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{spot.name}</p>
+                          {spot.description && (
+                            <p className="text-xs text-muted-foreground truncate">{spot.description}</p>
+                          )}
+                        </div>
+                        {alertSpotIds.has(spot.id) && (
+                          <span className="w-2 h-2 rounded-full bg-primary shrink-0" />
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
