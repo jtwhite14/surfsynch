@@ -1,5 +1,5 @@
 import type { conditionProfiles } from "@/lib/db/schema";
-import type { ConditionProfileResponse } from "@/types";
+import type { ConditionProfileResponse, ExclusionZones, ProfileSelections } from "@/types";
 
 export function formatProfile(p: typeof conditionProfiles.$inferSelect): ConditionProfileResponse {
   return {
@@ -26,6 +26,8 @@ export function formatProfile(p: typeof conditionProfiles.$inferSelect): Conditi
     weightWindSpeed: parseFloat(p.weightWindSpeed) || 0.7,
     weightWindDirection: parseFloat(p.weightWindDirection) || 0.6,
     weightWaveEnergy: parseFloat(p.weightWaveEnergy) || 0.8,
+    selections: (p.selections as ProfileSelections) ?? null,
+    exclusions: (p.exclusions as ExclusionZones) ?? null,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
   };

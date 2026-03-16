@@ -238,6 +238,10 @@ export const conditionProfiles = pgTable("condition_profiles", {
   weightWindSpeed: decimal("weight_wind_speed", { precision: 3, scale: 2 }).notNull().default("0.70"),
   weightWindDirection: decimal("weight_wind_direction", { precision: 3, scale: 2 }).notNull().default("0.60"),
   weightWaveEnergy: decimal("weight_wave_energy", { precision: 3, scale: 2 }).notNull().default("0.80"),
+  // Raw categorical selections from the UI (preserves multi-select state for editing)
+  selections: jsonb("selections"), // { waveSize: string[], swellPeriod: string[], ... }
+  // Exclusion zones: conditions that are absolute dealbreakers for this profile
+  exclusions: jsonb("exclusions"), // ExclusionZones | null
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [

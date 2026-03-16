@@ -100,6 +100,8 @@ export async function POST(
       weightWindSpeed,
       weightWindDirection,
       weightWaveEnergy,
+      selections,
+      exclusions,
     } = body;
 
     if (!name || typeof name !== "string" || name.trim().length === 0) {
@@ -141,6 +143,8 @@ export async function POST(
       ...(typeof weightWindSpeed === "number" && { weightWindSpeed: clampWeight(weightWindSpeed).toString() }),
       ...(typeof weightWindDirection === "number" && { weightWindDirection: clampWeight(weightWindDirection).toString() }),
       ...(typeof weightWaveEnergy === "number" && { weightWaveEnergy: clampWeight(weightWaveEnergy).toString() }),
+      ...(selections && { selections }),
+      ...(exclusions && { exclusions }),
     }).returning();
 
     // Fire-and-forget: recompute alerts for this spot with the new profile

@@ -1,6 +1,6 @@
 import { calculateWaveEnergy } from "@/lib/wave-energy";
 import type { ParsedConditions } from "./condition-matcher";
-import type { ConditionWeights, ProfileForMatching } from "@/types";
+import type { ConditionWeights, ExclusionZones, ProfileForMatching, ProfileSelections } from "@/types";
 import { DEFAULT_CONDITION_WEIGHTS } from "@/types";
 
 /**
@@ -70,6 +70,8 @@ export function buildProfileForMatching(profile: {
   weightWindSpeed?: string;
   weightWindDirection?: string;
   weightWaveEnergy?: string;
+  selections?: unknown;
+  exclusions?: unknown;
 }): ProfileForMatching {
   const { conditions, specifiedVars } = profileToConditions(profile);
   const weights: ConditionWeights = {
@@ -91,6 +93,8 @@ export function buildProfileForMatching(profile: {
     consistency: profile.consistency as 'low' | 'medium' | 'high',
     qualityCeiling: profile.qualityCeiling,
     weights,
+    selections: (profile.selections as ProfileSelections | null) ?? null,
+    exclusions: (profile.exclusions as ExclusionZones | null) ?? null,
   };
 }
 

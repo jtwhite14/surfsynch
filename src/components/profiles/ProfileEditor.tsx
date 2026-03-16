@@ -79,32 +79,40 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEdit
   const [error, setError] = useState<string | null>(null);
 
   // Categorical selections (multi-select)
+  // Use saved selections if available, otherwise fall back to reverse-mapping from numeric
+  const sel = profile?.selections;
   const [waveSize, setWaveSize] = useState<string[]>(() => {
+    if (sel?.waveSize?.length) return sel.waveSize;
     const cat = profile ? numericToCategory(profile.targetSwellHeight, WAVE_SIZE_MIDPOINTS) : null;
     return cat ? [cat] : [];
   });
   const [swellPeriod, setSwellPeriod] = useState<string[]>(() => {
+    if (sel?.swellPeriod?.length) return sel.swellPeriod;
     const cat = profile ? numericToCategory(profile.targetSwellPeriod, SWELL_PERIOD_MIDPOINTS) : null;
     return cat ? [cat] : [];
   });
   const [windCondition, setWindCondition] = useState<string[]>(() => {
+    if (sel?.windCondition?.length) return sel.windCondition;
     const cat = profile ? numericToCategory(profile.targetWindSpeed, WIND_SPEED_MIDPOINTS) : null;
     return cat ? [cat] : [];
   });
   const [tideLevel, setTideLevel] = useState<string[]>(() => {
+    if (sel?.tideLevel?.length) return sel.tideLevel;
     const cat = profile ? numericToCategory(profile.targetTideHeight, TIDE_HEIGHT_MIDPOINTS) : null;
     return cat ? [cat] : [];
   });
-  const [swellDirection, setSwellDirection] = useState<CardinalDirection[]>(
-    profile?.targetSwellDirection != null
+  const [swellDirection, setSwellDirection] = useState<CardinalDirection[]>(() => {
+    if (sel?.swellDirection?.length) return sel.swellDirection as CardinalDirection[];
+    return profile?.targetSwellDirection != null
       ? [degToCardinal(profile.targetSwellDirection)]
-      : []
-  );
-  const [windDirection, setWindDirection] = useState<CardinalDirection[]>(
-    profile?.targetWindDirection != null
+      : [];
+  });
+  const [windDirection, setWindDirection] = useState<CardinalDirection[]>(() => {
+    if (sel?.windDirection?.length) return sel.windDirection as CardinalDirection[];
+    return profile?.targetWindDirection != null
       ? [degToCardinal(profile.targetWindDirection)]
-      : []
-  );
+      : [];
+  });
   const [activeMonths, setActiveMonths] = useState<number[]>(profile?.activeMonths ?? []);
   const [consistency, setConsistency] = useState<string>(profile?.consistency ?? "medium");
   const [qualityCeiling, setQualityCeiling] = useState<number>(profile?.qualityCeiling ?? 3);
@@ -184,6 +192,14 @@ export function ProfileEditor({ spotId, profile, onSave, onCancel }: ProfileEdit
         body: JSON.stringify({
           name: name.trim(),
           ...targets,
+          selections: {
+            waveSize,
+            swellPeriod,
+            swellDirection,
+            windCondition,
+            windDirection,
+            tideLevel,
+          },
           activeMonths: activeMonths.length > 0 ? activeMonths : null,
           consistency,
           qualityCeiling,

@@ -1,6 +1,6 @@
-import { MarineConditions, ConditionWeights, DEFAULT_CONDITION_WEIGHTS, MatchDetails, TimeWindow, CardinalDirection, PreferredWaveSize, PreferredSwellPeriod, PreferredWind, ProfileForMatching } from "@/types";
+import { MarineConditions, ConditionWeights, DEFAULT_CONDITION_WEIGHTS, MatchDetails, TimeWindow, CardinalDirection, PreferredWaveSize, PreferredSwellPeriod, PreferredWind, ProfileForMatching, ProfileSelections, ExclusionZones } from "@/types";
 import { calculateDirectionAttenuation, calculateWaveEnergy } from "@/lib/wave-energy";
-import { getReinforcementConfidence, isProfileActiveForMonth } from "@/lib/matching/profile-utils";
+import { getReinforcementConfidence, isProfileActiveForMonth, WAVE_SIZE_MIDPOINTS, SWELL_PERIOD_MIDPOINTS, WIND_SPEED_MIDPOINTS, TIDE_HEIGHT_MIDPOINTS } from "@/lib/matching/profile-utils";
 
 // ── Gaussian similarity ──
 
@@ -28,6 +28,133 @@ function angularDistance(a: number, b: number): number {
 function directionalSimilarity(a: number, b: number, sigma: number): number {
   const dist = angularDistance(a, b);
   return Math.exp(-(dist * dist) / (2 * sigma * sigma));
+}
+
+// ── Range-based similarity for multi-select profiles ──
+
+/** Ranges for each category. Value inside any selected range = 1.0; outside = Gaussian decay from nearest edge. */
+const CATEGORY_RANGES: Record<string, Record<string, [number, number]>> = {
+  swellHeight: {
+    small: [0, 0.9],
+    medium: [0.9, 1.8],
+    large: [1.8, 3.0],
+    xl: [3.0, Infinity],
+  },
+  swellPeriod: {
+    short: [0, 8],
+    medium: [8, 12],
+    long: [12, Infinity],
+  },
+  windSpeed: {
+    glassy: [0, 10],
+    offshore: [10, 20],
+  },
+  tideHeight: {
+    low: [-Infinity, -0.3],
+    mid: [-0.3, 0.3],
+    high: [0.3, Infinity],
+  },
+};
+
+const CARDINAL_DEGREES: Record<string, number> = {
+  N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315,
+};
+
+// ── Exclusion zone veto ──
+
+/**
+ * Check if forecast conditions fall within any exclusion zone.
+ * Returns null if no veto, or a string describing which exclusion fired.
+ */
+export function checkExclusionVeto(
+  forecast: ParsedConditions,
+  exclusions: ExclusionZones | null | undefined
+): string | null {
+  if (!exclusions) return null;
+
+  // Directional checks: each cardinal covers ±22.5° (one wedge of the compass rose)
+  if (exclusions.windDirection?.length && forecast.windDirection != null) {
+    for (const dir of exclusions.windDirection) {
+      const deg = CARDINAL_DEGREES[dir];
+      if (deg != null && angularDistance(forecast.windDirection, deg) <= 22.5) {
+        return `windDirection:${dir}`;
+      }
+    }
+  }
+  if (exclusions.swellDirection?.length && forecast.swellDirection != null) {
+    for (const dir of exclusions.swellDirection) {
+      const deg = CARDINAL_DEGREES[dir];
+      if (deg != null && angularDistance(forecast.swellDirection, deg) <= 22.5) {
+        return `swellDirection:${dir}`;
+      }
+    }
+  }
+
+  // Categorical scalar checks: value falls within any excluded category's range
+  if (exclusions.swellHeight?.length && forecast.swellHeight != null) {
+    if (valueInCategories(forecast.swellHeight, exclusions.swellHeight, CATEGORY_RANGES.swellHeight)) {
+      return 'swellHeight';
+    }
+  }
+  if (exclusions.swellPeriod?.length && forecast.swellPeriod != null) {
+    if (valueInCategories(forecast.swellPeriod, exclusions.swellPeriod, CATEGORY_RANGES.swellPeriod)) {
+      return 'swellPeriod';
+    }
+  }
+  if (exclusions.windSpeed?.length && forecast.windSpeed != null) {
+    if (valueInCategories(forecast.windSpeed, exclusions.windSpeed, CATEGORY_RANGES.windSpeed)) {
+      return 'windSpeed';
+    }
+  }
+  if (exclusions.tideHeight?.length && forecast.tideHeight != null) {
+    if (valueInCategories(forecast.tideHeight, exclusions.tideHeight, CATEGORY_RANGES.tideHeight)) {
+      return 'tideHeight';
+    }
+  }
+
+  return null;
+}
+
+/** Check if a value falls within any of the named category ranges. */
+function valueInCategories(value: number, categories: string[], rangeMap: Record<string, [number, number]>): boolean {
+  for (const cat of categories) {
+    const range = rangeMap[cat];
+    if (range && value >= range[0] && value < range[1]) return true;
+  }
+  return false;
+}
+
+/**
+ * Range-based similarity: if forecast value falls within any selected category range, score = 1.0.
+ * Otherwise, Gaussian decay from the nearest range edge.
+ */
+function rangeSimilarity(forecastValue: number, selectedCategories: string[], rangeMap: Record<string, [number, number]>, sigma: number): number {
+  let minDist = Infinity;
+  for (const cat of selectedCategories) {
+    const range = rangeMap[cat];
+    if (!range) continue;
+    const [lo, hi] = range;
+    if (forecastValue >= lo && forecastValue < hi) return 1.0; // inside range
+    const dist = forecastValue < lo ? lo - forecastValue : forecastValue - hi;
+    if (dist < minDist) minDist = dist;
+  }
+  if (!isFinite(minDist)) return 0;
+  // Gaussian decay from nearest range edge
+  return Math.exp(-(minDist * minDist) / (2 * sigma * sigma));
+}
+
+/**
+ * Multi-direction similarity: best (minimum angular distance) across all selected directions.
+ */
+function multiDirectionSimilarity(forecastDeg: number, selectedDirs: string[], sigma: number): number {
+  let best = 0;
+  for (const dir of selectedDirs) {
+    const deg = CARDINAL_DEGREES[dir];
+    if (deg == null) continue;
+    const sim = directionalSimilarity(forecastDeg, deg, sigma);
+    if (sim > best) best = sim;
+  }
+  return best;
 }
 
 // ── Sigmas (tuned per-variable) ──
@@ -248,7 +375,8 @@ export function computeSimilarity(
   forecast: ParsedConditions,
   session: ParsedConditions,
   weights: ConditionWeights = DEFAULT_CONDITION_WEIGHTS,
-  profileSpecifiedVars?: Set<string>
+  profileSpecifiedVars?: Set<string>,
+  selections?: ProfileSelections | null
 ): { score: number; details: MatchDetails; coverage: number } {
   let weightedSum = 0;
   let totalWeight = 0;
@@ -273,8 +401,15 @@ export function computeSimilarity(
 
   // Swell height (relative sigma) + wave size preference
   if (forecast.swellHeight != null && session.swellHeight != null) {
-    const sigma = SIGMAS.swellHeight(session.swellHeight);
-    let sim = gaussianSimilarity(forecast.swellHeight, session.swellHeight, sigma);
+    let sim: number;
+    const hasSelections = selections?.waveSize && selections.waveSize.length > 0;
+    if (hasSelections) {
+      const sigma = SIGMAS.swellHeight(session.swellHeight);
+      sim = rangeSimilarity(forecast.swellHeight, selections!.waveSize!, CATEGORY_RANGES.swellHeight, sigma);
+    } else {
+      const sigma = SIGMAS.swellHeight(session.swellHeight);
+      sim = gaussianSimilarity(forecast.swellHeight, session.swellHeight, sigma);
+    }
     // Skip preference multiplier for profile-specified vars
     if (!isProfileMatch || !profileSpecifiedVars!.has("swellHeight")) {
       sim *= getPreferenceMultiplier(forecast.swellHeight, weights.preferredWaveSize, WAVE_SIZE_RANGES);
@@ -289,7 +424,10 @@ export function computeSimilarity(
 
   // Swell period + period preference
   if (forecast.swellPeriod != null && session.swellPeriod != null) {
-    let sim = gaussianSimilarity(forecast.swellPeriod, session.swellPeriod, SIGMAS.swellPeriod);
+    const hasPeriodSelections = selections?.swellPeriod && selections.swellPeriod.length > 0;
+    let sim = hasPeriodSelections
+      ? rangeSimilarity(forecast.swellPeriod, selections!.swellPeriod!, CATEGORY_RANGES.swellPeriod, SIGMAS.swellPeriod)
+      : gaussianSimilarity(forecast.swellPeriod, session.swellPeriod, SIGMAS.swellPeriod);
     if (!isProfileMatch || !profileSpecifiedVars!.has("swellPeriod")) {
       sim *= getPreferenceMultiplier(forecast.swellPeriod, weights.preferredSwellPeriod, SWELL_PERIOD_RANGES);
     }
@@ -303,7 +441,10 @@ export function computeSimilarity(
 
   // Swell direction
   if (forecast.swellDirection != null && session.swellDirection != null) {
-    const sim = directionalSimilarity(forecast.swellDirection, session.swellDirection, SIGMAS.swellDirection);
+    const hasSwellDirSelections = selections?.swellDirection && selections.swellDirection.length > 0;
+    const sim = hasSwellDirSelections
+      ? multiDirectionSimilarity(forecast.swellDirection, selections!.swellDirection!, SIGMAS.swellDirection)
+      : directionalSimilarity(forecast.swellDirection, session.swellDirection, SIGMAS.swellDirection);
     details.swellDirection = sim;
     weightedSum += weights.swellDirection * sim;
     totalWeight += weights.swellDirection;
@@ -313,7 +454,10 @@ export function computeSimilarity(
 
   // Wind speed + wind preference
   if (forecast.windSpeed != null && session.windSpeed != null) {
-    let sim = gaussianSimilarity(forecast.windSpeed, session.windSpeed, SIGMAS.windSpeed);
+    const hasWindSelections = selections?.windCondition && selections.windCondition.length > 0;
+    let sim = hasWindSelections
+      ? rangeSimilarity(forecast.windSpeed, selections!.windCondition!, CATEGORY_RANGES.windSpeed, SIGMAS.windSpeed)
+      : gaussianSimilarity(forecast.windSpeed, session.windSpeed, SIGMAS.windSpeed);
     if (!isProfileMatch || !profileSpecifiedVars!.has("windSpeed")) {
       sim *= getWindPreferenceMultiplier(forecast.windSpeed, weights.preferredWind);
     }
@@ -327,7 +471,10 @@ export function computeSimilarity(
 
   // Wind direction
   if (forecast.windDirection != null && session.windDirection != null) {
-    const sim = directionalSimilarity(forecast.windDirection, session.windDirection, SIGMAS.windDirection);
+    const hasWindDirSelections = selections?.windDirection && selections.windDirection.length > 0;
+    const sim = hasWindDirSelections
+      ? multiDirectionSimilarity(forecast.windDirection, selections!.windDirection!, SIGMAS.windDirection)
+      : directionalSimilarity(forecast.windDirection, session.windDirection, SIGMAS.windDirection);
     details.windDirection = sim;
     weightedSum += weights.windDirection * sim;
     totalWeight += weights.windDirection;
@@ -337,7 +484,10 @@ export function computeSimilarity(
 
   // Tide height + tide preference
   if (forecast.tideHeight != null && session.tideHeight != null) {
-    let sim = gaussianSimilarity(forecast.tideHeight, session.tideHeight, SIGMAS.tideHeight);
+    const hasTideSelections = selections?.tideLevel && selections.tideLevel.length > 0;
+    let sim = hasTideSelections
+      ? rangeSimilarity(forecast.tideHeight, selections!.tideLevel!, CATEGORY_RANGES.tideHeight, SIGMAS.tideHeight)
+      : gaussianSimilarity(forecast.tideHeight, session.tideHeight, SIGMAS.tideHeight);
     if (!isProfileMatch || !profileSpecifiedVars!.has("tideHeight")) {
       sim *= getTidePreferenceMultiplier(forecast.tideHeight, weights.preferredTide);
     }
@@ -613,7 +763,8 @@ export function generateProfileAlerts(
         fh.conditions,
         profile.conditions,
         profile.weights,
-        profile.specifiedVars
+        profile.specifiedVars,
+        profile.selections
       );
 
       if (coverage < 0.5) continue;

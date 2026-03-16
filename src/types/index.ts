@@ -160,8 +160,31 @@ export interface ConditionProfileResponse {
   weightWindSpeed: number;
   weightWindDirection: number;
   weightWaveEnergy: number;
+  selections: ProfileSelections | null;
+  exclusions: ExclusionZones | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface ProfileSelections {
+  waveSize?: string[];
+  swellPeriod?: string[];
+  swellDirection?: string[];
+  windCondition?: string[];
+  windDirection?: string[];
+  tideLevel?: string[];
+}
+
+// Exclusion zones: conditions that are absolute dealbreakers
+export interface ExclusionZones {
+  // Directional: cardinal directions that kill the spot (each covers ±22.5°)
+  windDirection?: CardinalDirection[];
+  swellDirection?: CardinalDirection[];
+  // Categorical: category keys that are dealbreakers (resolved to numeric ranges at match time)
+  swellHeight?: string[];    // e.g. ['small', 'xl']
+  swellPeriod?: string[];    // e.g. ['short']
+  windSpeed?: string[];      // e.g. ['onshore']
+  tideHeight?: string[];     // e.g. ['high']
 }
 
 export interface ProfileForMatching {
@@ -181,6 +204,8 @@ export interface ProfileForMatching {
   consistency: 'low' | 'medium' | 'high';
   qualityCeiling: number; // 1-5
   weights: ConditionWeights;
+  selections?: ProfileSelections | null;
+  exclusions?: ExclusionZones | null;
 }
 
 // Prediction types

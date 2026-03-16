@@ -65,7 +65,7 @@ export async function GET(
 
     for (const profile of profiles) {
       const pfm = buildProfileForMatching(profile);
-      const { score } = computeSimilarity(sessionConds, pfm.conditions, pfm.weights, pfm.specifiedVars);
+      const { score } = computeSimilarity(sessionConds, pfm.conditions, pfm.weights, pfm.specifiedVars, pfm.selections);
       if (score > bestScore) {
         bestScore = score;
         bestProfile = profile;

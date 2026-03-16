@@ -247,7 +247,8 @@ export async function GET(
           fh.conditions,
           profile.conditions,
           profile.weights,
-          profile.specifiedVars
+          profile.specifiedVars,
+          profile.selections
         );
 
         if (coverage < 0.5) continue;

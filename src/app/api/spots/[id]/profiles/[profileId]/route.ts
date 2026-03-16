@@ -105,6 +105,16 @@ export async function PUT(
       updates.lastReinforcedAt = null;
     }
 
+    // Save raw categorical selections for UI round-trip
+    if (body.selections !== undefined) {
+      updates.selections = body.selections;
+    }
+
+    // Exclusion zones
+    if (body.exclusions !== undefined) {
+      updates.exclusions = body.exclusions;
+    }
+
     // Weight fields (don't trigger reinforcement reset)
     const weightFields = [
       "weightSwellHeight", "weightSwellPeriod", "weightSwellDirection",

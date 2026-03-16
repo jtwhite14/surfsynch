@@ -1,0 +1,1 @@
+ALTER TABLE "condition_profiles" ADD COLUMN "selections" jsonb;
