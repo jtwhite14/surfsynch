@@ -14,6 +14,8 @@ import {
   MessageSquare,
   Calendar,
   Users,
+  Brain,
+  Sparkles,
 } from "lucide-react";
 
 const features = [
@@ -33,16 +35,28 @@ const features = [
     description: "Real-time swell, wind, and tide for every saved spot.",
   },
   {
-    icon: MessageSquare,
-    title: "SMS Alerts",
+    icon: Brain,
+    title: "AI Forecast Scoring",
     description:
-      "Get a text when your spots are firing. Set your own thresholds.",
+      "Wavebook learns from your sessions to score upcoming forecasts — so you know which days match your kind of surf.",
+  },
+  {
+    icon: MessageSquare,
+    title: "Smart SMS Alerts",
+    description:
+      "Get a text when AI detects conditions aligning with your best sessions. No manual thresholds needed.",
   },
   {
     icon: Calendar,
     title: "Weekly Forecast",
     description:
-      "7-day forecast scores so you can plan your week around swell.",
+      "7-day forecast scored by AI against your session history, so you can plan your week around the days that matter.",
+  },
+  {
+    icon: Sparkles,
+    title: "Condition Profiles",
+    description:
+      "Define your ideal conditions and Wavebook matches them against real-time forecasts to surface the sessions worth waking up for.",
   },
   {
     icon: Users,
@@ -85,9 +99,10 @@ export default async function LandingPage() {
               Nobody else&apos;s.
             </h1>
             <p className="mt-6 text-lg text-muted-foreground leading-relaxed max-w-xl mx-auto">
-              Wavebook is a private surf tracking app. No crowds, no exposure —
-              just you and your sessions. Track conditions, log waves, and keep
-              your spots to yourself.
+              Wavebook is a private, AI-powered surf tracker. Log sessions,
+              track conditions, and let machine learning score every forecast
+              against your personal wave history — all without exposing your
+              spots.
             </p>
             <div className="mt-10">
               <WaitlistForm />
@@ -112,9 +127,12 @@ export default async function LandingPage() {
                 to broadcast your spots to the world.
               </p>
               <p>
-                Wavebook keeps everything between you and the ocean. No social
-                feeds, no public profiles, no check-in maps for the masses. Just
-                a clean logbook that respects the lineup.
+                Wavebook learns what makes a great session{" "}
+                <span className="text-foreground">for you</span>. It
+                cross-references swell, wind, tide, and weather against your
+                logged sessions to score every forecast window — then alerts you
+                when conditions align. All of it stays private. No social feeds,
+                no public profiles, no check-in maps for the masses.
               </p>
             </div>
           </div>
