@@ -240,7 +240,7 @@ export default function SpotMap({
               anchor="center"
             >
               <svg width="8" height="8" viewBox="0 0 8 8">
-                <circle cx="4" cy="4" r="4" fill="white" fillOpacity={0.6} />
+                <circle cx="4" cy="4" r="4" fill="hsl(var(--primary))" fillOpacity={0.6} />
               </svg>
             </Marker>
           );
