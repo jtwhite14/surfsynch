@@ -469,7 +469,7 @@ export default function DashboardPage() {
                             className="inline-flex items-center gap-1.5 rounded-full bg-accent/50 px-2.5 py-1 text-xs hover:bg-accent transition-colors"
                           >
                             <SlidersHorizontal className="size-3" />
-                            <span>Tune alerts</span>
+                            <span>Set up alerts</span>
                           </button>
                         )}
                       </div>
@@ -687,7 +687,7 @@ export default function DashboardPage() {
                       >
                         <p className="text-xs text-muted-foreground">
                           Set your spot type to improve alert accuracy.{" "}
-                          <span className="text-primary font-medium">Tune alerts</span>
+                          <span className="text-primary font-medium">Set up alerts</span>
                         </p>
                       </button>
                     )}

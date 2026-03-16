@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback, useMemo } from "react";
+import { useRef, useState, useCallback, useMemo, useEffect } from "react";
 import Map, { Marker, MapRef, NavigationControl, GeolocateControl, MapMouseEvent } from "react-map-gl/mapbox";
 import Supercluster from "supercluster";
 import { SurfSpot } from "@/lib/db/schema";
@@ -135,6 +135,14 @@ export default function SpotMap({
       padding: flyToPadding,
     });
   }, [flyToPadding]);
+
+  // Fly to the selected spot whenever it changes (e.g. from banner clicks, not just marker clicks)
+  useEffect(() => {
+    if (selectedSpotId && mapLoaded) {
+      const spot = spotById[selectedSpotId];
+      if (spot) flyToSpot(spot);
+    }
+  }, [selectedSpotId, mapLoaded, spotById, flyToSpot]);
 
   const handleClusterClick = useCallback(
     (clusterId: number, longitude: number, latitude: number) => {
