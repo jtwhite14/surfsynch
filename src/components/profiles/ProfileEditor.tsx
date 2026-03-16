@@ -150,10 +150,12 @@ export function ProfileEditor({ spotId, profile, defaultName, onSave, onCancel, 
   // Spot type preset
   const [activePreset, setActivePreset] = useState<string | null>(null);
 
-  const hasAnyExclusion = excludeSwellDir.length > 0 || excludeWindDir.length > 0 ||
-    excludeWaveSize.length > 0 || excludeSwellPeriod.length > 0 ||
-    excludeWindSpeed.length > 0 || excludeTide.length > 0;
-  const [exclusionsOpen, setExclusionsOpen] = useState(hasAnyExclusion);
+  const hasSwellExclusion = excludeSwellDir.length > 0 || excludeWaveSize.length > 0 || excludeSwellPeriod.length > 0;
+  const hasWindExclusion = excludeWindDir.length > 0 || excludeWindSpeed.length > 0;
+  const hasTideExclusion = excludeTide.length > 0;
+  const [swellExcOpen, setSwellExcOpen] = useState(hasSwellExclusion);
+  const [windExcOpen, setWindExcOpen] = useState(hasWindExclusion);
+  const [tideExcOpen, setTideExcOpen] = useState(hasTideExclusion);
 
   function togglePill<T extends string>(current: T[], value: T): T[] {
     return current.includes(value) ? current.filter(v => v !== value) : [...current, value];
@@ -366,6 +368,44 @@ export function ProfileEditor({ spotId, profile, defaultName, onSave, onCancel, 
                   )}
                 </div>
               </ConditionRow>
+
+              {/* Swell — Doesn't work */}
+              <ExclusionDropdown
+                open={swellExcOpen}
+                onToggle={() => setSwellExcOpen(!swellExcOpen)}
+                hasExclusions={hasSwellExclusion}
+              >
+                <div className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Direction</span>
+                  <div className="flex items-start gap-3">
+                    <SwellExposurePicker value={excludeSwellDir} onChange={setExcludeSwellDir} variant="destructive" />
+                    {onDirectionEditStart && (
+                      <button
+                        onClick={() => startMapEdit("excludeSwellDir", excludeSwellDir, "exclusion")}
+                        className="text-[10px] text-destructive hover:underline mt-1 whitespace-nowrap"
+                      >
+                        Edit on map
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Size</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {WAVE_SIZE_OPTIONS.map(opt => (
+                      <ExclusionPill key={opt.value} active={excludeWaveSize.includes(opt.value)} onClick={() => setExcludeWaveSize(togglePill(excludeWaveSize, opt.value))}>{opt.label}</ExclusionPill>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Period</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {PERIOD_OPTIONS.map(opt => (
+                      <ExclusionPill key={opt.value} active={excludeSwellPeriod.includes(opt.value)} onClick={() => setExcludeSwellPeriod(togglePill(excludeSwellPeriod, opt.value))}>{opt.label}</ExclusionPill>
+                    ))}
+                  </div>
+                </div>
+              </ExclusionDropdown>
             </fieldset>
 
             {/* ── Wind ── */}
@@ -395,6 +435,36 @@ export function ProfileEditor({ spotId, profile, defaultName, onSave, onCancel, 
                   )}
                 </div>
               </ConditionRow>
+
+              {/* Wind — Doesn't work */}
+              <ExclusionDropdown
+                open={windExcOpen}
+                onToggle={() => setWindExcOpen(!windExcOpen)}
+                hasExclusions={hasWindExclusion}
+              >
+                <div className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Direction</span>
+                  <div className="flex items-start gap-3">
+                    <SwellExposurePicker value={excludeWindDir} onChange={setExcludeWindDir} variant="destructive" />
+                    {onDirectionEditStart && (
+                      <button
+                        onClick={() => startMapEdit("excludeWindDir", excludeWindDir, "exclusion")}
+                        className="text-[10px] text-destructive hover:underline mt-1 whitespace-nowrap"
+                      >
+                        Edit on map
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Conditions</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[...WIND_OPTIONS, { value: "onshore", label: "Onshore" }].map(opt => (
+                      <ExclusionPill key={opt.value} active={excludeWindSpeed.includes(opt.value)} onClick={() => setExcludeWindSpeed(togglePill(excludeWindSpeed, opt.value))}>{opt.label}</ExclusionPill>
+                    ))}
+                  </div>
+                </div>
+              </ExclusionDropdown>
             </fieldset>
 
             {/* ── Tide ── */}
@@ -407,108 +477,23 @@ export function ProfileEditor({ spotId, profile, defaultName, onSave, onCancel, 
                   ))}
                 </div>
               </ConditionRow>
+
+              {/* Tide — Doesn't work */}
+              <ExclusionDropdown
+                open={tideExcOpen}
+                onToggle={() => setTideExcOpen(!tideExcOpen)}
+                hasExclusions={hasTideExclusion}
+              >
+                <div className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Level</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {TIDE_OPTIONS.map(opt => (
+                      <ExclusionPill key={opt.value} active={excludeTide.includes(opt.value)} onClick={() => setExcludeTide(togglePill(excludeTide, opt.value))}>{opt.label}</ExclusionPill>
+                    ))}
+                  </div>
+                </div>
+              </ExclusionDropdown>
             </fieldset>
-
-        {/* ── Doesn't work (exclusion zones) ── */}
-        <div className="rounded-lg border border-destructive/30 overflow-hidden">
-          <button
-            className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-destructive/5 transition-colors"
-            onClick={() => setExclusionsOpen(!exclusionsOpen)}
-          >
-            <ChevronRight className={`size-3.5 text-destructive/70 shrink-0 transition-transform duration-200 ${exclusionsOpen ? 'rotate-90' : ''}`} />
-            <span className="text-sm font-medium text-destructive/80 flex-1">Doesn&apos;t work</span>
-            {!exclusionsOpen && hasAnyExclusion && (
-              <span className="text-xs text-destructive/60">{exclusionSummary()}</span>
-            )}
-          </button>
-          {exclusionsOpen && (
-            <div className="px-3 pb-3 pt-1 space-y-3 border-t border-destructive/20">
-              <p className="text-[11px] text-muted-foreground">
-                Conditions that make this spot unrideable. Alerts will never fire when these are forecast.
-              </p>
-
-              {/* Excluded swell direction */}
-              <div className="space-y-1.5">
-                <span className="text-xs font-medium text-muted-foreground">Swell direction</span>
-                <div className="flex items-start gap-3">
-                  <SwellExposurePicker
-                    value={excludeSwellDir}
-                    onChange={setExcludeSwellDir}
-                    variant="destructive"
-                  />
-                  {onDirectionEditStart && (
-                    <button
-                      onClick={() => startMapEdit("excludeSwellDir", excludeSwellDir, "exclusion")}
-                      className="text-[10px] text-destructive hover:underline mt-1 whitespace-nowrap"
-                    >
-                      Edit on map
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Excluded wind direction */}
-              <div className="space-y-1.5">
-                <span className="text-xs font-medium text-muted-foreground">Wind direction</span>
-                <div className="flex items-start gap-3">
-                  <SwellExposurePicker
-                    value={excludeWindDir}
-                    onChange={setExcludeWindDir}
-                    variant="destructive"
-                  />
-                  {onDirectionEditStart && (
-                    <button
-                      onClick={() => startMapEdit("excludeWindDir", excludeWindDir, "exclusion")}
-                      className="text-[10px] text-destructive hover:underline mt-1 whitespace-nowrap"
-                    >
-                      Edit on map
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Excluded wave size */}
-              <div className="space-y-1.5">
-                <span className="text-xs font-medium text-muted-foreground">Wave size</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {WAVE_SIZE_OPTIONS.map(opt => (
-                    <ExclusionPill key={opt.value} active={excludeWaveSize.includes(opt.value)} onClick={() => setExcludeWaveSize(togglePill(excludeWaveSize, opt.value))}>{opt.label}</ExclusionPill>
-                  ))}
-                </div>
-              </div>
-
-              {/* Excluded period */}
-              <div className="space-y-1.5">
-                <span className="text-xs font-medium text-muted-foreground">Period</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {PERIOD_OPTIONS.map(opt => (
-                    <ExclusionPill key={opt.value} active={excludeSwellPeriod.includes(opt.value)} onClick={() => setExcludeSwellPeriod(togglePill(excludeSwellPeriod, opt.value))}>{opt.label}</ExclusionPill>
-                  ))}
-                </div>
-              </div>
-
-              {/* Excluded wind speed */}
-              <div className="space-y-1.5">
-                <span className="text-xs font-medium text-muted-foreground">Wind</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {[...WIND_OPTIONS, { value: "onshore", label: "Onshore" }].map(opt => (
-                    <ExclusionPill key={opt.value} active={excludeWindSpeed.includes(opt.value)} onClick={() => setExcludeWindSpeed(togglePill(excludeWindSpeed, opt.value))}>{opt.label}</ExclusionPill>
-                  ))}
-                </div>
-              </div>
-
-              {/* Excluded tide */}
-              <div className="space-y-1.5">
-                <span className="text-xs font-medium text-muted-foreground">Tide</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {TIDE_OPTIONS.map(opt => (
-                    <ExclusionPill key={opt.value} active={excludeTide.includes(opt.value)} onClick={() => setExcludeTide(togglePill(excludeTide, opt.value))}>{opt.label}</ExclusionPill>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
 
         {/* Active Months */}
         <div className="space-y-1.5">
@@ -577,14 +562,6 @@ export function ProfileEditor({ spotId, profile, defaultName, onSave, onCancel, 
     </div>
   );
 
-  function exclusionSummary(): string {
-    const parts: string[] = [];
-    if (excludeWindDir.length > 0) parts.push(`Wind ${excludeWindDir.join(",")}`);
-    if (excludeSwellDir.length > 0) parts.push(`Swell ${excludeSwellDir.join(",")}`);
-    const scalarCount = excludeWaveSize.length + excludeSwellPeriod.length + excludeWindSpeed.length + excludeTide.length;
-    if (scalarCount > 0) parts.push(`+${scalarCount} more`);
-    return parts.join(" · ");
-  }
 }
 
 /* ── Compact row: label + cycling importance badge on left, controls below ── */
@@ -641,6 +618,41 @@ function Pill({
     >
       {children}
     </button>
+  );
+}
+
+/* ── Inline exclusion dropdown within a fieldset ── */
+
+function ExclusionDropdown({
+  open,
+  onToggle,
+  hasExclusions,
+  children,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  hasExclusions: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-md border border-destructive/25 overflow-hidden -mx-0.5">
+      <button
+        type="button"
+        className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-left hover:bg-destructive/5 transition-colors"
+        onClick={onToggle}
+      >
+        <ChevronRight className={`size-3 text-destructive/60 shrink-0 transition-transform duration-200 ${open ? 'rotate-90' : ''}`} />
+        <span className="text-[11px] font-medium text-destructive/70 flex-1">Doesn&apos;t work</span>
+        {!open && hasExclusions && (
+          <span className="w-1.5 h-1.5 rounded-full bg-destructive/50" />
+        )}
+      </button>
+      {open && (
+        <div className="px-2.5 pb-2.5 pt-1 space-y-2.5 border-t border-destructive/15">
+          {children}
+        </div>
+      )}
+    </div>
   );
 }
 
