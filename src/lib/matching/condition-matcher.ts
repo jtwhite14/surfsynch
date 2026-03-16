@@ -239,6 +239,11 @@ function getTidePreferenceMultiplier(tideHeight: number | null, pref: string | s
  *   For profile-based matching: coverage is computed as matchedPairs / profileSpecifiedCount
  *   (not /7), and preference multipliers are skipped for profile-specified vars.
  */
+// Minimum similarity required for "critical" importance variables (weight >= 1.5).
+// Below this threshold the variable acts as a hard veto on the match.
+const CRITICAL_WEIGHT_THRESHOLD = 1.5;
+const CRITICAL_SIM_FLOOR = 0.3;
+
 export function computeSimilarity(
   forecast: ParsedConditions,
   session: ParsedConditions,
@@ -248,6 +253,7 @@ export function computeSimilarity(
   let weightedSum = 0;
   let totalWeight = 0;
   let nonNullCount = 0;
+  let criticalVeto = false;
   const isProfileMatch = profileSpecifiedVars != null && profileSpecifiedVars.size > 0;
   const totalVars = isProfileMatch ? profileSpecifiedVars!.size : 7;
 
@@ -278,6 +284,7 @@ export function computeSimilarity(
     weightedSum += weights.swellHeight * sim;
     totalWeight += weights.swellHeight;
     nonNullCount++;
+    if (weights.swellHeight >= CRITICAL_WEIGHT_THRESHOLD && sim < CRITICAL_SIM_FLOOR) criticalVeto = true;
   }
 
   // Swell period + period preference
@@ -291,6 +298,7 @@ export function computeSimilarity(
     weightedSum += weights.swellPeriod * sim;
     totalWeight += weights.swellPeriod;
     nonNullCount++;
+    if (weights.swellPeriod >= CRITICAL_WEIGHT_THRESHOLD && sim < CRITICAL_SIM_FLOOR) criticalVeto = true;
   }
 
   // Swell direction
@@ -300,6 +308,7 @@ export function computeSimilarity(
     weightedSum += weights.swellDirection * sim;
     totalWeight += weights.swellDirection;
     nonNullCount++;
+    if (weights.swellDirection >= CRITICAL_WEIGHT_THRESHOLD && sim < CRITICAL_SIM_FLOOR) criticalVeto = true;
   }
 
   // Wind speed + wind preference
@@ -313,6 +322,7 @@ export function computeSimilarity(
     weightedSum += weights.windSpeed * sim;
     totalWeight += weights.windSpeed;
     nonNullCount++;
+    if (weights.windSpeed >= CRITICAL_WEIGHT_THRESHOLD && sim < CRITICAL_SIM_FLOOR) criticalVeto = true;
   }
 
   // Wind direction
@@ -322,6 +332,7 @@ export function computeSimilarity(
     weightedSum += weights.windDirection * sim;
     totalWeight += weights.windDirection;
     nonNullCount++;
+    if (weights.windDirection >= CRITICAL_WEIGHT_THRESHOLD && sim < CRITICAL_SIM_FLOOR) criticalVeto = true;
   }
 
   // Tide height + tide preference
@@ -335,6 +346,7 @@ export function computeSimilarity(
     weightedSum += weights.tideHeight * sim;
     totalWeight += weights.tideHeight;
     nonNullCount++;
+    if (weights.tideHeight >= CRITICAL_WEIGHT_THRESHOLD && sim < CRITICAL_SIM_FLOOR) criticalVeto = true;
   }
 
   // Wave energy (relative sigma)
@@ -345,6 +357,7 @@ export function computeSimilarity(
     weightedSum += weights.waveEnergy * sim;
     totalWeight += weights.waveEnergy;
     nonNullCount++;
+    if (weights.waveEnergy >= CRITICAL_WEIGHT_THRESHOLD && sim < CRITICAL_SIM_FLOOR) criticalVeto = true;
   }
 
   const coverage = nonNullCount / totalVars;
@@ -354,6 +367,11 @@ export function computeSimilarity(
   // For session matching: require at least 50% coverage (3.5 of 7)
   const minAbsoluteCount = isProfileMatch ? 2 : 0;
   if (coverage < 0.5 || totalWeight === 0 || nonNullCount < minAbsoluteCount) {
+    return { score: 0, details, coverage };
+  }
+
+  // Hard veto: if any critical-importance variable scored below the floor, reject the match
+  if (criticalVeto) {
     return { score: 0, details, coverage };
   }
 
