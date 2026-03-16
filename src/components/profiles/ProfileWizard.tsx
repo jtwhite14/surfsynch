@@ -667,10 +667,10 @@ export function ProfileWizard({
                     key={m.value}
                     onClick={() => toggleMonth(m.value)}
                     className={cn(
-                      "px-2 py-1 rounded-full text-xs font-medium transition-colors",
+                      "px-2 py-1 rounded-full text-xs font-medium transition-colors border",
                       activeMonths.includes(m.value)
-                        ? "border border-primary text-primary bg-primary/10"
-                        : "bg-muted text-muted-foreground hover:bg-accent"
+                        ? "border-primary text-primary bg-primary/10"
+                        : "border-transparent bg-muted text-muted-foreground hover:bg-accent"
                     )}
                   >
                     {m.label}
@@ -717,10 +717,19 @@ export function ProfileWizard({
     }
   }
 
+  // On compass steps, offset the card to the right so it doesn't cover the compass.
+  // The spot is centered on the page; we shift the card right and the flyTo padding
+  // keeps the spot + card combo visually centered.
+  const cardPositionClass = isCompassStep
+    ? "absolute inset-0 z-30 pointer-events-none flex items-start justify-end pr-[5vw] sm:pr-[8vw]"
+    : "absolute inset-0 z-30 pointer-events-none flex flex-col items-center";
+
   return (
-    <div className="absolute inset-0 z-30 pointer-events-none flex flex-col items-center">
-      {/* Floating card — sits in upper portion so spot pin stays visible at center */}
-      <div className="pointer-events-auto w-[420px] max-w-[92vw] mt-[12vh] sm:mt-[15vh]">
+    <div className={cardPositionClass}>
+      <div className={cn(
+        "pointer-events-auto w-[420px] max-w-[92vw]",
+        isCompassStep ? "mt-[15vh]" : "mt-[12vh] sm:mt-[15vh]"
+      )}>
         <div className="rounded-xl border bg-background/95 backdrop-blur-sm shadow-2xl overflow-hidden">
           {/* Question + close button */}
           <div className="px-5 pt-4 pb-3 flex items-start gap-3">
@@ -743,87 +752,65 @@ export function ProfileWizard({
             )}
           </div>
 
-          {/* "Add conditions that don't work" link — only on target steps that support exclusions */}
-          {canAddExclusion && (
-            <div className="px-5 pb-3">
-              <button
-                type="button"
-                onClick={addExclusionStep}
-                className="text-xs text-destructive/70 hover:text-destructive transition-colors"
+          {/* Footer: nav buttons */}
+          <div className="px-5 pb-4 flex items-center justify-end gap-2">
+            {!isFirst && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={goBack}
+                className="h-8 px-2"
               >
-                + Add conditions that don&apos;t work
-              </button>
-            </div>
-          )}
-
-          {/* Footer: progress dots + nav */}
-          <div className="px-5 pb-4 flex items-center gap-3">
-            {/* Progress dots */}
-            <div className="flex gap-1.5 flex-1">
-              {steps.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => goToStep(i)}
-                  className={cn(
-                    "h-1.5 rounded-full transition-all duration-300",
-                    i === stepIndex
-                      ? "w-6 bg-primary"
-                      : i < stepIndex
-                      ? "w-1.5 bg-primary/40"
-                      : "w-1.5 bg-muted-foreground/20"
-                  )}
-                />
-              ))}
-            </div>
-
-            {/* Nav buttons */}
-            <div className="flex gap-2 shrink-0">
-              {!isFirst && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={goBack}
-                  className="h-8 px-2"
-                >
-                  <ChevronLeft className="size-4" />
-                </Button>
-              )}
-              {currentStep === "preset" && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={goNext}
-                  className="h-8 text-muted-foreground"
-                >
-                  Skip
-                </Button>
-              )}
-              {isLast ? (
-                <Button
-                  size="sm"
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="h-8"
-                >
-                  {saving ? <Loader2 className="size-4 animate-spin" /> : profile ? "Save" : "Create"}
-                </Button>
-              ) : (
-                <Button
-                  size="sm"
-                  onClick={goNext}
-                  className="h-8"
-                >
-                  Next
-                </Button>
-              )}
-            </div>
+                <ChevronLeft className="size-4" />
+              </Button>
+            )}
+            {canAddExclusion && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={addExclusionStep}
+                className="h-8 text-destructive/70 hover:text-destructive mr-auto"
+              >
+                + Doesn&apos;t work
+              </Button>
+            )}
+            {currentStep === "preset" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={goNext}
+                className="h-8 text-muted-foreground"
+              >
+                Skip
+              </Button>
+            )}
+            {isLast ? (
+              <Button
+                size="sm"
+                onClick={handleSave}
+                disabled={saving}
+                className="h-8"
+              >
+                {saving ? <Loader2 className="size-4 animate-spin" /> : profile ? "Save" : "Create"}
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                onClick={goNext}
+                className="h-8"
+              >
+                Next
+              </Button>
+            )}
           </div>
         </div>
 
-        {/* Downward pointer arrow toward the spot pin */}
-        <div className="flex justify-center -mt-px">
-          <div className="w-3 h-3 rotate-45 bg-background/95 border-r border-b -mt-1.5" />
-        </div>
+        {/* Downward pointer arrow — only on non-compass steps */}
+        {!isCompassStep && (
+          <div className="flex justify-center -mt-px">
+            <div className="w-3 h-3 rotate-45 bg-background/95 border-r border-b -mt-1.5" />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -844,10 +831,10 @@ function WizardPill({
     <button
       onClick={onClick}
       className={cn(
-        "px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
+        "px-3 py-1.5 rounded-full text-sm font-medium transition-colors border",
         active
-          ? "border border-primary text-primary bg-primary/10"
-          : "bg-muted text-muted-foreground hover:bg-accent"
+          ? "border-primary text-primary bg-primary/10"
+          : "border-transparent bg-muted text-muted-foreground hover:bg-accent"
       )}
     >
       {children}
@@ -870,10 +857,10 @@ function ExclusionPill({
     <button
       onClick={onClick}
       className={cn(
-        "px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
+        "px-3 py-1.5 rounded-full text-sm font-medium transition-colors border",
         active
-          ? "border border-destructive text-destructive bg-destructive/10"
-          : "bg-muted text-muted-foreground hover:bg-accent"
+          ? "border-destructive text-destructive bg-destructive/10"
+          : "border-transparent bg-muted text-muted-foreground hover:bg-accent"
       )}
     >
       {children}
