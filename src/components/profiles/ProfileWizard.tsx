@@ -755,14 +755,24 @@ export function ProfileWizard({
               </Button>
             )}
             {isSkippable && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={goNext}
-                className="h-8 text-muted-foreground"
-              >
-                Skip
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setStepIndex(steps.length - 1)}
+                  className="h-8 text-muted-foreground/50 hover:text-muted-foreground"
+                >
+                  Skip all
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={goNext}
+                  className="h-8 text-muted-foreground"
+                >
+                  Skip
+                </Button>
+              </>
             )}
             {isLast ? (
               <Button
