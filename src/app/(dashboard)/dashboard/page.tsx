@@ -375,22 +375,32 @@ export default function DashboardPage() {
             for (const { spot, alerts } of results) {
               if (alerts.length > 0) {
                 ids.add(spot.id);
-                const best = alerts[0]; // Already sorted by effectiveScore
-                const snapshot = best.forecastSnapshot;
-                const waveHeight = snapshot?.primarySwellHeight != null
-                  ? `${(snapshot.primarySwellHeight * 3.28084).toFixed(0)}ft`
-                  : '';
-                const period = snapshot?.primarySwellPeriod != null
-                  ? `@ ${snapshot.primarySwellPeriod.toFixed(0)}s`
-                  : '';
-                summaries.push({
-                  spotId: spot.id,
-                  spotName: spot.name,
-                  effectiveScore: Math.round(best.effectiveScore),
-                  forecastHour: best.forecastHour,
-                  timeWindow: best.timeWindow,
-                  conditions: [waveHeight, period].filter(Boolean).join(' '),
-                });
+                // Best alert per day per spot
+                const bestByDay = new Map<string, typeof alerts[0]>();
+                for (const alert of alerts) {
+                  const dayKey = new Date(alert.forecastHour).toDateString();
+                  const existing = bestByDay.get(dayKey);
+                  if (!existing || alert.effectiveScore > existing.effectiveScore) {
+                    bestByDay.set(dayKey, alert);
+                  }
+                }
+                for (const best of bestByDay.values()) {
+                  const snapshot = best.forecastSnapshot;
+                  const waveHeight = snapshot?.primarySwellHeight != null
+                    ? `${(snapshot.primarySwellHeight * 3.28084).toFixed(0)}ft`
+                    : '';
+                  const period = snapshot?.primarySwellPeriod != null
+                    ? `@ ${snapshot.primarySwellPeriod.toFixed(0)}s`
+                    : '';
+                  summaries.push({
+                    spotId: spot.id,
+                    spotName: spot.name,
+                    effectiveScore: Math.round(best.effectiveScore),
+                    forecastHour: best.forecastHour,
+                    timeWindow: best.timeWindow,
+                    conditions: [waveHeight, period].filter(Boolean).join(' '),
+                  });
+                }
               }
             }
             setAlertSpotIds(ids);
@@ -907,7 +917,7 @@ export default function DashboardPage() {
                     const spot = spots.find(s => s.id === summary.spotId);
                     return (
                       <button
-                        key={summary.spotId}
+                        key={`${summary.spotId}:${summary.forecastHour}`}
                         onClick={() => spot && handleSpotClick(spot)}
                         className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/50 transition-colors w-full text-left"
                       >
