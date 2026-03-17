@@ -28,13 +28,31 @@ import {
   X,
   Plus,
   MapPin,
-  Sailboat,
 } from "lucide-react";
+
+function SurfboardIcon({ className, ...props }: React.SVGProps<SVGSVGElement> & { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      {...props}
+    >
+      <path d="M21 3C14 3 5 8 3 21c5-1 10-3 13-6s5-7 5-12z" />
+      <path d="M9 15l3-3" />
+    </svg>
+  );
+}
 
 const navigation = [
   { name: "Home", href: "/dashboard", icon: LayoutDashboard },
   { name: "Sessions", href: "/sessions", icon: Waves },
-  { name: "Equipment", href: "/equipment", icon: Sailboat },
+  { name: "Equipment", href: "/equipment", icon: SurfboardIcon },
 ];
 
 
