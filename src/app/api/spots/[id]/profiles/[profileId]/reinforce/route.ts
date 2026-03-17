@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthUserId } from "@/lib/auth";
 import { db, surfSessions, conditionProfiles } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { parseSessionConditions } from "@/lib/matching/condition-matcher";
@@ -15,8 +14,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string; profileId: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -33,7 +32,7 @@ export async function POST(
       where: and(
         eq(conditionProfiles.id, profileId),
         eq(conditionProfiles.spotId, spotId),
-        eq(conditionProfiles.userId, session.user.id)
+        eq(conditionProfiles.userId, userId)
       ),
     });
     if (!profile) {
@@ -44,7 +43,7 @@ export async function POST(
     const surfSession = await db.query.surfSessions.findFirst({
       where: and(
         eq(surfSessions.id, sessionId),
-        eq(surfSessions.userId, session.user.id),
+        eq(surfSessions.userId, userId),
         eq(surfSessions.spotId, spotId)
       ),
       with: { conditions: true },

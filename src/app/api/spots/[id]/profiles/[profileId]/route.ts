@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthUserId } from "@/lib/auth";
 import { db, surfSpots, conditionProfiles } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { formatProfile } from "@/lib/profiles/format";
@@ -13,8 +12,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string; profileId: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -24,7 +23,7 @@ export async function GET(
       where: and(
         eq(conditionProfiles.id, profileId),
         eq(conditionProfiles.spotId, id),
-        eq(conditionProfiles.userId, session.user.id)
+        eq(conditionProfiles.userId, userId)
       ),
     });
 
@@ -47,8 +46,8 @@ export async function PUT(
   { params }: { params: Promise<{ id: string; profileId: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -58,7 +57,7 @@ export async function PUT(
       where: and(
         eq(conditionProfiles.id, profileId),
         eq(conditionProfiles.spotId, id),
-        eq(conditionProfiles.userId, session.user.id)
+        eq(conditionProfiles.userId, userId)
       ),
     });
 
@@ -161,8 +160,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; profileId: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -172,7 +171,7 @@ export async function DELETE(
       where: and(
         eq(conditionProfiles.id, profileId),
         eq(conditionProfiles.spotId, id),
-        eq(conditionProfiles.userId, session.user.id)
+        eq(conditionProfiles.userId, userId)
       ),
     });
 

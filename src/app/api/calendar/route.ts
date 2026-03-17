@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { db, users, accounts } from "@/lib/db";
-import { eq, and } from "drizzle-orm";
+import { auth, clerkClient } from "@clerk/nextjs/server";
+import { getAuthUserId } from "@/lib/auth";
+import { db, users } from "@/lib/db";
+import { eq } from "drizzle-orm";
 import {
   refreshAccessToken,
   fetchCalendarEvents,
@@ -12,30 +12,57 @@ import { addDays } from "date-fns";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const { userId: clerkUserId } = await auth();
+    if (!clerkUserId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get user's Google account
-    const googleAccount = await db.query.accounts.findFirst({
-      where: and(
-        eq(accounts.userId, session.user.id),
-        eq(accounts.provider, "google")
-      ),
-    });
+    const userId = await getAuthUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    if (!googleAccount?.refresh_token) {
-      return NextResponse.json({
-        connected: false,
-        message: "Google Calendar not connected",
+    // Strategy 1: Try Clerk's OAuth token API
+    let accessToken: string | null = null;
+    try {
+      const client = await clerkClient();
+      const tokenResponse = await client.users.getUserOauthAccessToken(
+        clerkUserId,
+        "google"
+      );
+      const tokens = tokenResponse.data;
+      if (tokens.length > 0 && tokens[0].token) {
+        accessToken = tokens[0].token;
+      }
+    } catch {
+      // Clerk token not available, fall back to DB
+    }
+
+    // Strategy 2: Fall back to stored refresh token
+    if (!accessToken) {
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, userId),
+        columns: { googleRefreshToken: true },
       });
+
+      if (!user?.googleRefreshToken) {
+        return NextResponse.json({
+          connected: false,
+          message: "Google Calendar not connected",
+        });
+      }
+
+      try {
+        accessToken = await refreshAccessToken(user.googleRefreshToken);
+      } catch {
+        return NextResponse.json({
+          connected: false,
+          message: "Calendar access expired. Please reconnect.",
+        });
+      }
     }
 
     try {
-      // Get fresh access token
-      const accessToken = await refreshAccessToken(googleAccount.refresh_token);
-
       // Fetch events for the next 14 days
       const startDate = new Date();
       const endDate = addDays(new Date(), 14);

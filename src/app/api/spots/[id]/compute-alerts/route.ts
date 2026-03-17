@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthUserId } from "@/lib/auth";
 import { db, surfSpots, surfSessions, sessionConditions, spotForecasts, spotAlerts, conditionProfiles } from "@/lib/db";
 import { eq, and, gte, inArray, sql } from "drizzle-orm";
 import { fetchMarineForecast } from "@/lib/api/open-meteo";
@@ -26,8 +25,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -35,7 +34,7 @@ export async function POST(
 
     // Get spot with sessions
     const spot = await db.query.surfSpots.findFirst({
-      where: and(eq(surfSpots.id, id), eq(surfSpots.userId, session.user.id)),
+      where: and(eq(surfSpots.id, id), eq(surfSpots.userId, userId)),
       with: {
         surfSessions: {
           where: gte(surfSessions.rating, 3),
@@ -212,7 +211,7 @@ export async function POST(
     for (const alert of mergedAlerts) {
       await db.insert(spotAlerts).values({
         spotId: id,
-        userId: session.user.id,
+        userId: userId,
         forecastHour: alert.forecastHour,
         timeWindow: alert.timeWindow,
         matchScore: alert.matchScore.toFixed(2),

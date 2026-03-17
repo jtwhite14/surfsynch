@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthUserId } from "@/lib/auth";
 import { db, spotShares } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
@@ -12,8 +11,8 @@ const acceptSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -23,7 +22,7 @@ export async function POST(request: NextRequest) {
     const share = await db.query.spotShares.findFirst({
       where: and(
         eq(spotShares.inviteCode, inviteCode),
-        eq(spotShares.sharedWithUserId, session.user.id),
+        eq(spotShares.sharedWithUserId, userId),
         eq(spotShares.status, "pending")
       ),
     });

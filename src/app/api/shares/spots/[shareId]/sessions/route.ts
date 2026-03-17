@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthUserId } from "@/lib/auth";
 import { db, spotShares, surfSessions } from "@/lib/db";
 import { eq, and, gte, desc } from "drizzle-orm";
 
@@ -9,8 +8,8 @@ export async function GET(
   { params }: { params: Promise<{ shareId: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -20,7 +19,7 @@ export async function GET(
     const share = await db.query.spotShares.findFirst({
       where: and(
         eq(spotShares.id, shareId),
-        eq(spotShares.sharedWithUserId, session.user.id),
+        eq(spotShares.sharedWithUserId, userId),
         eq(spotShares.status, "accepted")
       ),
     });

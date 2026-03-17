@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthUserId } from "@/lib/auth";
 import { db, surfSpots, surfSessions, sessionConditions } from "@/lib/db";
 import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
@@ -14,8 +13,8 @@ const createSpotSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -27,7 +26,7 @@ export async function GET(request: NextRequest) {
       const spot = await db.query.surfSpots.findFirst({
         where: and(
           eq(surfSpots.id, spotId),
-          eq(surfSpots.userId, session.user.id)
+          eq(surfSpots.userId, userId)
         ),
         with: {
           surfSessions: {
@@ -48,7 +47,7 @@ export async function GET(request: NextRequest) {
 
     // Get all spots for user
     const spots = await db.query.surfSpots.findMany({
-      where: eq(surfSpots.userId, session.user.id),
+      where: eq(surfSpots.userId, userId),
       orderBy: [desc(surfSpots.createdAt)],
     });
 
@@ -64,8 +63,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -75,7 +74,7 @@ export async function POST(request: NextRequest) {
     const [spot] = await db
       .insert(surfSpots)
       .values({
-        userId: session.user.id,
+        userId: userId,
         name: validated.name,
         latitude: validated.latitude.toString(),
         longitude: validated.longitude.toString(),
@@ -101,8 +100,8 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -127,7 +126,7 @@ export async function PUT(request: NextRequest) {
         ...(typeof alertsSilenced === "boolean" && { alertsSilenced }),
         updatedAt: new Date(),
       })
-      .where(and(eq(surfSpots.id, spotId), eq(surfSpots.userId, session.user.id)))
+      .where(and(eq(surfSpots.id, spotId), eq(surfSpots.userId, userId)))
       .returning();
 
     if (!spot) {
@@ -146,8 +145,8 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -160,7 +159,7 @@ export async function DELETE(request: NextRequest) {
 
     const [deleted] = await db
       .delete(surfSpots)
-      .where(and(eq(surfSpots.id, spotId), eq(surfSpots.userId, session.user.id)))
+      .where(and(eq(surfSpots.id, spotId), eq(surfSpots.userId, userId)))
       .returning();
 
     if (!deleted) {

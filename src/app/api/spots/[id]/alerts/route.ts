@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthUserId } from "@/lib/auth";
 import { db, surfSpots, spotAlerts, surfSessions, conditionProfiles } from "@/lib/db";
 import { eq, and, desc } from "drizzle-orm";
 import type { SpotAlertResponse } from "@/types";
@@ -10,8 +9,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -21,7 +20,7 @@ export async function GET(
     const spot = await db.query.surfSpots.findFirst({
       where: and(
         eq(surfSpots.id, id),
-        eq(surfSpots.userId, session.user.id)
+        eq(surfSpots.userId, userId)
       ),
     });
 
@@ -38,7 +37,7 @@ export async function GET(
     const alerts = await db.query.spotAlerts.findMany({
       where: and(
         eq(spotAlerts.spotId, id),
-        eq(spotAlerts.userId, session.user.id),
+        eq(spotAlerts.userId, userId),
         eq(spotAlerts.status, "active")
       ),
       orderBy: [desc(spotAlerts.effectiveScore)],
@@ -102,8 +101,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -119,7 +118,7 @@ export async function PATCH(
       .set({ status, updatedAt: new Date() })
       .where(and(
         eq(spotAlerts.id, alertId),
-        eq(spotAlerts.userId, session.user.id),
+        eq(spotAlerts.userId, userId),
         eq(spotAlerts.spotId, spotId)
       ));
 

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthUserId } from "@/lib/auth";
 import {
   db,
   uploadSessions,
@@ -30,8 +29,8 @@ const completeSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -42,7 +41,7 @@ export async function POST(request: NextRequest) {
     const uploadSession = await db.query.uploadSessions.findFirst({
       where: and(
         eq(uploadSessions.id, validated.uploadSessionId),
-        eq(uploadSessions.userId, session.user.id)
+        eq(uploadSessions.userId, userId)
       ),
     });
 
@@ -61,7 +60,7 @@ export async function POST(request: NextRequest) {
       const spot = await db.query.surfSpots.findFirst({
         where: and(
           eq(surfSpots.id, s.spotId),
-          eq(surfSpots.userId, session.user.id)
+          eq(surfSpots.userId, userId)
         ),
       });
 
@@ -76,7 +75,7 @@ export async function POST(request: NextRequest) {
         .insert(surfSessions)
         .values({
           spotId: s.spotId,
-          userId: session.user.id,
+          userId: userId,
           date: new Date(s.date),
           startTime: new Date(s.startTime),
           rating: s.rating,

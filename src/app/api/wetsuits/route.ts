@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthUserId } from "@/lib/auth";
 import { db, wetsuits } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
@@ -20,13 +19,13 @@ const wetsuitSchema = z.object({
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const suits = await db.query.wetsuits.findMany({
-      where: eq(wetsuits.userId, session.user.id),
+      where: eq(wetsuits.userId, userId),
       orderBy: (wetsuits, { desc }) => [desc(wetsuits.createdAt)],
     });
 
@@ -39,8 +38,8 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -50,7 +49,7 @@ export async function POST(request: NextRequest) {
     const [suit] = await db
       .insert(wetsuits)
       .values({
-        userId: session.user.id,
+        userId: userId,
         name: validated.name,
         brand: validated.brand || null,
         thickness: validated.thickness || null,
@@ -74,8 +73,8 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -100,7 +99,7 @@ export async function PUT(request: NextRequest) {
     const [updated] = await db
       .update(wetsuits)
       .set(updates)
-      .where(and(eq(wetsuits.id, id), eq(wetsuits.userId, session.user.id)))
+      .where(and(eq(wetsuits.id, id), eq(wetsuits.userId, userId)))
       .returning();
 
     if (!updated) {
@@ -119,8 +118,8 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -131,7 +130,7 @@ export async function DELETE(request: NextRequest) {
 
     const [deleted] = await db
       .delete(wetsuits)
-      .where(and(eq(wetsuits.id, id), eq(wetsuits.userId, session.user.id)))
+      .where(and(eq(wetsuits.id, id), eq(wetsuits.userId, userId)))
       .returning();
 
     if (!deleted) {

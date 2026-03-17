@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthUserId } from "@/lib/auth";
 import { db, spotShares } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 
@@ -9,8 +8,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; shareId: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -20,7 +19,7 @@ export async function DELETE(
       .delete(spotShares)
       .where(and(
         eq(spotShares.id, shareId),
-        eq(spotShares.sharedByUserId, session.user.id)
+        eq(spotShares.sharedByUserId, userId)
       ))
       .returning();
 

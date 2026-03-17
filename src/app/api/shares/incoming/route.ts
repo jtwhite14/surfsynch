@@ -1,19 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthUserId } from "@/lib/auth";
 import { db, spotShares } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const invites = await db.query.spotShares.findMany({
       where: and(
-        eq(spotShares.sharedWithUserId, session.user.id),
+        eq(spotShares.sharedWithUserId, userId),
         eq(spotShares.status, "pending")
       ),
       with: {

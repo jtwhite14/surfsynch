@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthUserId } from "@/lib/auth";
 import { db, surfSessions, surfSpots } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { fetchHourlyTimeline } from "@/lib/api/open-meteo";
@@ -10,8 +9,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -20,7 +19,7 @@ export async function GET(
     const surfSession = await db.query.surfSessions.findFirst({
       where: and(
         eq(surfSessions.id, id),
-        eq(surfSessions.userId, session.user.id)
+        eq(surfSessions.userId, userId)
       ),
       with: { spot: true },
     });

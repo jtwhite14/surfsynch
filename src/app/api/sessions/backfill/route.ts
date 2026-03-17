@@ -1,20 +1,19 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthUserId } from "@/lib/auth";
 import { db, surfSessions, sessionConditions, surfSpots } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { fetchHistoricalConditions, fetchCurrentConditions } from "@/lib/api/open-meteo";
 
 export async function POST() {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Get all sessions for the user with their conditions and spot
     const sessions = await db.query.surfSessions.findMany({
-      where: eq(surfSessions.userId, session.user.id),
+      where: eq(surfSessions.userId, userId),
       with: {
         conditions: true,
         spot: true,

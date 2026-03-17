@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthUserId } from "@/lib/auth";
 import { db, spotShares, surfSpots, users } from "@/lib/db";
 import { eq, and, count } from "drizzle-orm";
 import { z } from "zod";
@@ -15,8 +14,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -34,12 +33,12 @@ export async function POST(
     }
 
     // Allow sharing if user owns the spot OR has an accepted share
-    const isOwner = spot.userId === session.user.id;
+    const isOwner = spot.userId === userId;
     if (!isOwner) {
       const existingShare = await db.query.spotShares.findFirst({
         where: and(
           eq(spotShares.spotId, spotId),
-          eq(spotShares.sharedWithUserId, session.user.id),
+          eq(spotShares.sharedWithUserId, userId),
           eq(spotShares.status, "accepted")
         ),
       });
@@ -58,7 +57,7 @@ export async function POST(
     }
 
     // Can't share with self
-    if (targetUser.id === session.user.id) {
+    if (targetUser.id === userId) {
       return NextResponse.json({ error: "You can't share a spot with yourself" }, { status: 400 });
     }
 
@@ -68,7 +67,7 @@ export async function POST(
       .from(spotShares)
       .where(and(
         eq(spotShares.spotId, spotId),
-        eq(spotShares.sharedByUserId, session.user.id)
+        eq(spotShares.sharedByUserId, userId)
       ));
 
     if (shareCount.count >= 5) {
@@ -79,7 +78,7 @@ export async function POST(
     const existing = await db.query.spotShares.findFirst({
       where: and(
         eq(spotShares.spotId, spotId),
-        eq(spotShares.sharedByUserId, session.user.id),
+        eq(spotShares.sharedByUserId, userId),
         eq(spotShares.sharedWithUserId, targetUser.id)
       ),
     });
@@ -94,7 +93,7 @@ export async function POST(
       .insert(spotShares)
       .values({
         spotId,
-        sharedByUserId: session.user.id,
+        sharedByUserId: userId,
         sharedWithUserId: targetUser.id,
         inviteCode,
       })
@@ -124,8 +123,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -135,7 +134,7 @@ export async function GET(
     const spot = await db.query.surfSpots.findFirst({
       where: and(
         eq(surfSpots.id, spotId),
-        eq(surfSpots.userId, session.user.id)
+        eq(surfSpots.userId, userId)
       ),
     });
 
@@ -146,7 +145,7 @@ export async function GET(
     const shares = await db.query.spotShares.findMany({
       where: and(
         eq(spotShares.spotId, spotId),
-        eq(spotShares.sharedByUserId, session.user.id)
+        eq(spotShares.sharedByUserId, userId)
       ),
       with: {
         sharedWith: {

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthUserId } from "@/lib/auth";
 import { db, sessionPhotos, surfSessions } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { createClient } from "@supabase/supabase-js";
@@ -23,8 +22,8 @@ function getSupabaseClient() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -70,7 +69,7 @@ export async function POST(request: NextRequest) {
       .where(
         and(
           eq(sessionPhotos.fileHash, fileHash),
-          eq(surfSessions.userId, session.user.id)
+          eq(surfSessions.userId, userId)
         )
       )
       .limit(1);
@@ -90,7 +89,7 @@ export async function POST(request: NextRequest) {
 
     // No duplicate — upload to Supabase
     const ext = file.name.split(".").pop() || "jpg";
-    const filename = `${session.user.id}/${Date.now()}-${Math.random()
+    const filename = `${userId}/${Date.now()}-${Math.random()
       .toString(36)
       .slice(2)}.${ext}`;
 

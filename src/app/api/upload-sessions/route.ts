@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthUserId } from "@/lib/auth";
 import { db, uploadSessions } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
 
 export async function POST() {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -18,7 +17,7 @@ export async function POST() {
     const [uploadSession] = await db
       .insert(uploadSessions)
       .values({
-        userId: session.user.id,
+        userId: userId,
         token,
         status: "pending",
         expiresAt,
@@ -44,8 +43,8 @@ export async function POST() {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -62,7 +61,7 @@ export async function GET(request: NextRequest) {
     const uploadSession = await db.query.uploadSessions.findFirst({
       where: and(
         eq(uploadSessions.id, id),
-        eq(uploadSessions.userId, session.user.id)
+        eq(uploadSessions.userId, userId)
       ),
       with: {
         photos: true,

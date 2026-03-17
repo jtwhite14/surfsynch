@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthUserId } from "@/lib/auth";
 import { db, surfSpots, conditionProfiles } from "@/lib/db";
 import { eq, and, asc } from "drizzle-orm";
 import { formatProfile } from "@/lib/profiles/format";
@@ -19,15 +18,15 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id } = await params;
 
     const spot = await db.query.surfSpots.findFirst({
-      where: and(eq(surfSpots.id, id), eq(surfSpots.userId, session.user.id)),
+      where: and(eq(surfSpots.id, id), eq(surfSpots.userId, userId)),
     });
     if (!spot) {
       return NextResponse.json({ error: "Spot not found" }, { status: 404 });
@@ -55,15 +54,15 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id } = await params;
 
     const spot = await db.query.surfSpots.findFirst({
-      where: and(eq(surfSpots.id, id), eq(surfSpots.userId, session.user.id)),
+      where: and(eq(surfSpots.id, id), eq(surfSpots.userId, userId)),
     });
     if (!spot) {
       return NextResponse.json({ error: "Spot not found" }, { status: 404 });
@@ -123,7 +122,7 @@ export async function POST(
 
     const [profile] = await db.insert(conditionProfiles).values({
       spotId: id,
-      userId: session.user.id,
+      userId: userId,
       name: name.trim(),
       sortOrder: existing.length,
       targetSwellHeight: targetSwellHeight?.toString() ?? null,

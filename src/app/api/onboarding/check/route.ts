@@ -1,18 +1,17 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthUserId } from "@/lib/auth";
 import { db, surfSessions } from "@/lib/db";
 import { eq } from "drizzle-orm";
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const sessions = await db.query.surfSessions.findMany({
-      where: eq(surfSessions.userId, session.user.id),
+      where: eq(surfSessions.userId, userId),
     });
 
     return NextResponse.json({

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthUserId } from "@/lib/auth";
 import { db, surfboards } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
@@ -25,13 +24,13 @@ const surfboardSchema = z.object({
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const boards = await db.query.surfboards.findMany({
-      where: eq(surfboards.userId, session.user.id),
+      where: eq(surfboards.userId, userId),
       orderBy: (surfboards, { desc }) => [desc(surfboards.createdAt)],
     });
 
@@ -44,8 +43,8 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -55,7 +54,7 @@ export async function POST(request: NextRequest) {
     const [board] = await db
       .insert(surfboards)
       .values({
-        userId: session.user.id,
+        userId: userId,
         name: validated.name,
         brand: validated.brand || null,
         model: validated.model || null,
@@ -84,8 +83,8 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -115,7 +114,7 @@ export async function PUT(request: NextRequest) {
     const [updated] = await db
       .update(surfboards)
       .set(updates)
-      .where(and(eq(surfboards.id, id), eq(surfboards.userId, session.user.id)))
+      .where(and(eq(surfboards.id, id), eq(surfboards.userId, userId)))
       .returning();
 
     if (!updated) {
@@ -134,8 +133,8 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -146,7 +145,7 @@ export async function DELETE(request: NextRequest) {
 
     const [deleted] = await db
       .delete(surfboards)
-      .where(and(eq(surfboards.id, id), eq(surfboards.userId, session.user.id)))
+      .where(and(eq(surfboards.id, id), eq(surfboards.userId, userId)))
       .returning();
 
     if (!deleted) {

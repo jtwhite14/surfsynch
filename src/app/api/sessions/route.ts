@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthUserId } from "@/lib/auth";
 import { db, surfSessions, sessionConditions, surfSpots, sessionPhotos, surfboards, wetsuits, uploadPhotos } from "@/lib/db";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { z } from "zod";
@@ -21,8 +20,8 @@ const createSessionSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -36,7 +35,7 @@ export async function GET(request: NextRequest) {
       const surfSession = await db.query.surfSessions.findFirst({
         where: and(
           eq(surfSessions.id, sessionId),
-          eq(surfSessions.userId, session.user.id)
+          eq(surfSessions.userId, userId)
         ),
         with: {
           conditions: true,
@@ -57,8 +56,8 @@ export async function GET(request: NextRequest) {
     // Get all sessions for user (optionally filtered by spot)
     const sessions = await db.query.surfSessions.findMany({
       where: spotId
-        ? and(eq(surfSessions.userId, session.user.id), eq(surfSessions.spotId, spotId))
-        : eq(surfSessions.userId, session.user.id),
+        ? and(eq(surfSessions.userId, userId), eq(surfSessions.spotId, spotId))
+        : eq(surfSessions.userId, userId),
       orderBy: [desc(surfSessions.date)],
       limit: limit ? parseInt(limit) : undefined,
       with: {
@@ -83,8 +82,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -95,7 +94,7 @@ export async function POST(request: NextRequest) {
     const spot = await db.query.surfSpots.findFirst({
       where: and(
         eq(surfSpots.id, validated.spotId),
-        eq(surfSpots.userId, session.user.id)
+        eq(surfSpots.userId, userId)
       ),
     });
 
@@ -106,7 +105,7 @@ export async function POST(request: NextRequest) {
     // Verify equipment ownership
     if (validated.surfboardId) {
       const board = await db.query.surfboards.findFirst({
-        where: and(eq(surfboards.id, validated.surfboardId), eq(surfboards.userId, session.user.id)),
+        where: and(eq(surfboards.id, validated.surfboardId), eq(surfboards.userId, userId)),
       });
       if (!board) {
         return NextResponse.json({ error: "Surfboard not found" }, { status: 404 });
@@ -114,7 +113,7 @@ export async function POST(request: NextRequest) {
     }
     if (validated.wetsuitId) {
       const suit = await db.query.wetsuits.findFirst({
-        where: and(eq(wetsuits.id, validated.wetsuitId), eq(wetsuits.userId, session.user.id)),
+        where: and(eq(wetsuits.id, validated.wetsuitId), eq(wetsuits.userId, userId)),
       });
       if (!suit) {
         return NextResponse.json({ error: "Wetsuit not found" }, { status: 404 });
@@ -126,7 +125,7 @@ export async function POST(request: NextRequest) {
       .insert(surfSessions)
       .values({
         spotId: validated.spotId,
-        userId: session.user.id,
+        userId: userId,
         surfboardId: validated.surfboardId || null,
         wetsuitId: validated.wetsuitId || null,
         date: new Date(validated.date),
@@ -263,8 +262,8 @@ const updateSessionSchema = z.object({
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -282,7 +281,7 @@ export async function PUT(request: NextRequest) {
     const existing = await db.query.surfSessions.findFirst({
       where: and(
         eq(surfSessions.id, sessionId),
-        eq(surfSessions.userId, session.user.id)
+        eq(surfSessions.userId, userId)
       ),
     });
 
@@ -295,7 +294,7 @@ export async function PUT(request: NextRequest) {
       const spot = await db.query.surfSpots.findFirst({
         where: and(
           eq(surfSpots.id, validated.spotId),
-          eq(surfSpots.userId, session.user.id)
+          eq(surfSpots.userId, userId)
         ),
       });
       if (!spot) {
@@ -306,7 +305,7 @@ export async function PUT(request: NextRequest) {
     // Verify equipment ownership
     if (validated.surfboardId) {
       const board = await db.query.surfboards.findFirst({
-        where: and(eq(surfboards.id, validated.surfboardId), eq(surfboards.userId, session.user.id)),
+        where: and(eq(surfboards.id, validated.surfboardId), eq(surfboards.userId, userId)),
       });
       if (!board) {
         return NextResponse.json({ error: "Surfboard not found" }, { status: 404 });
@@ -314,7 +313,7 @@ export async function PUT(request: NextRequest) {
     }
     if (validated.wetsuitId) {
       const suit = await db.query.wetsuits.findFirst({
-        where: and(eq(wetsuits.id, validated.wetsuitId), eq(wetsuits.userId, session.user.id)),
+        where: and(eq(wetsuits.id, validated.wetsuitId), eq(wetsuits.userId, userId)),
       });
       if (!suit) {
         return NextResponse.json({ error: "Wetsuit not found" }, { status: 404 });
@@ -365,8 +364,8 @@ export async function PUT(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -387,7 +386,7 @@ export async function PATCH(request: NextRequest) {
     const existing = await db.query.surfSessions.findFirst({
       where: and(
         eq(surfSessions.id, sessionId),
-        eq(surfSessions.userId, session.user.id)
+        eq(surfSessions.userId, userId)
       ),
     });
 
@@ -423,8 +422,8 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -440,7 +439,7 @@ export async function DELETE(request: NextRequest) {
       .where(
         and(
           eq(surfSessions.id, sessionId),
-          eq(surfSessions.userId, session.user.id)
+          eq(surfSessions.userId, userId)
         )
       )
       .returning();
