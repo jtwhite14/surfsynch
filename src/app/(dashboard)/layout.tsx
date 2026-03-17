@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession, signOut } from "next-auth/react";
+import { useUser, useClerk } from "@clerk/nextjs";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -61,20 +61,21 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { data: session, status } = useSession();
+  const { user, isLoaded, isSignedIn } = useUser();
+  const { signOut } = useClerk();
   const router = useRouter();
   const pathname = usePathname();
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    if (status === "unauthenticated") {
+    if (isLoaded && !isSignedIn) {
       router.push("/");
     }
-  }, [status, router]);
+  }, [isLoaded, isSignedIn, router]);
 
   useEffect(() => {
-    if (status !== "authenticated" || onboardingChecked) return;
+    if (!isSignedIn || onboardingChecked) return;
 
     async function checkOnboarding() {
       try {
@@ -93,14 +94,14 @@ export default function DashboardLayout({
     }
 
     checkOnboarding();
-  }, [status, onboardingChecked, pathname, router]);
+  }, [isSignedIn, onboardingChecked, pathname, router]);
 
   // Close mobile menu on navigation
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
 
-  if (status === "loading" || (status === "authenticated" && !onboardingChecked)) {
+  if (!isLoaded || (isSignedIn && !onboardingChecked)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-pulse text-muted-foreground">Loading...</div>
@@ -108,9 +109,15 @@ export default function DashboardLayout({
     );
   }
 
-  if (!session) {
+  if (!user) {
     return null;
   }
+
+  const userInfo = {
+    name: user.fullName,
+    email: user.primaryEmailAddress?.emailAddress,
+    image: user.imageUrl,
+  };
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard";
@@ -125,9 +132,10 @@ export default function DashboardLayout({
           className="hidden lg:flex shrink-0 flex-col border-r bg-sidebar h-full w-[60px]"
         >
           <SidebarContent
-            session={session}
+            user={userInfo}
             pathname={pathname}
             isActive={isActive}
+            onSignOut={() => signOut({ redirectUrl: "/login" })}
           />
         </nav>
 
@@ -154,9 +162,10 @@ export default function DashboardLayout({
             </button>
           </div>
           <SidebarContent
-            session={session}
+            user={userInfo}
             pathname={pathname}
             isActive={isActive}
+            onSignOut={() => signOut({ redirectUrl: "/login" })}
             mobile
           />
         </nav>
@@ -187,14 +196,16 @@ export default function DashboardLayout({
 }
 
 function SidebarContent({
-  session,
+  user,
   pathname,
   isActive,
+  onSignOut,
   mobile,
 }: {
-  session: { user?: { name?: string | null; email?: string | null; image?: string | null } };
+  user: { name?: string | null; email?: string | null; image?: string | null };
   pathname: string;
   isActive: (href: string) => boolean;
+  onSignOut: () => void;
   mobile?: boolean;
 }) {
   const collapsed = !mobile;
@@ -292,11 +303,11 @@ function SidebarContent({
               <button className="flex items-center justify-center size-9 rounded-md hover:bg-accent transition-colors">
                 <Avatar className="size-7">
                   <AvatarImage
-                    src={session.user?.image || undefined}
-                    alt={session.user?.name || "User"}
+                    src={user.image || undefined}
+                    alt={user.name || "User"}
                   />
                   <AvatarFallback className="text-xs">
-                    {session.user?.name?.charAt(0) || "U"}
+                    {user.name?.charAt(0) || "U"}
                   </AvatarFallback>
                 </Avatar>
               </button>
@@ -304,19 +315,19 @@ function SidebarContent({
               <button className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-sm hover:bg-accent transition-colors">
                 <Avatar className="size-7">
                   <AvatarImage
-                    src={session.user?.image || undefined}
-                    alt={session.user?.name || "User"}
+                    src={user.image || undefined}
+                    alt={user.name || "User"}
                   />
                   <AvatarFallback className="text-xs">
-                    {session.user?.name?.charAt(0) || "U"}
+                    {user.name?.charAt(0) || "U"}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <p className="truncate font-medium text-sidebar-foreground text-sm leading-tight">
-                    {session.user?.name}
+                    {user.name}
                   </p>
                   <p className="truncate text-xs text-muted-foreground leading-tight">
-                    {session.user?.email}
+                    {user.email}
                   </p>
                 </div>
               </button>
@@ -332,7 +343,7 @@ function SidebarContent({
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="flex items-center gap-2 cursor-pointer"
-              onClick={() => signOut({ callbackUrl: "/login" })}
+              onClick={onSignOut}
             >
               <LogOut className="size-4" />
               Sign out

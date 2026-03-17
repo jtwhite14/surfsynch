@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { getServerSession } from "next-auth";
+import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
+import { db, surfSessions } from "@/lib/db";
+import { desc, gte } from "drizzle-orm";
 import { WaitlistForm } from "@/components/WaitlistForm";
 import {
   HeroScreenshot,
@@ -70,8 +71,8 @@ const features = [
 ];
 
 export default async function LandingPage() {
-  const session = await getServerSession(authOptions);
-  if (session) {
+  const { userId } = await auth();
+  if (userId) {
     redirect("/dashboard");
   }
 
@@ -84,12 +85,20 @@ export default async function LandingPage() {
             <BookOpen className="h-5 w-5 text-primary" />
             Wavebook
           </span>
-          <Link
-            href="/login"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Log In
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/signup"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Sign Up
+            </Link>
+            <Link
+              href="/login"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Log In
+            </Link>
+          </div>
         </div>
       </nav>
 

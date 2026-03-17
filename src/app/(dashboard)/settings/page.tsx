@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useSession } from "next-auth/react";
+import { useUser } from "@clerk/nextjs";
 import dynamic from "next/dynamic";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,7 @@ function toE164(value: string): string {
 }
 
 export default function SettingsPage() {
-  const { data: session } = useSession();
+  const { user } = useUser();
   const [homeLocation, setHomeLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
   const [locationSaving, setLocationSaving] = useState(false);
@@ -218,12 +218,12 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium">{session?.user?.name}</p>
-              <p className="text-sm text-muted-foreground">{session?.user?.email}</p>
+              <p className="font-medium">{user?.fullName}</p>
+              <p className="text-sm text-muted-foreground">{user?.primaryEmailAddress?.emailAddress}</p>
             </div>
-            {session?.user?.image && (
+            {user?.imageUrl && (
               <img
-                src={session.user.image}
+                src={user.imageUrl}
                 alt="Profile"
                 className="w-12 h-12 rounded-full"
               />

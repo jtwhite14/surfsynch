@@ -1,6 +1,7 @@
 "use client";
 
-import { SessionProvider } from "next-auth/react";
+import { ClerkProvider } from "@clerk/nextjs";
+import { dark } from "@clerk/themes";
 import { ReactNode } from "react";
 
 interface ProvidersProps {
@@ -8,5 +9,9 @@ interface ProvidersProps {
 }
 
 export function Providers({ children }: ProvidersProps) {
-  return <SessionProvider>{children}</SessionProvider>;
+  return (
+    <ClerkProvider appearance={{ baseTheme: dark }}>
+      {children}
+    </ClerkProvider>
+  );
 }

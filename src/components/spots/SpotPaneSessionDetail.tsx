@@ -265,51 +265,6 @@ export function SpotPaneSessionDetail({
               </div>
             )}
 
-            {/* Full-screen lightbox */}
-            {lightboxOpen && (
-              <div
-                className="fixed inset-0 z-[100] bg-black flex items-center justify-center"
-                onClick={() => setLightboxOpen(false)}
-              >
-                <button
-                  className="absolute top-4 right-4 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors z-10"
-                  onClick={() => setLightboxOpen(false)}
-                >
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-                <img
-                  src={allPhotos[activePhotoIndex]?.photoUrl}
-                  alt="Session photo"
-                  className="h-full w-full object-contain"
-                  onClick={(e) => e.stopPropagation()}
-                />
-                {allPhotos.length > 1 && (
-                  <>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setActivePhotoIndex((prev) => (prev - 1 + allPhotos.length) % allPhotos.length); }}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
-                    >
-                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setActivePhotoIndex((prev) => (prev + 1) % allPhotos.length); }}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
-                    >
-                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
-                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/60 rounded-full px-3 py-1 text-sm text-white">
-                      {activePhotoIndex + 1} / {allPhotos.length}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
           </div>
         )}
 
@@ -388,6 +343,52 @@ export function SpotPaneSessionDetail({
         {/* Conditions Timeline */}
         <ConditionsTimeline sessionId={session.id} />
       </div>
+
+      {/* Full-screen lightbox — rendered at top level to avoid overflow clipping */}
+      {lightboxOpen && allPhotos.length > 0 && (
+        <div
+          className="fixed inset-0 z-[100] bg-black flex items-center justify-center"
+          onClick={() => setLightboxOpen(false)}
+        >
+          <button
+            className="absolute top-4 right-4 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors z-10"
+            onClick={() => setLightboxOpen(false)}
+          >
+            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <img
+            src={allPhotos[activePhotoIndex]?.photoUrl}
+            alt="Session photo"
+            className="h-full w-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+          {allPhotos.length > 1 && (
+            <>
+              <button
+                onClick={(e) => { e.stopPropagation(); setActivePhotoIndex((prev) => (prev - 1 + allPhotos.length) % allPhotos.length); }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
+              >
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setActivePhotoIndex((prev) => (prev + 1) % allPhotos.length); }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
+              >
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/60 rounded-full px-3 py-1 text-sm text-white">
+                {activePhotoIndex + 1} / {allPhotos.length}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Edit Dialog (still a modal for editing session fields) */}
       <SessionEditDialog
