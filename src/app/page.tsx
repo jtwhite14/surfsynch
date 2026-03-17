@@ -2,14 +2,11 @@ import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
-import { db, surfSessions } from "@/lib/db";
-import { desc, gte } from "drizzle-orm";
 import { WaitlistForm } from "@/components/WaitlistForm";
 import {
   HeroScreenshot,
   FeatureScreenshots,
 } from "@/components/ScreenshotShowcase";
-import { SessionPhotoGallery } from "@/components/SessionPhotoGallery";
 import {
   MapPin,
   BookOpen,
@@ -72,41 +69,11 @@ const features = [
   },
 ];
 
-async function getTopSessionPhotos() {
-  try {
-    const topSessions = await db.query.surfSessions.findMany({
-      where: gte(surfSessions.rating, 4),
-      orderBy: [desc(surfSessions.rating), desc(surfSessions.date)],
-      limit: 12,
-      with: {
-        spot: true,
-        photos: {
-          limit: 1,
-          orderBy: (photos, { asc }) => [asc(photos.sortOrder)],
-        },
-      },
-    });
-
-    return topSessions
-      .filter((s) => s.photos.length > 0)
-      .map((s) => ({
-        photoUrl: s.photos[0].photoUrl,
-        spotName: s.spot?.name ?? null,
-        rating: s.rating,
-        date: s.date.toISOString(),
-      }));
-  } catch {
-    return [];
-  }
-}
-
 export default async function LandingPage() {
   const session = await getServerSession(authOptions);
   if (session) {
     redirect("/dashboard");
   }
-
-  const sessionPhotos = await getTopSessionPhotos();
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -199,11 +166,6 @@ export default async function LandingPage() {
 
         {/* App Screenshots */}
         <FeatureScreenshots />
-
-        {/* Session Photos from Top Sessions */}
-        {sessionPhotos.length > 0 && (
-          <SessionPhotoGallery photos={sessionPhotos} />
-        )}
 
         {/* Privacy Commitment */}
         <section className="py-24 md:py-32">
