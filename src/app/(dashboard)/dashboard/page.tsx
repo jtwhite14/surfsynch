@@ -906,31 +906,54 @@ export default function DashboardPage() {
                     </p>
                   </div>
                 ) : (
-                  alertSummaries.map((summary) => {
-                    const forecastDate = new Date(summary.forecastHour);
+                  (() => {
                     const now = new Date();
                     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                    const target = new Date(forecastDate.getFullYear(), forecastDate.getMonth(), forecastDate.getDate());
-                    const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                    const dayLabel = diffDays === 0 ? "Today" : diffDays === 1 ? "Tomorrow" : forecastDate.toLocaleDateString("en-US", { weekday: "short" });
 
-                    const spot = spots.find(s => s.id === summary.spotId);
-                    return (
-                      <button
-                        key={`${summary.spotId}:${summary.forecastHour}`}
-                        onClick={() => spot && handleSpotClick(spot)}
-                        className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/50 transition-colors w-full text-left"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium truncate">{summary.spotName}</p>
-                          <p className="text-xs text-muted-foreground">{dayLabel} {summary.conditions}</p>
+                    // Group alerts by day
+                    const grouped = new Map<string, { label: string; sortKey: number; items: typeof alertSummaries }>();
+                    for (const summary of alertSummaries) {
+                      const forecastDate = new Date(summary.forecastHour);
+                      const target = new Date(forecastDate.getFullYear(), forecastDate.getMonth(), forecastDate.getDate());
+                      const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                      const dayKey = target.toISOString().slice(0, 10);
+                      const dayLabel = diffDays === 0 ? "Today" : diffDays === 1 ? "Tomorrow" : forecastDate.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+
+                      if (!grouped.has(dayKey)) {
+                        grouped.set(dayKey, { label: dayLabel, sortKey: diffDays, items: [] });
+                      }
+                      grouped.get(dayKey)!.items.push(summary);
+                    }
+
+                    // Sort groups by date
+                    const sortedGroups = [...grouped.entries()].sort((a, b) => a[1].sortKey - b[1].sortKey);
+
+                    return sortedGroups.map(([dayKey, group]) => (
+                      <div key={dayKey}>
+                        <div className="px-4 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide bg-muted/30 border-b">
+                          {group.label}
                         </div>
-                        <span className="text-xs font-medium text-primary shrink-0">
-                          {summary.effectiveScore}%
-                        </span>
-                      </button>
-                    );
-                  })
+                        {group.items.map((summary) => {
+                          const spot = spots.find(s => s.id === summary.spotId);
+                          return (
+                            <button
+                              key={`${summary.spotId}:${summary.forecastHour}`}
+                              onClick={() => spot && handleSpotClick(spot)}
+                              className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/50 transition-colors w-full text-left"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium truncate">{summary.spotName}</p>
+                                <p className="text-xs text-muted-foreground">{summary.timeWindow} · {summary.conditions}</p>
+                              </div>
+                              <span className="text-xs font-medium text-primary shrink-0">
+                                {summary.effectiveScore}%
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ));
+                  })()
                 )}
                 {sharedSpots.length > 0 && (
                   <>
