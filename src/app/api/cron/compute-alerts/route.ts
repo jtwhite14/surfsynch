@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, surfSpots, surfSessions, sessionConditions, spotForecasts, spotAlerts, users, conditionProfiles } from "@/lib/db";
 import { eq, gte, and, inArray, isNull, sql } from "drizzle-orm";
 import { sendAlertSMS } from "@/lib/sms/send-alert-sms";
-import { haversineDistance, getDistancePenalty } from "@/lib/utils/geo";
+import { haversineDistance, getDistancePenalty, getRarityBoost } from "@/lib/utils/geo";
 import { fetchMarineForecast } from "@/lib/api/open-meteo";
 import { fetchTideTimeline, warmStationCache } from "@/lib/api/noaa-tides";
 import {
@@ -394,7 +394,7 @@ async function getOrFetchForecast(
 async function sendPendingSMSAlerts(): Promise<number> {
   const now = new Date();
 
-  // Get unsent, active, future alerts with spot names and locations
+  // Get unsent, active, future alerts with spot names, locations, and profile rarity data
   const pendingAlerts = await db
     .select({
       alertId: spotAlerts.id,
@@ -405,9 +405,12 @@ async function sendPendingSMSAlerts(): Promise<number> {
       timeWindow: spotAlerts.timeWindow,
       forecastHour: spotAlerts.forecastHour,
       effectiveScore: spotAlerts.effectiveScore,
+      profileConsistency: conditionProfiles.consistency,
+      profileQualityCeiling: conditionProfiles.qualityCeiling,
     })
     .from(spotAlerts)
     .innerJoin(surfSpots, eq(spotAlerts.spotId, surfSpots.id))
+    .leftJoin(conditionProfiles, eq(spotAlerts.matchedProfileId, conditionProfiles.id))
     .where(
       and(
         eq(spotAlerts.status, "active"),
@@ -440,16 +443,22 @@ async function sendPendingSMSAlerts(): Promise<number> {
     const homeLat = user.homeLatitude ? parseFloat(user.homeLatitude) : null;
     const homeLng = user.homeLongitude ? parseFloat(user.homeLongitude) : null;
 
-    // Sort by distance-adjusted score so nearby good spots rank above faraway OK ones
+    // Sort by distance + rarity adjusted score
     const sorted = userAlerts.sort((a, b) => {
       const scoreA = parseFloat(a.effectiveScore);
       const scoreB = parseFloat(b.effectiveScore);
+      const rarityA = a.profileConsistency
+        ? getRarityBoost(a.profileConsistency as 'low' | 'medium' | 'high', a.profileQualityCeiling ?? 3)
+        : 1.0;
+      const rarityB = b.profileConsistency
+        ? getRarityBoost(b.profileConsistency as 'low' | 'medium' | 'high', b.profileQualityCeiling ?? 3)
+        : 1.0;
       if (homeLat != null && homeLng != null) {
         const distA = haversineDistance(homeLat, homeLng, parseFloat(a.spotLatitude), parseFloat(a.spotLongitude));
         const distB = haversineDistance(homeLat, homeLng, parseFloat(b.spotLatitude), parseFloat(b.spotLongitude));
-        return (scoreB * getDistancePenalty(distB)) - (scoreA * getDistancePenalty(distA));
+        return (scoreB * getDistancePenalty(distB) * rarityB) - (scoreA * getDistancePenalty(distA) * rarityA);
       }
-      return scoreB - scoreA;
+      return (scoreB * rarityB) - (scoreA * rarityA);
     });
 
     const success = await sendAlertSMS(

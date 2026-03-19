@@ -61,6 +61,26 @@ export function getDistancePenalty(distanceKm: number): number {
   return 0.5 + 0.5 / (1 + excess / 80);
 }
 
+/**
+ * Rarity boost derived from a spot's profile consistency and quality ceiling.
+ * Low consistency + high ceiling = rare epic day → up to ~1.20x boost.
+ * High consistency or low ceiling = no boost (floor at 1.0).
+ *
+ * For spots with multiple profiles, call with the best combo and take the max.
+ */
+export function getRarityBoost(
+  consistency: 'low' | 'medium' | 'high',
+  qualityCeiling: number
+): number {
+  // How rare is it? low = 0.20, medium = 0.05, high = 0
+  const consistencyFactor = consistency === 'low' ? 0.20
+    : consistency === 'medium' ? 0.05
+    : 0;
+  // How good is it when it fires? ceiling 2→0, 5→1
+  const ceilingFactor = Math.max(0, (qualityCeiling - 2) / 3);
+  return 1 + consistencyFactor * ceilingFactor;
+}
+
 export function findNearbySpots(
   lat: number,
   lng: number,

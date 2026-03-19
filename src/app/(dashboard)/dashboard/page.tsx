@@ -44,7 +44,7 @@ import { SpotSharePanel } from "@/components/sharing/SpotSharePanel";
 import { IncomingInvites } from "@/components/sharing/IncomingInvites";
 import { SharedSpotsList } from "@/components/sharing/SharedSpotsList";
 import { SharedSpotPane } from "@/components/sharing/SharedSpotPane";
-import { haversineDistance, getDistancePenalty } from "@/lib/utils/geo";
+import { haversineDistance, getDistancePenalty, getRarityBoost } from "@/lib/utils/geo";
 import type { SurfSpot } from "@/lib/db/schema";
 import type { SurfSessionWithConditions, SharedSpotView, CardinalDirection, ConditionProfileResponse } from "@/types";
 
@@ -347,41 +347,54 @@ export default function DashboardPage() {
         // Fetch alert status and profile counts for each spot (fire-and-forget, non-blocking)
         const spotsList = spotsData.spots || [];
         if (spotsList.length > 0) {
-          // Fetch profile counts
-          Promise.all(
+          // Fetch profiles and alerts in parallel, then combine for ranking
+          const profilesPromise = Promise.all(
             spotsList.map((s: SurfSpot) =>
               fetch(`/api/spots/${s.id}/profiles`)
                 .then(r => r.ok ? r.json() : { profiles: [] })
-                .then(data => ({ spotId: s.id, count: (data.profiles || []).length }))
-                .catch(() => ({ spotId: s.id, count: 0 }))
+                .then(data => ({ spotId: s.id, profiles: (data.profiles || []) as Array<{ consistency: 'low' | 'medium' | 'high'; qualityCeiling: number; isActive: boolean }> }))
+                .catch(() => ({ spotId: s.id, profiles: [] as Array<{ consistency: 'low' | 'medium' | 'high'; qualityCeiling: number; isActive: boolean }> }))
             )
-          ).then(results => {
-            const counts: Record<string, number> = {};
-            for (const { spotId, count } of results) {
-              counts[spotId] = count;
-            }
-            setSpotProfileCounts(counts);
-          });
+          );
 
-          Promise.all(
+          const alertsPromise = Promise.all(
             spotsList.map((s: SurfSpot) =>
               fetch(`/api/spots/${s.id}/alerts`)
                 .then(r => r.ok ? r.json() : { alerts: [] })
                 .then(data => ({ spot: s, alerts: data.alerts || [] }))
                 .catch(() => ({ spot: s, alerts: [] }))
             )
-          ).then(results => {
+          );
+
+          Promise.all([profilesPromise, alertsPromise]).then(([profileResults, alertResults]) => {
+            // Build profile counts + per-spot rarity boost
+            const counts: Record<string, number> = {};
+            const spotRarity: Record<string, number> = {};
+            for (const { spotId, profiles } of profileResults) {
+              counts[spotId] = profiles.length;
+              // Best rarity boost across active profiles for this spot
+              let best = 1.0;
+              for (const p of profiles) {
+                if (p.isActive) {
+                  best = Math.max(best, getRarityBoost(p.consistency, p.qualityCeiling));
+                }
+              }
+              spotRarity[spotId] = best;
+            }
+            setSpotProfileCounts(counts);
+
             const ids = new Set<string>();
             const summaries: typeof alertSummaries = [];
             const homeLat = locationData.latitude;
             const homeLng = locationData.longitude;
-            for (const { spot, alerts } of results) {
+            for (const { spot, alerts } of alertResults) {
               if (alerts.length > 0) {
                 ids.add(spot.id);
                 // Compute distance from home (if set)
                 const distanceKm = (homeLat && homeLng)
                   ? haversineDistance(homeLat, homeLng, parseFloat(spot.latitude), parseFloat(spot.longitude))
                   : null;
+                const rarity = spotRarity[spot.id] ?? 1.0;
                 // Best alert per day per spot
                 const bestByDay = new Map<string, typeof alerts[0]>();
                 for (const alert of alerts) {
@@ -400,12 +413,12 @@ export default function DashboardPage() {
                     ? `@ ${snapshot.primarySwellPeriod.toFixed(0)}s`
                     : '';
                   const score = Math.round(best.effectiveScore);
-                  const penalty = distanceKm != null ? getDistancePenalty(distanceKm) : 1;
+                  const distancePenalty = distanceKm != null ? getDistancePenalty(distanceKm) : 1;
                   summaries.push({
                     spotId: spot.id,
                     spotName: spot.name,
                     effectiveScore: score,
-                    travelScore: Math.round(score * penalty),
+                    travelScore: Math.round(score * distancePenalty * rarity),
                     distanceKm,
                     forecastHour: best.forecastHour,
                     timeWindow: best.timeWindow,
@@ -415,7 +428,7 @@ export default function DashboardPage() {
               }
             }
             setAlertSpotIds(ids);
-            // Sort by distance-adjusted score so nearby good conditions rank above faraway OK ones
+            // Sort by distance + rarity adjusted score
             setAlertSummaries(summaries.sort((a, b) => b.travelScore - a.travelScore));
           });
         }
@@ -671,7 +684,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Scrollable content */}
-              <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
+              <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-3 space-y-4">
                 {showAllSessions ? (
                   /* All Sessions view */
                   <div>
