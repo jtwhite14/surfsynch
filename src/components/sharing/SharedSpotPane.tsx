@@ -62,7 +62,7 @@ export function SharedSpotPane({ sharedSpot, onClose }: SharedSpotPaneProps) {
       </div>
 
       {/* Sessions list */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-3 space-y-3">
         {loading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="size-5 animate-spin text-muted-foreground" />

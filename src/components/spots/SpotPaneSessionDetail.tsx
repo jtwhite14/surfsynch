@@ -159,7 +159,7 @@ export function SpotPaneSessionDetail({
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-4">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 pb-3 space-y-4">
         {/* Ignored banner */}
         {session.ignored && (
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-600 dark:text-yellow-400 text-sm">

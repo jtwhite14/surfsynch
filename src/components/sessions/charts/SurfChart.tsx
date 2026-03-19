@@ -120,9 +120,9 @@ export function SurfChart({ data, sessionIndex }: SurfChartProps) {
   };
 
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02]">
+    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
       {/* Header */}
-      <div className="flex items-start gap-8 p-5 pb-3">
+      <div className="flex items-start gap-4 sm:gap-8 p-4 sm:p-5 pb-3">
         {/* Surf Height section */}
         <div>
           <span className="text-[13px] font-medium text-white/40 tracking-wide">
@@ -201,7 +201,7 @@ export function SurfChart({ data, sessionIndex }: SurfChartProps) {
       </div>
 
       {/* Time + period + direction — unified grid */}
-      <div className="flex px-4 pb-3 pt-1">
+      <div className="flex px-4 pb-3 pt-1 overflow-x-auto">
         {chartData.map((d, i) => {
           const isSession = i === sessionIndex;
           const deg = directions[i];

@@ -65,7 +65,7 @@ export function ChartPanel({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 sm:p-5">
+    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 sm:p-5 overflow-hidden">
       <div className="flex items-start justify-between mb-4">
         <div>
           <div className="flex items-center gap-3">
@@ -104,7 +104,7 @@ export function ChartPanel({
           )}
         </div>
       </div>
-      <div className="h-[180px] w-full -ml-2">
+      <div className="h-[180px] w-full -ml-2 min-w-0">
         {children}
       </div>
     </div>
