@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
 
 const NUM_SEGMENTS = 12;
 const SVG_WIDTH = 360;
@@ -65,7 +64,7 @@ interface TideCurveSelectorProps {
 
 export function TideCurveSelector({ segments, onChange, mode }: TideCurveSelectorProps) {
   const svgRef = useRef<SVGSVGElement>(null);
-  const [painting, setPainting] = useState<boolean | null>(null); // null = not dragging, true = painting on, false = painting off
+  const [painting, setPainting] = useState<boolean | null>(null);
 
   const getSegmentFromEvent = useCallback((e: React.PointerEvent) => {
     const svg = svgRef.current;
@@ -103,18 +102,10 @@ export function TideCurveSelector({ segments, onChange, mode }: TideCurveSelecto
     setPainting(null);
   }, []);
 
-  const fillColor = mode === "target"
-    ? "hsl(var(--primary) / 0.3)"
-    : "hsl(var(--destructive) / 0.3)";
-  const fillColorActive = mode === "target"
-    ? "hsl(var(--primary) / 0.6)"
-    : "hsl(var(--destructive) / 0.6)";
-  const strokeColor = mode === "target"
-    ? "hsl(var(--primary))"
-    : "hsl(var(--destructive))";
-
   const anySelected = segments.some(Boolean);
 
+  // Use CSS classes for segment fills to work with oklch CSS variables
+  // Each segment is rendered with a class-based approach
   return (
     <div className="space-y-1">
       <svg
@@ -129,7 +120,9 @@ export function TideCurveSelector({ segments, onChange, mode }: TideCurveSelecto
         {/* Baseline */}
         <line
           x1={0} y1={CENTER_Y} x2={SVG_WIDTH} y2={CENTER_Y}
-          stroke="hsl(var(--border))" strokeWidth={1} strokeDasharray="4 2"
+          className="stroke-border"
+          strokeWidth={1}
+          strokeDasharray="4 2"
         />
 
         {/* Segment fills */}
@@ -137,8 +130,13 @@ export function TideCurveSelector({ segments, onChange, mode }: TideCurveSelecto
           <path
             key={i}
             d={d}
-            fill={segments[i] ? fillColorActive : "hsl(var(--muted))"}
-            className="transition-[fill] duration-100"
+            className={
+              segments[i]
+                ? mode === "target"
+                  ? "fill-primary/50 transition-[fill] duration-100"
+                  : "fill-destructive/50 transition-[fill] duration-100"
+                : "fill-muted-foreground/15 transition-[fill] duration-100"
+            }
           />
         ))}
 
@@ -146,7 +144,13 @@ export function TideCurveSelector({ segments, onChange, mode }: TideCurveSelecto
         <path
           d={CURVE_PATH}
           fill="none"
-          stroke={anySelected ? strokeColor : "hsl(var(--muted-foreground) / 0.5)"}
+          className={
+            anySelected
+              ? mode === "target"
+                ? "stroke-primary"
+                : "stroke-destructive"
+              : "stroke-muted-foreground/50"
+          }
           strokeWidth={2}
         />
 
