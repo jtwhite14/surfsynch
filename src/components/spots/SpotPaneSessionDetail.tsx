@@ -347,11 +347,11 @@ export function SpotPaneSessionDetail({
       {/* Full-screen lightbox — rendered at top level to avoid overflow clipping */}
       {lightboxOpen && allPhotos.length > 0 && (
         <div
-          className="fixed inset-0 z-[100] bg-black flex items-center justify-center"
+          className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4"
           onClick={() => setLightboxOpen(false)}
         >
           <button
-            className="absolute top-4 right-4 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors z-10"
+            className="absolute top-6 right-6 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors z-10"
             onClick={() => setLightboxOpen(false)}
           >
             <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -361,14 +361,14 @@ export function SpotPaneSessionDetail({
           <img
             src={allPhotos[activePhotoIndex]?.photoUrl}
             alt="Session photo"
-            className="h-full w-full object-contain"
+            className="max-h-full max-w-full object-contain rounded-lg"
             onClick={(e) => e.stopPropagation()}
           />
           {allPhotos.length > 1 && (
             <>
               <button
                 onClick={(e) => { e.stopPropagation(); setActivePhotoIndex((prev) => (prev - 1 + allPhotos.length) % allPhotos.length); }}
-                className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
+                className="absolute left-6 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
               >
                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -376,7 +376,7 @@ export function SpotPaneSessionDetail({
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); setActivePhotoIndex((prev) => (prev + 1) % allPhotos.length); }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
+                className="absolute right-6 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
               >
                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
