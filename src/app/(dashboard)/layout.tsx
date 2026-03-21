@@ -51,7 +51,7 @@ function SurfboardIcon({ className, ...props }: React.SVGProps<SVGSVGElement> & 
 
 const navigation = [
   { name: "Home", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Equipment", href: "/equipment", icon: SurfboardIcon },
+  { name: "Gear", href: "/dashboard", icon: SurfboardIcon, event: "open-gear" },
 ];
 
 
@@ -222,24 +222,39 @@ function SidebarContent({
       {/* Navigation */}
       <div className={`flex flex-col gap-px p-3 ${collapsed ? "items-center" : ""}`}>
         {navigation.map((item) => {
-          const active = isActive(item.href);
-          const link = (
+          const active = !item.event && isActive(item.href);
+          const className = `flex items-center rounded-md text-sm font-medium transition-colors ${
+            collapsed
+              ? `justify-center size-9 ${
+                  active
+                    ? "bg-accent text-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                }`
+              : `gap-2.5 px-2.5 py-1.5 w-full ${
+                  active
+                    ? "bg-accent text-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                }`
+          }`;
+
+          const link = item.event ? (
             <Link
-              key={item.href}
+              key={item.name}
               href={item.href}
-              className={`flex items-center rounded-md text-sm font-medium transition-colors ${
-                collapsed
-                  ? `justify-center size-9 ${
-                      active
-                        ? "bg-accent text-foreground"
-                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                    }`
-                  : `gap-2.5 px-2.5 py-1.5 w-full ${
-                      active
-                        ? "bg-accent text-foreground"
-                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                    }`
-              }`}
+              onClick={(e) => {
+                if (pathname === item.href) e.preventDefault();
+                window.dispatchEvent(new CustomEvent(item.event!));
+              }}
+              className={className}
+            >
+              <item.icon className="size-4 shrink-0" />
+              {!collapsed && item.name}
+            </Link>
+          ) : (
+            <Link
+              key={item.name}
+              href={item.href}
+              className={className}
             >
               <item.icon className="size-4 shrink-0" />
               {!collapsed && item.name}
@@ -248,7 +263,7 @@ function SidebarContent({
 
           if (collapsed) {
             return (
-              <Tooltip key={item.href}>
+              <Tooltip key={item.name}>
                 <TooltipTrigger asChild>{link}</TooltipTrigger>
                 <TooltipContent side="right">{item.name}</TooltipContent>
               </Tooltip>

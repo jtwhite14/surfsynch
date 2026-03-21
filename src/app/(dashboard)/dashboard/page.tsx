@@ -1094,7 +1094,7 @@ export default function DashboardPage() {
                       New Spot
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setGearModalOpen(true)}>
-                      New Gear
+                      Manage Gear
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -1171,7 +1171,7 @@ export default function DashboardPage() {
                         return (
                           <button
                             key={item.id}
-                            onClick={() => router.push("/equipment")}
+                            onClick={() => setGearModalOpen(true)}
                             className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/50 transition-colors w-full text-left"
                           >
                             {item._type === "surfboard" && (item as Surfboard).photoUrl && (
@@ -1370,6 +1370,19 @@ export default function DashboardPage() {
           directionEditState={directionEdit}
         />
       )}
+
+      <GearModal
+        open={gearModalOpen}
+        onClose={() => setGearModalOpen(false)}
+        onChanged={async () => {
+          const [boardsRes, suitsRes] = await Promise.all([
+            fetch("/api/surfboards").then((r) => r.ok ? r.json() : { surfboards: [] }),
+            fetch("/api/wetsuits").then((r) => r.ok ? r.json() : { wetsuits: [] }),
+          ]);
+          setSurfboards(boardsRes.surfboards || []);
+          setWetsuits(suitsRes.wetsuits || []);
+        }}
+      />
     </div>
   );
 }
