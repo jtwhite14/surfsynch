@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConditionsDisplay } from "@/components/sessions/ConditionsDisplay";
@@ -344,8 +345,8 @@ export function SpotPaneSessionDetail({
         <ConditionsTimeline sessionId={session.id} />
       </div>
 
-      {/* Full-screen lightbox — rendered at top level to avoid overflow clipping */}
-      {lightboxOpen && allPhotos.length > 0 && (
+      {/* Full-screen lightbox — portaled to document.body to escape overflow clipping */}
+      {lightboxOpen && allPhotos.length > 0 && createPortal(
         <div
           className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4"
           onClick={() => setLightboxOpen(false)}
@@ -387,7 +388,8 @@ export function SpotPaneSessionDetail({
               </div>
             </>
           )}
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Edit Dialog (still a modal for editing session fields) */}
