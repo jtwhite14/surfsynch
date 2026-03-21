@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { ArrowLeft, ChevronRight, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SwellExposurePicker } from "@/components/spots/SwellExposurePicker";
@@ -86,7 +85,7 @@ const IMPORTANCE_LEVELS = [
 ] as const;
 
 export function ProfileEditor({ spotId, profile, defaultName, onSave, onCancel, onDirectionEditStart, onDirectionEditStop, directionEditState }: ProfileEditorProps) {
-  const [name, setName] = useState(profile?.name ?? defaultName ?? "");
+  const name = defaultName ?? "Profile";
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -303,18 +302,6 @@ export function ProfileEditor({ spotId, profile, defaultName, onSave, onCancel, 
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        {/* Name + Preset row */}
-        <div className="space-y-1.5">
-          <label htmlFor="profile-name" className="text-sm font-medium">Profile name</label>
-          <Input
-            id="profile-name"
-            placeholder='e.g. "Winter NW swell"'
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            autoFocus
-          />
-        </div>
-
         <div className="flex flex-wrap gap-1.5">
           {Object.entries(WEIGHT_PRESETS).map(([key, preset]) => (
             <button

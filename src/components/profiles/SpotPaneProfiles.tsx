@@ -48,8 +48,8 @@ export function SpotPaneProfiles({ spotId, onBack, onDirectionEditStart, onDirec
 
   useEffect(() => { fetchProfiles(); }, [fetchProfiles]);
 
-  const handleDelete = async (profile: ConditionProfileResponse) => {
-    if (!confirm(`Delete "${profile.name}"?`)) return;
+  const handleDelete = async (profile: ConditionProfileResponse, displayName: string) => {
+    if (!confirm(`Delete "${displayName}"?`)) return;
     try {
       const res = await fetch(`/api/spots/${spotId}/profiles/${profile.id}`, {
         method: "DELETE",
@@ -126,8 +126,9 @@ export function SpotPaneProfiles({ spotId, onBack, onDirectionEditStart, onDirec
           </div>
         ) : (
           <>
-            {profiles.map(profile => {
+            {profiles.map((profile, index) => {
               const isExpanded = expandedId === profile.id;
+              const displayName = `Profile ${index + 1}`;
               return (
                 <div
                   key={profile.id}
@@ -144,7 +145,7 @@ export function SpotPaneProfiles({ spotId, onBack, onDirectionEditStart, onDirec
                         isExpanded ? "" : "-rotate-90"
                       )} />
                       <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{profile.name}</p>
+                        <p className="text-sm font-medium truncate">{displayName}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {buildTargetSummary(profile)}
                         </p>
@@ -159,7 +160,7 @@ export function SpotPaneProfiles({ spotId, onBack, onDirectionEditStart, onDirec
                         <Pencil className="size-3.5" />
                       </button>
                       <button
-                        onClick={() => handleDelete(profile)}
+                        onClick={() => handleDelete(profile, displayName)}
                         className="rounded-md p-1 hover:bg-accent transition-colors text-muted-foreground hover:text-destructive"
                         title="Delete profile"
                       >

@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { ChevronLeft, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
@@ -156,7 +155,6 @@ function avgCardinalDeg(dirs: CardinalDirection[]): number {
 }
 
 type Step =
-  | "name"
   | "preset"
   | "waveSize"
   | "exc_waveSize"
@@ -175,7 +173,6 @@ type Step =
   | "quality";
 
 const BASE_STEPS: Step[] = [
-  "name",
   "preset",
   "waveSize",
   "exc_waveSize",
@@ -201,7 +198,6 @@ const EXCLUSION_STEPS = new Set<Step>([
 ]);
 
 const STEP_QUESTIONS: Record<Step, string> = {
-  name: "What should we call this profile?",
   preset: "What type of break is this?",
   waveSize: "What size waves work here?",
   exc_waveSize: "What wave sizes don't work?",
@@ -234,8 +230,8 @@ export function ProfileWizard({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Form state
-  const [name, setName] = useState(profile?.name ?? defaultName ?? "");
+  // Form state — name is auto-generated (e.g. "Profile 1")
+  const name = defaultName ?? "Profile";
 
   const sel = profile?.selections;
   const [waveSize, setWaveSize] = useState<string[]>(() => {
@@ -461,7 +457,7 @@ export function ProfileWizard({
   }
 
   async function handleSave() {
-    const saveName = name.trim() || defaultName || "Profile";
+    const saveName = name;
 
     // Compute target swell height from range slider (midpoint in meters)
     const rangeMax = waveSizeRange[1] >= WAVE_HEIGHT_MAX ? waveSizeRange[1] + 5 : waveSizeRange[1]; // treat 20 as ~25ft for midpoint
@@ -552,20 +548,6 @@ export function ProfileWizard({
   // Render the step content
   function renderStepContent() {
     switch (currentStep) {
-      case "name":
-        return (
-          <div className="space-y-3">
-            <Input
-              placeholder='e.g. "Winter NW swell"'
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoFocus
-              className="text-base"
-              onKeyDown={(e) => e.key === "Enter" && goNext()}
-            />
-          </div>
-        );
-
       case "preset":
         return (
           <div className="flex flex-wrap gap-2">

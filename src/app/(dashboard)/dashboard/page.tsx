@@ -484,6 +484,11 @@ export default function DashboardPage() {
 
   return (
     <div className={`relative h-full w-full${addSpotMode !== "idle" ? " cursor-crosshair" : ""}`}>
+      {loading ? (
+        <div className="h-full w-full flex items-center justify-center bg-muted">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
       <SpotMap
         spots={spots}
         interactive={addSpotMode !== "idle"}
@@ -1062,12 +1067,24 @@ export default function DashboardPage() {
                 >
                   Gear
                 </button>
-                <button
-                  onClick={() => setSessionsPanelOpen((o) => !o)}
-                  className="px-3 py-2.5 hover:bg-accent/50 transition-colors"
-                >
-                  {sessionsPanelOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
-                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="px-3 py-2.5 hover:bg-accent/50 transition-colors">
+                      <Plus className="size-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => router.push("/sessions/new")}>
+                      New Session
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleStartAddSpot()}>
+                      New Spot
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push("/equipment")}>
+                      New Gear
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               {sessionsPanelOpen && sessionsTab === "sessions" && (
