@@ -1074,7 +1074,7 @@ export default function DashboardPage() {
                       <Plus className="size-4" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
+                  <DropdownMenuContent side="right" align="start">
                     <DropdownMenuItem onClick={() => router.push("/sessions/new")}>
                       New Session
                     </DropdownMenuItem>
