@@ -1082,7 +1082,14 @@ export default function DashboardPage() {
                       <p className="text-sm text-muted-foreground">No spots yet</p>
                     </div>
                   ) : (
-                    spots.map((spot) => (
+                    [...spots]
+                      .sort((a, b) => {
+                        if (!homeLocation) return 0;
+                        const distA = haversineDistance(homeLocation.latitude, homeLocation.longitude, parseFloat(a.latitude), parseFloat(a.longitude));
+                        const distB = haversineDistance(homeLocation.latitude, homeLocation.longitude, parseFloat(b.latitude), parseFloat(b.longitude));
+                        return distA - distB;
+                      })
+                      .map((spot) => (
                       <button
                         key={spot.id}
                         onClick={() => handleSpotClick(spot)}
