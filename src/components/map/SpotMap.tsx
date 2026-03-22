@@ -1,13 +1,31 @@
 "use client";
 
 import { useRef, useState, useCallback, useMemo, useEffect } from "react";
-import Map, { Marker, MapRef, NavigationControl, GeolocateControl, MapMouseEvent, Source, Layer } from "react-map-gl/mapbox";
+import { createPortal } from "react-dom";
+import Map, { Marker, MapRef, NavigationControl, GeolocateControl, MapMouseEvent, Source, Layer, useControl } from "react-map-gl/mapbox";
 import Supercluster from "supercluster";
 import { SurfSpot } from "@/lib/db/schema";
 import SpotMarker from "./SpotMarker";
 import MapDirectionOverlay from "./MapDirectionOverlay";
 import type { CardinalDirection } from "@/types";
+import type { IControl } from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
+
+class PortalControl implements IControl {
+  _container: HTMLDivElement;
+  constructor() {
+    this._container = document.createElement("div");
+    this._container.className = "mapboxgl-ctrl mapboxgl-ctrl-group";
+  }
+  onAdd() { return this._container; }
+  onRemove() { this._container.remove(); }
+  getDefaultPosition() { return "bottom-right" as const; }
+}
+
+function LayerPickerControl({ children }: { children: React.ReactNode }) {
+  const ctrl = useControl(() => new PortalControl(), { position: "bottom-right" });
+  return createPortal(children, ctrl._container);
+}
 
 interface SharedSpotMarkerData {
   shareId: string;
@@ -170,8 +188,8 @@ export default function SpotMap({
       style={{ width: "100%", height: "100%" }}
       cursor={interactive && onMapClick ? "crosshair" : "grab"}
     >
-      <GeolocateControl position="bottom-right" trackUserLocation />
       <NavigationControl position="bottom-right" />
+      <GeolocateControl position="bottom-right" trackUserLocation />
 
       {/* NOAA CUDEM color bathymetry (1/9 arc-second ~3m nearshore) */}
       {mapMode === "depth" && (
@@ -340,15 +358,14 @@ export default function SpotMap({
         );
       })()}
 
-      {/* Layer picker */}
-      <div className="absolute bottom-[148px] right-[10px] z-10">
+      {/* Layer picker — injected into Mapbox control stack */}
+      <LayerPickerControl>
         <button
           onClick={(e) => { e.stopPropagation(); setShowLayerPicker((v) => !v); }}
-          className="mapboxgl-ctrl mapboxgl-ctrl-group"
           title="Map layers"
-          style={{ margin: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 29, height: 29 }}
+          style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 29, height: 29 }}
         >
-          <svg className="size-[18px]" viewBox="0 0 24 24" fill="none" stroke={showLayerPicker ? "#4264fb" : "#333"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={showLayerPicker ? "#4264fb" : "#333"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 2L2 7l10 5 10-5-10-5z" />
             <path d="M2 17l10 5 10-5" />
             <path d="M2 12l10 5 10-5" />
@@ -382,7 +399,7 @@ export default function SpotMap({
             ))}
           </div>
         )}
-      </div>
+      </LayerPickerControl>
     </Map>
   );
 }
