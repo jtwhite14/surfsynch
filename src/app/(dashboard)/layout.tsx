@@ -44,6 +44,7 @@ export default function DashboardLayout({
   const { signOut } = useClerk();
   const router = useRouter();
   const pathname = usePathname();
+  const isMapView = pathname === "/dashboard" || pathname.startsWith("/dashboard/spot") || pathname.startsWith("/dashboard/session");
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -165,8 +166,8 @@ export default function DashboardLayout({
             </Link>
           </header>
 
-          <main className={`flex-1 ${pathname === "/dashboard" ? "overflow-hidden" : "overflow-y-auto"}`}>
-            {pathname === "/dashboard" ? children : <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">{children}</div>}
+          <main className={`flex-1 ${isMapView ? "overflow-hidden" : "overflow-y-auto"}`}>
+            {isMapView ? children : <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">{children}</div>}
           </main>
         </div>
       </div>
