@@ -1,6 +1,6 @@
 import { MarineConditions, HourlyForecast, ForecastData } from "@/types";
 import { fetchTideHeight, fetchTideTimeline } from "./noaa-tides";
-import { fetchNdbcWaveData, fetchNdbcTimeline } from "./noaa-ndbc";
+import { fetchNdbcWaveData, fetchNdbcTimeline, NdbcObservation } from "./noaa-ndbc";
 import { calculateWaveEnergy } from "@/lib/wave-energy";
 
 const MARINE_API_BASE = "https://marine-api.open-meteo.com/v1/marine";
@@ -458,23 +458,25 @@ export async function fetchHourlyTimeline(
     ? "https://api.open-meteo.com/v1/forecast"
     : HISTORICAL_API_BASE;
 
+  // ERA5 does not support sea_surface_temperature — only include it for forecast API
+  const weatherHourlyParams = [
+    "wind_speed_10m",
+    "wind_direction_10m",
+    "wind_gusts_10m",
+    "temperature_2m",
+    ...(daysAgo <= 5 ? ["sea_surface_temperature"] : []),
+    "relative_humidity_2m",
+    "precipitation",
+    "pressure_msl",
+    "cloud_cover",
+    "visibility",
+    "weather_code",
+    "is_day",
+  ];
   const weatherParamsObj: Record<string, string> = {
     latitude: latitude.toString(),
     longitude: longitude.toString(),
-    hourly: [
-      "wind_speed_10m",
-      "wind_direction_10m",
-      "wind_gusts_10m",
-      "temperature_2m",
-      "sea_surface_temperature",
-      "relative_humidity_2m",
-      "precipitation",
-      "pressure_msl",
-      "cloud_cover",
-      "visibility",
-      "weather_code",
-      "is_day",
-    ].join(","),
+    hourly: weatherHourlyParams.join(","),
     timezone: "auto",
   };
   if (daysAgo <= 5) {
@@ -487,21 +489,36 @@ export async function fetchHourlyTimeline(
   }
   const weatherParams = new URLSearchParams(weatherParamsObj);
 
+  // Wrap each fetch so one failure doesn't kill the others
   const [marineResponse, weatherResponse, tideData] = await Promise.all([
-    fetchWithRetry(`${MARINE_API_BASE}?${marineParams}`),
-    fetchWithRetry(`${weatherApiBase}?${weatherParams}`),
+    fetchWithRetry(`${MARINE_API_BASE}?${marineParams}`).catch(() => null),
+    fetchWithRetry(`${weatherApiBase}?${weatherParams}`).catch(() => null),
     fetchTideTimeline(latitude, longitude, dayBefore, dayAfter),
   ]);
 
-  const marineData: OpenMeteoMarineResponse | null = marineResponse.ok
+  const marineData: OpenMeteoMarineResponse | null = marineResponse?.ok
     ? await marineResponse.json()
     : null;
-  const weatherData: OpenMeteoWeatherResponse | null = weatherResponse.ok
+  const weatherData: OpenMeteoWeatherResponse | null = weatherResponse?.ok
     ? await weatherResponse.json()
     : null;
 
-  const times: string[] =
+  let times: string[] =
     marineData?.hourly?.time || weatherData?.hourly?.time || [];
+
+  // If both Open-Meteo APIs failed (common for historic sessions), build the
+  // timeline from NDBC buoy data as the primary source
+  let ndbcMap: Map<string, NdbcObservation> | null = null;
+  let ndbcOnly = false;
+  if (times.length === 0) {
+    ndbcMap = await fetchNdbcTimeline(latitude, longitude, dayBefore, dayAfter);
+    if (ndbcMap && ndbcMap.size > 0) {
+      // Keep NDBC times in UTC — sessionTime is already UTC so comparisons work
+      times = Array.from(ndbcMap.keys()).sort();
+      ndbcOnly = true;
+    }
+  }
+
   if (times.length === 0) {
     return { timeline: [], sessionHourIndex: 0 };
   }
@@ -519,17 +536,19 @@ export async function fetchHourlyTimeline(
 
   // Build full hourly array
   const allHours: HourlyForecast[] = times.map((time, index) => {
-    const swellHt = marineData?.hourly?.swell_wave_height?.[index] ?? null;
-    const swellPd = marineData?.hourly?.swell_wave_period?.[index] ?? null;
+    // When ndbcOnly, populate wave data directly from ndbcMap
+    const ndbcObs = ndbcOnly ? ndbcMap?.get(time) : null;
+    const swellHt = ndbcObs?.waveHeight ?? marineData?.hourly?.swell_wave_height?.[index] ?? null;
+    const swellPd = ndbcObs?.dominantPeriod ?? marineData?.hourly?.swell_wave_period?.[index] ?? null;
     return {
       time,
       timestamp: new Date(time),
-      waveHeight: marineData?.hourly?.wave_height?.[index] ?? null,
-      wavePeriod: marineData?.hourly?.wave_period?.[index] ?? null,
-      waveDirection: marineData?.hourly?.wave_direction?.[index] ?? null,
+      waveHeight: ndbcObs?.waveHeight ?? marineData?.hourly?.wave_height?.[index] ?? null,
+      wavePeriod: ndbcObs?.dominantPeriod ?? marineData?.hourly?.wave_period?.[index] ?? null,
+      waveDirection: ndbcObs?.meanWaveDirection ?? marineData?.hourly?.wave_direction?.[index] ?? null,
       primarySwellHeight: swellHt,
       primarySwellPeriod: swellPd,
-      primarySwellDirection: marineData?.hourly?.swell_wave_direction?.[index] ?? null,
+      primarySwellDirection: ndbcObs?.meanWaveDirection ?? marineData?.hourly?.swell_wave_direction?.[index] ?? null,
       secondarySwellHeight: marineData?.hourly?.secondary_swell_wave_height?.[index] ?? null,
       secondarySwellPeriod: marineData?.hourly?.secondary_swell_wave_period?.[index] ?? null,
       secondarySwellDirection: marineData?.hourly?.secondary_swell_wave_direction?.[index] ?? null,
@@ -555,26 +574,31 @@ export async function fetchHourlyTimeline(
 
   // NDBC buoy fallback: if Open-Meteo marine returned no wave data for the
   // entire timeline, backfill from the nearest NOAA buoy
-  const hasAnyWaveData = allHours.some((h) => h.waveHeight !== null);
-  if (!hasAnyWaveData) {
-    const ndbcMap = await fetchNdbcTimeline(latitude, longitude, dayBefore, dayAfter);
-    if (ndbcMap) {
-      for (const hour of allHours) {
-        // Timeline times are local (timezone:"auto"), NDBC keys are UTC.
-        // Convert the local time to a UTC key for lookup.
-        const localDate = new Date(hour.time);
-        const utcMs = localDate.getTime() - (marineData?.utc_offset_seconds ?? weatherData?.utc_offset_seconds ?? 0) * 1000;
-        const utcDate = new Date(utcMs);
-        const utcKey = `${utcDate.getUTCFullYear()}-${String(utcDate.getUTCMonth() + 1).padStart(2, "0")}-${String(utcDate.getUTCDate()).padStart(2, "0")}T${String(utcDate.getUTCHours()).padStart(2, "0")}:00`;
-        const obs = ndbcMap.get(utcKey);
-        if (obs) {
-          hour.waveHeight = obs.waveHeight;
-          hour.wavePeriod = obs.dominantPeriod;
-          hour.waveDirection = obs.meanWaveDirection;
-          hour.primarySwellHeight = obs.waveHeight;
-          hour.primarySwellPeriod = obs.dominantPeriod;
-          hour.primarySwellDirection = obs.meanWaveDirection;
-          hour.waveEnergy = calculateWaveEnergy(obs.waveHeight, obs.dominantPeriod);
+  if (!ndbcOnly) {
+    const hasAnyWaveData = allHours.some((h) => h.waveHeight !== null);
+    if (!hasAnyWaveData) {
+      // Reuse ndbcMap if we already fetched it above, otherwise fetch now
+      if (!ndbcMap) {
+        ndbcMap = await fetchNdbcTimeline(latitude, longitude, dayBefore, dayAfter);
+      }
+      if (ndbcMap) {
+        for (const hour of allHours) {
+          // Timeline times are local (timezone:"auto"), NDBC keys are UTC.
+          // Convert the local time to a UTC key for lookup.
+          const localDate = new Date(hour.time);
+          const utcMs = localDate.getTime() - (marineData?.utc_offset_seconds ?? weatherData?.utc_offset_seconds ?? 0) * 1000;
+          const utcDate = new Date(utcMs);
+          const utcKey = `${utcDate.getUTCFullYear()}-${String(utcDate.getUTCMonth() + 1).padStart(2, "0")}-${String(utcDate.getUTCDate()).padStart(2, "0")}T${String(utcDate.getUTCHours()).padStart(2, "0")}:00`;
+          const obs = ndbcMap.get(utcKey);
+          if (obs) {
+            hour.waveHeight = obs.waveHeight;
+            hour.wavePeriod = obs.dominantPeriod;
+            hour.waveDirection = obs.meanWaveDirection;
+            hour.primarySwellHeight = obs.waveHeight;
+            hour.primarySwellPeriod = obs.dominantPeriod;
+            hour.primarySwellDirection = obs.meanWaveDirection;
+            hour.waveEnergy = calculateWaveEnergy(obs.waveHeight, obs.dominantPeriod);
+          }
         }
       }
     }
@@ -584,7 +608,8 @@ export async function fetchHourlyTimeline(
   // Open-Meteo returns local times (no offset) due to timezone:"auto".
   // On the server (UTC), new Date("2026-03-10T10:00") parses as 10:00 UTC,
   // so we must shift sessionTime by utc_offset_seconds to compare in local time.
-  const utcOffsetMs = (marineData?.utc_offset_seconds ?? weatherData?.utc_offset_seconds ?? 0) * 1000;
+  // When ndbcOnly, times are UTC and sessionTime is already UTC — no shift needed.
+  const utcOffsetMs = ndbcOnly ? 0 : (marineData?.utc_offset_seconds ?? weatherData?.utc_offset_seconds ?? 0) * 1000;
   const sessionLocalMs = sessionTime.getTime() + utcOffsetMs;
   let closestIndex = 0;
   let minDiff = Infinity;
@@ -603,6 +628,168 @@ export async function fetchHourlyTimeline(
   const sessionHourIndex = closestIndex - sliceStart;
 
   return { timeline, sessionHourIndex };
+}
+
+/**
+ * Fetch 12 months of hourly marine + weather data for condition-history heatmap.
+ * Returns hourly data as HourlyForecast[] (no tide — too many NOAA calls).
+ * The Marine Archive API covers data up to ~5 days ago; more recent days use the forecast API.
+ */
+export async function fetchHistoricalMarineTimeline(
+  latitude: number,
+  longitude: number,
+  startDate: Date,
+  endDate: Date
+): Promise<HourlyForecast[]> {
+  const fmt = (d: Date) => d.toISOString().split("T")[0];
+
+  // Split into archive range (>5 days ago) and recent range (<=5 days ago)
+  const now = new Date();
+  const fiveDaysAgo = new Date(now);
+  fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+
+  const archiveEnd = endDate < fiveDaysAgo ? endDate : fiveDaysAgo;
+  const recentStart = startDate > fiveDaysAgo ? startDate : new Date(fiveDaysAgo);
+  recentStart.setDate(recentStart.getDate() + 1);
+
+  const results: HourlyForecast[] = [];
+
+  // Archive range (ERA5 for weather, Marine Archive for marine)
+  if (startDate < archiveEnd) {
+    const marineParams = new URLSearchParams({
+      latitude: latitude.toString(),
+      longitude: longitude.toString(),
+      start_date: fmt(startDate),
+      end_date: fmt(archiveEnd),
+      hourly: MARINE_PARAMS,
+      timezone: "auto",
+    });
+
+    const weatherParams = new URLSearchParams({
+      latitude: latitude.toString(),
+      longitude: longitude.toString(),
+      start_date: fmt(startDate),
+      end_date: fmt(archiveEnd),
+      hourly: "wind_speed_10m,wind_direction_10m",
+      timezone: "auto",
+    });
+
+    const [marineRes, weatherRes] = await Promise.all([
+      fetchWithRetry(`${MARINE_API_BASE}?${marineParams}`),
+      fetchWithRetry(`${HISTORICAL_API_BASE}?${weatherParams}`),
+    ]);
+
+    const marineData: OpenMeteoMarineResponse | null = marineRes.ok ? await marineRes.json() : null;
+    const weatherData: OpenMeteoWeatherResponse | null = weatherRes.ok ? await weatherRes.json() : null;
+
+    const times = marineData?.hourly?.time || weatherData?.hourly?.time || [];
+    for (let i = 0; i < times.length; i++) {
+      const swellHt = marineData?.hourly?.swell_wave_height?.[i] ?? null;
+      const swellPd = marineData?.hourly?.swell_wave_period?.[i] ?? null;
+      results.push({
+        time: times[i],
+        timestamp: new Date(times[i]),
+        waveHeight: marineData?.hourly?.wave_height?.[i] ?? null,
+        wavePeriod: marineData?.hourly?.wave_period?.[i] ?? null,
+        waveDirection: marineData?.hourly?.wave_direction?.[i] ?? null,
+        primarySwellHeight: swellHt,
+        primarySwellPeriod: swellPd,
+        primarySwellDirection: marineData?.hourly?.swell_wave_direction?.[i] ?? null,
+        secondarySwellHeight: marineData?.hourly?.secondary_swell_wave_height?.[i] ?? null,
+        secondarySwellPeriod: marineData?.hourly?.secondary_swell_wave_period?.[i] ?? null,
+        secondarySwellDirection: marineData?.hourly?.secondary_swell_wave_direction?.[i] ?? null,
+        windWaveHeight: marineData?.hourly?.wind_wave_height?.[i] ?? null,
+        windWavePeriod: marineData?.hourly?.wind_wave_period?.[i] ?? null,
+        windWaveDirection: marineData?.hourly?.wind_wave_direction?.[i] ?? null,
+        windSpeed: weatherData?.hourly?.wind_speed_10m?.[i] ?? null,
+        windDirection: weatherData?.hourly?.wind_direction_10m?.[i] ?? null,
+        windGust: null,
+        airTemp: null,
+        seaSurfaceTemp: null,
+        humidity: null,
+        precipitation: null,
+        pressureMsl: null,
+        cloudCover: null,
+        visibility: null,
+        tideHeight: null,
+        waveEnergy: calculateWaveEnergy(swellHt, swellPd),
+        weatherCode: null,
+        isDay: null,
+      });
+    }
+  }
+
+  // Recent range (forecast API with past_days)
+  if (recentStart <= endDate) {
+    const daysAgo = Math.ceil((now.getTime() - recentStart.getTime()) / (1000 * 60 * 60 * 24));
+    const marineParams = new URLSearchParams({
+      latitude: latitude.toString(),
+      longitude: longitude.toString(),
+      past_days: Math.max(daysAgo, 1).toString(),
+      forecast_days: "1",
+      hourly: MARINE_PARAMS,
+      timezone: "auto",
+    });
+
+    const weatherParams = new URLSearchParams({
+      latitude: latitude.toString(),
+      longitude: longitude.toString(),
+      past_days: Math.max(daysAgo, 1).toString(),
+      forecast_days: "1",
+      hourly: "wind_speed_10m,wind_direction_10m",
+      timezone: "auto",
+    });
+
+    const [marineRes, weatherRes] = await Promise.all([
+      fetchWithRetry(`${MARINE_API_BASE}?${marineParams}`),
+      fetchWithRetry(`https://api.open-meteo.com/v1/forecast?${weatherParams}`),
+    ]);
+
+    const marineData: OpenMeteoMarineResponse | null = marineRes.ok ? await marineRes.json() : null;
+    const weatherData: OpenMeteoWeatherResponse | null = weatherRes.ok ? await weatherRes.json() : null;
+
+    const times = marineData?.hourly?.time || weatherData?.hourly?.time || [];
+    const recentStartStr = fmt(recentStart);
+    const endDateStr = fmt(endDate);
+    for (let i = 0; i < times.length; i++) {
+      const dateStr = times[i].split("T")[0];
+      if (dateStr < recentStartStr || dateStr > endDateStr) continue;
+      const swellHt = marineData?.hourly?.swell_wave_height?.[i] ?? null;
+      const swellPd = marineData?.hourly?.swell_wave_period?.[i] ?? null;
+      results.push({
+        time: times[i],
+        timestamp: new Date(times[i]),
+        waveHeight: marineData?.hourly?.wave_height?.[i] ?? null,
+        wavePeriod: marineData?.hourly?.wave_period?.[i] ?? null,
+        waveDirection: marineData?.hourly?.wave_direction?.[i] ?? null,
+        primarySwellHeight: swellHt,
+        primarySwellPeriod: swellPd,
+        primarySwellDirection: marineData?.hourly?.swell_wave_direction?.[i] ?? null,
+        secondarySwellHeight: marineData?.hourly?.secondary_swell_wave_height?.[i] ?? null,
+        secondarySwellPeriod: marineData?.hourly?.secondary_swell_wave_period?.[i] ?? null,
+        secondarySwellDirection: marineData?.hourly?.secondary_swell_wave_direction?.[i] ?? null,
+        windWaveHeight: marineData?.hourly?.wind_wave_height?.[i] ?? null,
+        windWavePeriod: marineData?.hourly?.wind_wave_period?.[i] ?? null,
+        windWaveDirection: marineData?.hourly?.wind_wave_direction?.[i] ?? null,
+        windSpeed: weatherData?.hourly?.wind_speed_10m?.[i] ?? null,
+        windDirection: weatherData?.hourly?.wind_direction_10m?.[i] ?? null,
+        windGust: null,
+        airTemp: null,
+        seaSurfaceTemp: null,
+        humidity: null,
+        precipitation: null,
+        pressureMsl: null,
+        cloudCover: null,
+        visibility: null,
+        tideHeight: null,
+        waveEnergy: calculateWaveEnergy(swellHt, swellPd),
+        weatherCode: null,
+        isDay: null,
+      });
+    }
+  }
+
+  return results;
 }
 
 /**
