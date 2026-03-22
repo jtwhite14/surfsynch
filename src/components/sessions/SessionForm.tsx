@@ -937,6 +937,9 @@ export function SessionForm({ spots: initialSpots, defaultSpotId, surfboards: in
                         mode="single"
                         selected={draft.date}
                         onSelect={(d) => d && updateDraft(idx, { date: d })}
+                        captionLayout="dropdown"
+                        startMonth={new Date(2000, 0)}
+                        endMonth={new Date(2030, 11)}
                         initialFocus
                       />
                     </PopoverContent>

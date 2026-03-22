@@ -341,7 +341,7 @@ export default function SpotMap({
       })()}
 
       {/* Layer picker */}
-      <div className="absolute bottom-[180px] right-[10px] z-10">
+      <div className="absolute bottom-[148px] right-[10px] z-10">
         <button
           onClick={(e) => { e.stopPropagation(); setShowLayerPicker((v) => !v); }}
           className="mapboxgl-ctrl mapboxgl-ctrl-group"
