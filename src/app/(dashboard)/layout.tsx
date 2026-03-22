@@ -238,6 +238,7 @@ function SidebarContent({
         })}
 
         {/* Add button */}
+        <div className="pt-2" />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             {collapsed ? (
