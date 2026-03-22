@@ -44,6 +44,7 @@ import { IncomingInvites } from "@/components/sharing/IncomingInvites";
 import { SharedSpotsList } from "@/components/sharing/SharedSpotsList";
 import { SharedSpotPane } from "@/components/sharing/SharedSpotPane";
 import { GearModal } from "@/components/gear/GearModal";
+import { ForecastCalendar } from "@/components/forecast-calendar/ForecastCalendar";
 import { haversineDistance, getDistancePenalty, getRarityBoost } from "@/lib/utils/geo";
 import type { SurfSpot, Surfboard, Wetsuit } from "@/lib/db/schema";
 import type { SurfSessionWithConditions, SharedSpotView, CardinalDirection, ConditionProfileResponse } from "@/types";
@@ -1107,6 +1108,17 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
+
+          {/* Forecast Calendar panel */}
+          {spots.length > 0 && (
+            <ForecastCalendar
+              spots={spots.map(s => ({ id: s.id, name: s.name }))}
+              onSpotClick={(spotId) => {
+                const spot = spots.find(s => s.id === spotId);
+                if (spot) handleSpotClick(spot);
+              }}
+            />
+          )}
 
           {/* Sessions / Spots panel */}
           {(sessions.length > 0 || spots.length > 0 || surfboards.length > 0 || wetsuits.length > 0) && (

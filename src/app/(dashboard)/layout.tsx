@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/tooltip";
 import {
   LayoutDashboard,
+  Dna,
   Waves,
   BookOpen,
   Settings,
@@ -32,6 +33,7 @@ import {
 
 const navigation = [
   { name: "Home", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Surf DNA", href: "/insights", icon: Dna },
 ];
 
 
