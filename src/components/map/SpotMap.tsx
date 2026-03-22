@@ -131,7 +131,7 @@ export default function SpotMap({
   const flyToSpot = useCallback((spot: SurfSpot) => {
     mapRef.current?.flyTo({
       center: [parseFloat(spot.longitude), parseFloat(spot.latitude)],
-      zoom: 14,
+      zoom: 15,
       duration: 1000,
       padding: flyToPadding ?? { top: 0, bottom: 0, left: 0, right: 0 },
     });
@@ -285,7 +285,7 @@ export default function SpotMap({
               if (onSharedSpotClick) onSharedSpotClick(shared);
               mapRef.current?.flyTo({
                 center: [lng, lat],
-                zoom: 14,
+                zoom: 15,
                 duration: 1000,
                 padding: flyToPadding,
               });
@@ -339,24 +339,26 @@ export default function SpotMap({
         );
       })()}
 
-      {/* Bathymetry toggle */}
-      <div className="absolute top-3 right-3 z-10">
-        <button
-          onClick={(e) => { e.stopPropagation(); setShowBathymetry((v) => !v); }}
-          className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium shadow-lg backdrop-blur-sm transition-colors ${
-            showBathymetry
-              ? "bg-primary text-primary-foreground"
-              : "bg-background/90 text-foreground hover:bg-background"
-          }`}
-          title="Toggle bathymetry"
-        >
-          <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M2 12c2-3 4.5-5 7-5s5 2 7 5-4.5 5-7 5-5-2-7-5z" />
-            <path d="M2 17c2-2 4.5-4 7-4s5 2 7 4" />
-            <path d="M2 7c2-2 4.5-4 7-4s5 2 7 4" />
-          </svg>
-          Depth
-        </button>
+      {/* Map Layers control — positioned above the zoom/geolocate cluster */}
+      <div className="absolute bottom-[140px] right-[10px] z-10">
+        <div className="flex flex-col items-stretch rounded-md shadow-lg overflow-hidden">
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowBathymetry((v) => !v); }}
+            className={`flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium transition-colors ${
+              showBathymetry
+                ? "bg-primary text-primary-foreground"
+                : "bg-white text-[#333] hover:bg-gray-100"
+            }`}
+            title="Toggle bathymetry layer"
+          >
+            <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2L2 7l10 5 10-5-10-5z" />
+              <path d="M2 17l10 5 10-5" />
+              <path d="M2 12l10 5 10-5" />
+            </svg>
+            Bathymetry
+          </button>
+        </div>
       </div>
     </Map>
   );
