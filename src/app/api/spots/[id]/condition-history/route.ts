@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUserId } from "@/lib/auth";
-import { db, surfSpots, surfSessions } from "@/lib/db";
+import { db, surfSpots, surfSessions, conditionHistoryCache } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { fetchHistoricalMarineTimeline } from "@/lib/api/open-meteo";
 import {
@@ -10,10 +10,12 @@ import {
 } from "@/lib/matching/condition-matcher";
 import { ConditionWeights, DEFAULT_CONDITION_WEIGHTS } from "@/types";
 
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
 /**
  * GET: Return daily condition similarity scores for the last 12 months.
  * Compares each day's conditions (around the session's time window) to the session's conditions.
- * Used for the GitHub-style contribution heatmap.
+ * Results are cached in the database and recomputed weekly.
  *
  * Query params:
  *   sessionId - the session to compare against
@@ -54,6 +56,23 @@ export async function GET(
       return NextResponse.json({ error: "Session conditions not found" }, { status: 404 });
     }
 
+    // Check cache
+    const cached = await db.query.conditionHistoryCache.findFirst({
+      where: and(
+        eq(conditionHistoryCache.spotId, spotId),
+        eq(conditionHistoryCache.sessionId, sessionId)
+      ),
+    });
+
+    if (cached && Date.now() - cached.computedAt.getTime() < CACHE_TTL_MS) {
+      return NextResponse.json({
+        scores: cached.scores,
+        sessionDate: session.date,
+        cached: true,
+      });
+    }
+
+    // Compute fresh scores
     const sessionParsed = parseSessionConditions(session.conditions);
     const weights: ConditionWeights = (spot.conditionWeights as ConditionWeights) || DEFAULT_CONDITION_WEIGHTS;
 
@@ -119,9 +138,25 @@ export async function GET(
     // Sort by date
     scores.sort((a, b) => a.date.localeCompare(b.date));
 
+    // Upsert cache
+    if (cached) {
+      await db
+        .update(conditionHistoryCache)
+        .set({ scores, computedAt: new Date() })
+        .where(eq(conditionHistoryCache.id, cached.id));
+    } else {
+      await db.insert(conditionHistoryCache).values({
+        spotId,
+        sessionId,
+        scores,
+        computedAt: new Date(),
+      });
+    }
+
     return NextResponse.json({
       scores,
       sessionDate: session.date,
+      cached: false,
     });
   } catch (error) {
     console.error("Error computing condition history:", error);

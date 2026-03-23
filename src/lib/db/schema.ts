@@ -511,6 +511,17 @@ export const waitlist = pgTable("waitlist", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Condition history cache (heatmap scores)
+export const conditionHistoryCache = pgTable("condition_history_cache", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  spotId: uuid("spot_id").notNull().references(() => surfSpots.id, { onDelete: "cascade" }),
+  sessionId: uuid("session_id").notNull().references(() => surfSessions.id, { onDelete: "cascade" }),
+  scores: jsonb("scores").notNull(), // Array<{ date: string; score: number }>
+  computedAt: timestamp("computed_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("condition_history_cache_spot_session_idx").on(table.spotId, table.sessionId),
+]);
+
 // Type exports
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -538,3 +549,5 @@ export type Wetsuit = typeof wetsuits.$inferSelect;
 export type NewWetsuit = typeof wetsuits.$inferInsert;
 export type SpotShare = typeof spotShares.$inferSelect;
 export type NewSpotShare = typeof spotShares.$inferInsert;
+export type ConditionHistoryCache = typeof conditionHistoryCache.$inferSelect;
+export type NewConditionHistoryCache = typeof conditionHistoryCache.$inferInsert;
