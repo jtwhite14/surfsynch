@@ -17,7 +17,7 @@ const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function getScoreColor(score: number): string {
-  if (score <= 0) return "var(--heatmap-empty)";
+  if (score < 30) return "var(--heatmap-empty)";
   if (score < 50) return "var(--heatmap-low)";
   if (score < 65) return "var(--heatmap-med-low)";
   if (score < 78) return "var(--heatmap-med)";
@@ -62,8 +62,12 @@ export function ConditionHeatmap({ spotId, sessionId, sessionDate }: ConditionHe
     const rect = e.currentTarget.getBoundingClientRect();
     const parentRect = e.currentTarget.closest(".heatmap-container")?.getBoundingClientRect();
     if (parentRect) {
+      const tooltipWidth = 180;
+      const rawX = rect.left - parentRect.left + rect.width / 2;
+      // Clamp so tooltip doesn't overflow left or right
+      const x = Math.max(tooltipWidth / 2, Math.min(rawX, parentRect.width - tooltipWidth / 2));
       setTooltip({
-        x: rect.left - parentRect.left + rect.width / 2,
+        x,
         y: rect.top - parentRect.top - 4,
         date,
         score,
@@ -165,7 +169,7 @@ export function ConditionHeatmap({ spotId, sessionId, sessionDate }: ConditionHe
       <p className="text-xs text-muted-foreground mb-3">
         How often similar conditions occurred in the last 12 months
       </p>
-      <div className="heatmap-container relative overflow-x-auto">
+      <div className="heatmap-container relative overflow-x-auto overflow-y-visible">
         <style>{`
           :root {
             --heatmap-empty: oklch(0.25 0 0);
@@ -246,7 +250,7 @@ export function ConditionHeatmap({ spotId, sessionId, sessionDate }: ConditionHe
         {/* Tooltip */}
         {tooltip && (
           <div
-            className="absolute pointer-events-none z-10 backdrop-blur-xl bg-black/70 border border-white/10 rounded-lg px-2.5 py-1.5 shadow-2xl"
+            className="absolute pointer-events-none z-10 backdrop-blur-xl bg-black/70 border border-white/10 rounded-lg px-2.5 py-1.5 shadow-2xl whitespace-nowrap"
             style={{
               left: tooltip.x,
               top: tooltip.y,
