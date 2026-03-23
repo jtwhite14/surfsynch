@@ -19,7 +19,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  LayoutDashboard,
+  Map,
   Waves,
   BookOpen,
   Settings,
@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 
 const navigation = [
-  { name: "Home", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Dashboard", href: "/dashboard", icon: Map },
 ];
 
 
