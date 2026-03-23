@@ -18,8 +18,7 @@ const MONTH_LABELS = [
 ];
 
 function getScoreColor(score: number): string {
-  if (score < 30) return "var(--heatmap-empty)";
-  if (score < 50) return "var(--heatmap-low)";
+  if (score < 50) return "var(--heatmap-empty)";
   if (score < 65) return "var(--heatmap-med-low)";
   if (score < 78) return "var(--heatmap-med)";
   if (score < 88) return "var(--heatmap-med-high)";
