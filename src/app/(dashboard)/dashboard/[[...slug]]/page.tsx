@@ -43,6 +43,7 @@ import { SpotSharePanel } from "@/components/sharing/SpotSharePanel";
 import { IncomingInvites } from "@/components/sharing/IncomingInvites";
 import { SharedSpotsList } from "@/components/sharing/SharedSpotsList";
 import { SharedSpotPane } from "@/components/sharing/SharedSpotPane";
+import { FiveStarHeatmap } from "@/components/spots/FiveStarHeatmap";
 import { GearModal } from "@/components/gear/GearModal";
 import { ForecastCalendar } from "@/components/forecast-calendar/ForecastCalendar";
 import { haversineDistance, getDistancePenalty, getRarityBoost } from "@/lib/utils/geo";
@@ -857,6 +858,9 @@ export default function DashboardPage() {
 
                     {/* Weekly forecast with integrated scores */}
                     <WeeklyForecast spotId={selectedSpot.id} />
+
+                    {/* 5-Star Condition Frequency */}
+                    <FiveStarHeatmap spotId={selectedSpot.id} />
 
                     {/* Recent Sessions section */}
                     {loadingSpotSessions ? (
