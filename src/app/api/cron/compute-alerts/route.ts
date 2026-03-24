@@ -414,6 +414,7 @@ async function sendPendingSMSAlerts(): Promise<number> {
     .where(
       and(
         eq(spotAlerts.status, "active"),
+        eq(surfSpots.alertsSilenced, false),
         isNull(spotAlerts.smsSentAt),
         gte(spotAlerts.forecastHour, now)
       )

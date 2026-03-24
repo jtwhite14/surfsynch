@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUserId } from "@/lib/auth";
-import { db, spotAlerts } from "@/lib/db";
+import { db, spotAlerts, surfSpots } from "@/lib/db";
 import { and, eq, gte } from "drizzle-orm";
 import type { MatchDetails, MarineConditions } from "@/types";
 
@@ -70,14 +70,17 @@ export async function GET(request: NextRequest) {
     }
 
     // Query with relations
-    const alerts = await db.query.spotAlerts.findMany({
+    const allAlerts = await db.query.spotAlerts.findMany({
       where: and(...conditions),
       with: {
-        spot: { columns: { id: true, name: true } },
+        spot: { columns: { id: true, name: true, alertsSilenced: true } },
         matchedProfile: { columns: { id: true, name: true } },
         matchedSession: { columns: { id: true, rating: true } },
       },
     });
+
+    // Filter out alerts for silenced spots
+    const alerts = allAlerts.filter((a) => !a.spot?.alertsSilenced);
 
     // Group: date -> spotId -> windows
     const now = new Date();

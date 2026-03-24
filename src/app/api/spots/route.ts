@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUserId } from "@/lib/auth";
-import { db, surfSpots, surfSessions, sessionConditions } from "@/lib/db";
+import { db, surfSpots, surfSessions, sessionConditions, spotAlerts } from "@/lib/db";
 import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 
@@ -131,6 +131,16 @@ export async function PUT(request: NextRequest) {
 
     if (!spot) {
       return NextResponse.json({ error: "Spot not found" }, { status: 404 });
+    }
+
+    // When silencing, expire all active alerts for this spot
+    if (alertsSilenced === true) {
+      await db
+        .update(spotAlerts)
+        .set({ status: "expired", updatedAt: new Date() })
+        .where(
+          and(eq(spotAlerts.spotId, spotId), eq(spotAlerts.status, "active"))
+        );
     }
 
     return NextResponse.json({ spot });
