@@ -1,4 +1,4 @@
-import { MarineConditions, ConditionWeights, DEFAULT_CONDITION_WEIGHTS, MatchDetails, TimeWindow, CardinalDirection, PreferredWaveSize, PreferredSwellPeriod, PreferredWind, ProfileForMatching, ProfileSelections, ExclusionZones } from "@/types";
+import { MarineConditions, ConditionWeights, DEFAULT_CONDITION_WEIGHTS, MatchDetails, TimeWindow, CardinalDirection, PreferredWaveSize, PreferredSwellPeriod, PreferredWind, ProfileForMatching, ProfileSelections, ExclusionZones, WindSpeedTier, WIND_SPEED_TIER_THRESHOLDS } from "@/types";
 import { calculateDirectionAttenuation, calculateWaveEnergy } from "@/lib/wave-energy";
 import { getReinforcementConfidence, isProfileActiveForMonth, WAVE_SIZE_MIDPOINTS, SWELL_PERIOD_MIDPOINTS, WIND_SPEED_MIDPOINTS, TIDE_HEIGHT_MIDPOINTS } from "@/lib/matching/profile-utils";
 import { nearestSelectedSegmentDistance, computeTidePhases } from "@/lib/matching/tide-phase";
@@ -178,6 +178,51 @@ function multiDirectionSimilarity(forecastDeg: number, selectedDirs: string[], s
     if (sim > best) best = sim;
   }
   return best;
+}
+
+/**
+ * WindRose similarity: combined direction + speed scoring using per-direction speed thresholds.
+ * For each rose entry, compute directional proximity and whether the forecast speed
+ * is within that direction's tolerance. Returns the best combined score.
+ */
+function windRoseSimilarity(
+  forecastDirDeg: number,
+  forecastSpeed: number,
+  windRose: Partial<Record<CardinalDirection, WindSpeedTier>>
+): { speedSim: number; dirSim: number } {
+  let bestSpeed = 0;
+  let bestDir = 0;
+
+  for (const [dir, tier] of Object.entries(windRose) as [CardinalDirection, WindSpeedTier][]) {
+    const dirDeg = CARDINAL_DEGREES[dir];
+    if (dirDeg == null || !tier) continue;
+
+    // Directional similarity (Gaussian, sigma=45°)
+    const dirSim = directionalSimilarity(forecastDirDeg, dirDeg, SIGMAS.windDirection);
+
+    // Speed acceptability: 1.0 if under threshold, Gaussian decay above
+    const threshold = WIND_SPEED_TIER_THRESHOLDS[tier];
+    let speedSim: number;
+    if (forecastSpeed <= threshold) {
+      speedSim = 1.0;
+    } else {
+      // Gaussian decay from the threshold edge
+      const overshoot = forecastSpeed - threshold;
+      speedSim = Math.exp(-(overshoot * overshoot) / (2 * SIGMAS.windSpeed * SIGMAS.windSpeed));
+    }
+
+    // Combined: weight speed by directional relevance
+    // The best direction match determines the direction score,
+    // and the speed score comes from that direction's threshold
+    if (dirSim > bestDir) {
+      bestDir = dirSim;
+      bestSpeed = speedSim;
+    } else if (dirSim === bestDir && speedSim > bestSpeed) {
+      bestSpeed = speedSim;
+    }
+  }
+
+  return { speedSim: bestSpeed, dirSim: bestDir };
 }
 
 // ── Sigmas (tuned per-variable) ──
@@ -501,34 +546,55 @@ export function computeSimilarity(
     if (weights.swellDirection >= CRITICAL_WEIGHT_THRESHOLD && sim < CRITICAL_SIM_FLOOR) criticalVeto = true;
   }
 
-  // Wind speed + wind preference
-  if (forecast.windSpeed != null && session.windSpeed != null) {
-    const hasWindSelections = selections?.windCondition && selections.windCondition.length > 0;
-    let sim = hasWindSelections
-      ? rangeSimilarity(forecast.windSpeed, selections!.windCondition!, CATEGORY_RANGES.windSpeed, SIGMAS.windSpeed)
-      : gaussianSimilarity(forecast.windSpeed, session.windSpeed, SIGMAS.windSpeed);
-    if (!isProfileMatch || !profileSpecifiedVars!.has("windSpeed")) {
-      sim *= getWindPreferenceMultiplier(forecast.windSpeed, weights.preferredWind);
-    }
-    sim = Math.min(1, sim);
-    details.windSpeed = sim;
-    weightedSum += weights.windSpeed * sim;
+  // Wind — windRose path (per-direction speed tolerance) or legacy path
+  const hasWindRose = selections?.windRose && Object.keys(selections.windRose).length > 0;
+
+  if (hasWindRose && forecast.windSpeed != null && forecast.windDirection != null) {
+    // WindRose: combined direction + speed scoring
+    const { speedSim, dirSim } = windRoseSimilarity(
+      forecast.windDirection, forecast.windSpeed, selections!.windRose!
+    );
+
+    details.windSpeed = speedSim;
+    weightedSum += weights.windSpeed * speedSim;
     totalWeight += weights.windSpeed;
     nonNullCount++;
-    if (weights.windSpeed >= CRITICAL_WEIGHT_THRESHOLD && sim < CRITICAL_SIM_FLOOR) criticalVeto = true;
-  }
+    if (weights.windSpeed >= CRITICAL_WEIGHT_THRESHOLD && speedSim < CRITICAL_SIM_FLOOR) criticalVeto = true;
 
-  // Wind direction
-  if (forecast.windDirection != null && session.windDirection != null) {
-    const hasWindDirSelections = selections?.windDirection && selections.windDirection.length > 0;
-    const sim = hasWindDirSelections
-      ? multiDirectionSimilarity(forecast.windDirection, selections!.windDirection!, SIGMAS.windDirection)
-      : directionalSimilarity(forecast.windDirection, session.windDirection, SIGMAS.windDirection);
-    details.windDirection = sim;
-    weightedSum += weights.windDirection * sim;
+    details.windDirection = dirSim;
+    weightedSum += weights.windDirection * dirSim;
     totalWeight += weights.windDirection;
     nonNullCount++;
-    if (weights.windDirection >= CRITICAL_WEIGHT_THRESHOLD && sim < CRITICAL_SIM_FLOOR) criticalVeto = true;
+    if (weights.windDirection >= CRITICAL_WEIGHT_THRESHOLD && dirSim < CRITICAL_SIM_FLOOR) criticalVeto = true;
+  } else {
+    // Legacy: separate wind speed + direction matching
+    if (forecast.windSpeed != null && session.windSpeed != null) {
+      const hasWindSelections = selections?.windCondition && selections.windCondition.length > 0;
+      let sim = hasWindSelections
+        ? rangeSimilarity(forecast.windSpeed, selections!.windCondition!, CATEGORY_RANGES.windSpeed, SIGMAS.windSpeed)
+        : gaussianSimilarity(forecast.windSpeed, session.windSpeed, SIGMAS.windSpeed);
+      if (!isProfileMatch || !profileSpecifiedVars!.has("windSpeed")) {
+        sim *= getWindPreferenceMultiplier(forecast.windSpeed, weights.preferredWind);
+      }
+      sim = Math.min(1, sim);
+      details.windSpeed = sim;
+      weightedSum += weights.windSpeed * sim;
+      totalWeight += weights.windSpeed;
+      nonNullCount++;
+      if (weights.windSpeed >= CRITICAL_WEIGHT_THRESHOLD && sim < CRITICAL_SIM_FLOOR) criticalVeto = true;
+    }
+
+    if (forecast.windDirection != null && session.windDirection != null) {
+      const hasWindDirSelections = selections?.windDirection && selections.windDirection.length > 0;
+      const sim = hasWindDirSelections
+        ? multiDirectionSimilarity(forecast.windDirection, selections!.windDirection!, SIGMAS.windDirection)
+        : directionalSimilarity(forecast.windDirection, session.windDirection, SIGMAS.windDirection);
+      details.windDirection = sim;
+      weightedSum += weights.windDirection * sim;
+      totalWeight += weights.windDirection;
+      nonNullCount++;
+      if (weights.windDirection >= CRITICAL_WEIGHT_THRESHOLD && sim < CRITICAL_SIM_FLOOR) criticalVeto = true;
+    }
   }
 
   // Tide height + tide preference (tide curve takes priority)

@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, ChevronRight, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SwellExposurePicker } from "@/components/spots/SwellExposurePicker";
-import type { CardinalDirection, ConditionProfileResponse, ExclusionZones } from "@/types";
-import { WEIGHT_PRESETS } from "@/types";
+import type { CardinalDirection, ConditionProfileResponse, ExclusionZones, WindSpeedTier } from "@/types";
+import { WEIGHT_PRESETS, WIND_SPEED_TIER_THRESHOLDS } from "@/types";
+import { WindRose, WindRoseValue } from "@/components/profiles/WindRose";
 import {
   WAVE_SIZE_MIDPOINTS,
   SWELL_PERIOD_MIDPOINTS,
@@ -102,10 +103,17 @@ export function ProfileEditor({ spotId, profile, defaultName, onSave, onCancel, 
     const cat = profile ? numericToCategory(profile.targetSwellPeriod, SWELL_PERIOD_MIDPOINTS) : null;
     return cat ? [cat] : [];
   });
-  const [windCondition, setWindCondition] = useState<string[]>(() => {
-    if (sel?.windCondition?.length) return sel.windCondition;
-    const cat = profile ? numericToCategory(profile.targetWindSpeed, WIND_SPEED_MIDPOINTS) : null;
-    return cat ? [cat] : [];
+  const [windRose, setWindRose] = useState<WindRoseValue>(() => {
+    if (sel?.windRose && Object.keys(sel.windRose).length > 0) return sel.windRose;
+    // Migrate from old windCondition + windDirection
+    if (sel?.windDirection?.length) {
+      const tier: WindSpeedTier = sel.windCondition?.includes("offshore") ? "strong"
+        : sel.windCondition?.includes("glassy") ? "light" : "moderate";
+      const rose: WindRoseValue = {};
+      for (const d of sel.windDirection) rose[d as CardinalDirection] = tier;
+      return rose;
+    }
+    return {};
   });
   const [tideLevel, setTideLevel] = useState<string[]>(() => {
     if (sel?.tideLevel?.length) return sel.tideLevel;
@@ -116,12 +124,6 @@ export function ProfileEditor({ spotId, profile, defaultName, onSave, onCancel, 
     if (sel?.swellDirection?.length) return sel.swellDirection as CardinalDirection[];
     return profile?.targetSwellDirection != null
       ? [degToCardinal(profile.targetSwellDirection)]
-      : [];
-  });
-  const [windDirection, setWindDirection] = useState<CardinalDirection[]>(() => {
-    if (sel?.windDirection?.length) return sel.windDirection as CardinalDirection[];
-    return profile?.targetWindDirection != null
-      ? [degToCardinal(profile.targetWindDirection)]
       : [];
   });
   const [activeMonths, setActiveMonths] = useState<number[]>(profile?.activeMonths ?? []);
@@ -181,12 +183,20 @@ export function ProfileEditor({ spotId, profile, defaultName, onSave, onCancel, 
   }
 
   function buildTargets() {
+    // Derive wind targets from windRose
+    const roseDirs = Object.keys(windRose) as CardinalDirection[];
+    const roseTiers = Object.values(windRose) as WindSpeedTier[];
+    const avgWindSpeed = roseTiers.length > 0
+      ? roseTiers.reduce((sum, t) => sum + WIND_SPEED_TIER_THRESHOLDS[t], 0) / roseTiers.length
+      : null;
+    const avgWindDir = roseDirs.length > 0 ? avgCardinalDeg(roseDirs) : null;
+
     return {
       targetSwellHeight: waveSize.length > 0 ? avgMidpoints(waveSize, WAVE_SIZE_MIDPOINTS) : null,
       targetSwellPeriod: swellPeriod.length > 0 ? avgMidpoints(swellPeriod, SWELL_PERIOD_MIDPOINTS) : null,
       targetSwellDirection: swellDirection.length > 0 ? avgCardinalDeg(swellDirection) : null,
-      targetWindSpeed: windCondition.length > 0 ? avgMidpoints(windCondition, WIND_SPEED_MIDPOINTS) : null,
-      targetWindDirection: windDirection.length > 0 ? avgCardinalDeg(windDirection) : null,
+      targetWindSpeed: avgWindSpeed,
+      targetWindDirection: avgWindDir,
       targetTideHeight: tideLevel.length > 0 ? avgMidpoints(tideLevel, TIDE_HEIGHT_MIDPOINTS) : null,
     };
   }
@@ -213,7 +223,6 @@ export function ProfileEditor({ spotId, profile, defaultName, onSave, onCancel, 
     const { field, selected } = directionEditState;
     switch (field) {
       case "swellDirection": setSwellDirection(selected); break;
-      case "windDirection": setWindDirection(selected); break;
       case "excludeSwellDir": setExcludeSwellDir(selected); break;
       case "excludeWindDir": setExcludeWindDir(selected); break;
     }
@@ -251,8 +260,10 @@ export function ProfileEditor({ spotId, profile, defaultName, onSave, onCancel, 
             waveSize,
             swellPeriod,
             swellDirection,
-            windCondition,
-            windDirection,
+            windRose,
+            // Backward-compat: derive old fields from windRose
+            windCondition: Object.keys(windRose).length > 0 ? ["offshore"] : [],
+            windDirection: Object.keys(windRose) as CardinalDirection[],
             tideLevel,
           },
           exclusions: buildExclusions(),
@@ -399,28 +410,9 @@ export function ProfileEditor({ spotId, profile, defaultName, onSave, onCancel, 
             <fieldset className="space-y-3 rounded-lg border border-border/50 px-3 py-3">
               <legend className="px-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Wind</legend>
 
-              {/* Wind Speed */}
-              <ConditionRow label="Speed" level={weightToLevel(wWindSpeed)} onLevelChange={(l) => { setWWindSpeed(levelToWeight(l)); clearPreset(); }}>
-                <div className="flex flex-wrap gap-1.5">
-                  {WIND_OPTIONS.map(opt => (
-                    <Pill key={opt.value} active={windCondition.includes(opt.value)} onClick={() => setWindCondition(togglePill(windCondition, opt.value))}>{opt.label}</Pill>
-                  ))}
-                </div>
-              </ConditionRow>
-
-              {/* Wind Direction */}
-              <ConditionRow label="Direction" level={weightToLevel(wWindDir)} onLevelChange={(l) => { setWWindDir(levelToWeight(l)); clearPreset(); }}>
-                <div className="flex items-start gap-3">
-                  <SwellExposurePicker value={windDirection} onChange={setWindDirection} />
-                  {onDirectionEditStart && (
-                    <button
-                      onClick={() => startMapEdit("windDirection", windDirection, "target")}
-                      className="text-[10px] text-primary hover:underline mt-1 whitespace-nowrap"
-                    >
-                      Edit on map
-                    </button>
-                  )}
-                </div>
+              {/* Wind Rose — combined direction + speed tolerance */}
+              <ConditionRow label="Tolerance" level={weightToLevel(wWindSpeed)} onLevelChange={(l) => { setWWindSpeed(levelToWeight(l)); setWWindDir(levelToWeight(l)); clearPreset(); }}>
+                <WindRose value={windRose} onChange={setWindRose} />
               </ConditionRow>
 
               {/* Wind — Doesn't work */}

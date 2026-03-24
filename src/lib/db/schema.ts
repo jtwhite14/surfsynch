@@ -434,14 +434,12 @@ export const spotShares = pgTable("spot_shares", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   sharedWithUserId: uuid("shared_with_user_id")
-    .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   status: varchar("status", { length: 20 }).notNull().default("pending"), // pending | accepted | declined
   inviteCode: varchar("invite_code", { length: 64 }).notNull().unique(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   respondedAt: timestamp("responded_at"),
 }, (table) => [
-  uniqueIndex("uq_spot_shares_trio").on(table.spotId, table.sharedByUserId, table.sharedWithUserId),
   index("idx_spot_shares_shared_with").on(table.sharedWithUserId),
 ]);
 

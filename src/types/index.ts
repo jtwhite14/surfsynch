@@ -61,6 +61,15 @@ export type CardinalDirection = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW
 
 export const VALID_CARDINAL_DIRECTIONS: CardinalDirection[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 
+// Wind speed tolerance per direction (used by WindRose)
+export type WindSpeedTier = 'light' | 'moderate' | 'strong';
+
+export const WIND_SPEED_TIER_THRESHOLDS: Record<WindSpeedTier, number> = {
+  light: 10,     // up to 10 km/h
+  moderate: 20,  // up to 20 km/h
+  strong: 30,    // up to 30 km/h
+};
+
 // Preference types for follow-up questions
 export type PreferredWaveSize = 'small' | 'medium' | 'large' | 'xl';
 export type PreferredSwellPeriod = 'short' | 'medium' | 'long';
@@ -174,6 +183,7 @@ export interface ProfileSelections {
   swellDirection?: string[];
   windCondition?: string[];
   windDirection?: string[];
+  windRose?: Partial<Record<CardinalDirection, WindSpeedTier>>; // per-direction speed tolerance
   tideLevel?: string[];
   tideCurve?: { segments: boolean[] }; // 12 segments of the tide cycle
 }
@@ -275,9 +285,10 @@ export interface SpotShareResponse {
   id: string;
   spotId: string;
   sharedByUserId: string;
-  sharedWithUserId: string;
+  sharedWithUserId: string | null;
   status: 'pending' | 'accepted' | 'declined';
   inviteCode: string;
+  inviteUrl?: string;
   createdAt: Date;
   respondedAt: Date | null;
   sharedWith?: {
