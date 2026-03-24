@@ -963,13 +963,26 @@ export function ProfileWizard({
                 {saving ? <Loader2 className="size-4 animate-spin" /> : profile ? "Save" : "Create"}
               </Button>
             ) : (
-              <Button
-                size="sm"
-                onClick={goNext}
-                className="h-8"
-              >
-                Next
-              </Button>
+              <>
+                {profile && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="h-8"
+                  >
+                    {saving ? <Loader2 className="size-4 animate-spin" /> : "Save"}
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  onClick={goNext}
+                  className="h-8"
+                >
+                  Next
+                </Button>
+              </>
             )}
           </div>
         </div>
