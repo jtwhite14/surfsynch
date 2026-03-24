@@ -54,7 +54,8 @@ export async function POST(
     }
 
     const inviteCode = generateInviteCode();
-    const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/${inviteCode}`;
+    const origin = new URL(request.url).origin;
+    const inviteUrl = `${origin}/invite/${inviteCode}`;
 
     const [share] = await db
       .insert(spotShares)
@@ -113,10 +114,11 @@ export async function GET(
       },
     });
 
+    const origin = new URL(request.url).origin;
     const sharesWithUrls = shares.map((share) => ({
       ...share,
       inviteUrl: !share.sharedWithUserId
-        ? `${process.env.NEXT_PUBLIC_APP_URL}/invite/${share.inviteCode}`
+        ? `${origin}/invite/${share.inviteCode}`
         : undefined,
     }));
 
