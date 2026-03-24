@@ -275,7 +275,7 @@ export default function SpotMap({
               anchor="center"
             >
               <svg width="12" height="12" viewBox="0 0 12 12">
-                <circle cx="6" cy="6" r="6" fill="#E2B714" />
+                <circle cx="6" cy="6" r="6" fill="white" fillOpacity={0.6} />
               </svg>
             </Marker>
           );
