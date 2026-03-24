@@ -10,8 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatDate } from "@/lib/utils/date";
 import {
   ArrowLeft,
-  ChevronDown,
-  ChevronUp,
+  CloudSun,
   Plus,
   Loader2,
   X,
@@ -67,7 +66,7 @@ export default function DashboardPage() {
   const [spots, setSpots] = useState<SurfSpot[]>([]);
   const [sessions, setSessions] = useState<SurfSessionWithConditions[]>([]);
   const [loading, setLoading] = useState(true);
-  const [alertsPanelOpen, setAlertsPanelOpen] = useState(true);
+  const [alertsForecastTab, setAlertsForecastTab] = useState<"alerts" | "forecast">("alerts");
   const [sessionsPanelOpen, setSessionsPanelOpen] = useState(true);
   const [sessionsTab, setSessionsTab] = useState<"sessions" | "spots" | "equipment">("sessions");
   const [surfboards, setSurfboards] = useState<Surfboard[]>([]);
@@ -1030,26 +1029,39 @@ export default function DashboardPage() {
             </>
           ) : (sessions.length > 0 || alertSummaries.length > 0 || sharedSpots.length > 0 || spots.length > 0 || surfboards.length > 0 || wetsuits.length > 0) ? (
             <>
-          {/* Alerts panel */}
+          {/* Alerts + Forecast tabbed panel */}
           <div className="rounded-lg border bg-background/90 backdrop-blur-sm shadow-lg overflow-hidden">
-            <div className="flex items-center border-b">
-              <span className="flex-1 px-4 py-2.5 text-sm font-medium text-foreground">
+            <div className="flex border-b">
+              <button
+                onClick={() => setAlertsForecastTab("alerts")}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-colors ${
+                  alertsForecastTab === "alerts"
+                    ? "text-foreground border-b-2 border-primary -mb-px"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Bell className="size-3.5" />
                 Alerts
                 {alertSummaries.length > 0 && (
-                  <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary/20 text-primary text-[10px] font-bold">
+                  <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary/20 text-primary text-[10px] font-bold">
                     {alertSummaries.length}
                   </span>
                 )}
-              </span>
+              </button>
               <button
-                onClick={() => setAlertsPanelOpen((o) => !o)}
-                className="px-3 py-2.5 hover:bg-accent/50 transition-colors"
+                onClick={() => setAlertsForecastTab("forecast")}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-colors ${
+                  alertsForecastTab === "forecast"
+                    ? "text-foreground border-b-2 border-primary -mb-px"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
               >
-                {alertsPanelOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                <CloudSun className="size-3.5" />
+                Forecast
               </button>
             </div>
 
-            {alertsPanelOpen && (
+            {alertsForecastTab === "alerts" ? (
               <div className="max-h-80 overflow-y-auto">
                 {alertSummaries.length === 0 ? (
                   <div className="px-4 py-6 text-center">
@@ -1123,19 +1135,21 @@ export default function DashboardPage() {
                   </>
                 )}
               </div>
+            ) : spots.length > 0 ? (
+              <ForecastCalendar
+                spots={spots.map(s => ({ id: s.id, name: s.name }))}
+                onSpotClick={(spotId) => {
+                  const spot = spots.find(s => s.id === spotId);
+                  if (spot) handleSpotClick(spot);
+                }}
+                embedded
+              />
+            ) : (
+              <div className="px-4 py-6 text-center">
+                <p className="text-sm text-muted-foreground">No spots added yet</p>
+              </div>
             )}
           </div>
-
-          {/* Forecast Calendar panel */}
-          {spots.length > 0 && (
-            <ForecastCalendar
-              spots={spots.map(s => ({ id: s.id, name: s.name }))}
-              onSpotClick={(spotId) => {
-                const spot = spots.find(s => s.id === spotId);
-                if (spot) handleSpotClick(spot);
-              }}
-            />
-          )}
 
           {/* Sessions / Spots panel */}
           {(sessions.length > 0 || spots.length > 0 || surfboards.length > 0 || wetsuits.length > 0) && (

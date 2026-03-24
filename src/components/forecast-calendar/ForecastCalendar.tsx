@@ -63,6 +63,7 @@ interface DisplayDay {
 interface ForecastCalendarProps {
   spots: { id: string; name: string }[];
   onSpotClick?: (spotId: string) => void;
+  embedded?: boolean;
 }
 
 const THRESHOLD = 70;
@@ -95,7 +96,7 @@ function flattenDays(apiDays: ApiCalendarDay[]): DisplayDay[] {
 
 // ── Main Component ──
 
-export function ForecastCalendar({ spots, onSpotClick }: ForecastCalendarProps) {
+export function ForecastCalendar({ spots, onSpotClick, embedded }: ForecastCalendarProps) {
   const [data, setData] = useState<ForecastCalendarData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedSpotId, setSelectedSpotId] = useState<string>("");
@@ -122,28 +123,30 @@ export function ForecastCalendar({ spots, onSpotClick }: ForecastCalendarProps) 
   const days = data ? flattenDays(data.days) : [];
 
   return (
-    <div className="rounded-lg border bg-background/90 backdrop-blur-sm shadow-lg overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b">
-        <h3 className="text-sm font-semibold">Forecast</h3>
-        {spots.length > 1 && (
-          <select
-            value={selectedSpotId}
-            onChange={(e) => {
-              setSelectedSpotId(e.target.value);
-              setExpandedCell(null);
-            }}
-            className="text-xs bg-transparent border-0 text-muted-foreground focus:outline-none cursor-pointer pr-4"
-          >
-            <option value="">All spots</option>
-            {spots.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
+    <div className={embedded ? "overflow-hidden" : "rounded-lg border bg-background/90 backdrop-blur-sm shadow-lg overflow-hidden"}>
+      {/* Header — spot filter only (hidden when embedded with single spot) */}
+      {(!embedded || spots.length > 1) && (
+        <div className={`flex items-center justify-between px-3 py-2 ${embedded ? "" : "border-b"}`}>
+          {!embedded && <h3 className="text-sm font-semibold">Forecast</h3>}
+          {spots.length > 1 && (
+            <select
+              value={selectedSpotId}
+              onChange={(e) => {
+                setSelectedSpotId(e.target.value);
+                setExpandedCell(null);
+              }}
+              className={`text-xs bg-transparent border-0 text-muted-foreground focus:outline-none cursor-pointer pr-4 ${embedded ? "ml-auto" : ""}`}
+            >
+              <option value="">All spots</option>
+              {spots.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
 
       {/* Loading skeleton */}
       {loading && (
