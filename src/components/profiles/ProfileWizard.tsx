@@ -6,8 +6,9 @@ import { ChevronLeft, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
 import { TideCurveSelector } from "@/components/profiles/TideCurveSelector";
-import type { CardinalDirection, ConditionProfileResponse, ExclusionZones } from "@/types";
-import { WEIGHT_PRESETS } from "@/types";
+import type { CardinalDirection, ConditionProfileResponse, ExclusionZones, WindSpeedTier } from "@/types";
+import { WEIGHT_PRESETS, WIND_SPEED_TIER_THRESHOLDS } from "@/types";
+import { WindRose, WindRoseValue } from "@/components/profiles/WindRose";
 import {
   WAVE_SIZE_MIDPOINTS,
   SWELL_PERIOD_MIDPOINTS,
@@ -162,9 +163,8 @@ type Step =
   | "exc_swellPeriod"
   | "swellDirection"
   | "exc_swellDirection"
-  | "windSpeed"
+  | "wind"
   | "exc_windSpeed"
-  | "windDirection"
   | "exc_windDirection"
   | "tide"
   | "exc_tide"
@@ -180,9 +180,8 @@ const BASE_STEPS: Step[] = [
   "exc_swellPeriod",
   "swellDirection",
   "exc_swellDirection",
-  "windSpeed",
+  "wind",
   "exc_windSpeed",
-  "windDirection",
   "exc_windDirection",
   "tide",
   "exc_tide",
@@ -205,9 +204,8 @@ const STEP_QUESTIONS: Record<Step, string> = {
   exc_swellPeriod: "What swell periods don't work?",
   swellDirection: "What direction should the swell come from?",
   exc_swellDirection: "What swell directions don't work?",
-  windSpeed: "What wind conditions work?",
+  wind: "How much wind can each direction handle?",
   exc_windSpeed: "What wind conditions don't work?",
-  windDirection: "What wind direction is best?",
   exc_windDirection: "What wind directions don't work?",
   tide: "What tide levels work?",
   exc_tide: "What tide levels don't work?",
@@ -283,10 +281,18 @@ export function ProfileWizard({
     }
     return [8, 16]; // sensible default
   });
-  const [windCondition, setWindCondition] = useState<string[]>(() => {
-    if (sel?.windCondition?.length) return sel.windCondition;
-    const cat = profile ? numericToCategory(profile.targetWindSpeed, WIND_SPEED_MIDPOINTS) : null;
-    return cat ? [cat] : [];
+  const [windRose, setWindRose] = useState<WindRoseValue>(() => {
+    if (sel?.windRose && Object.keys(sel.windRose).length > 0) return sel.windRose;
+    // Migrate from old windCondition + windDirection
+    if (sel?.windDirection?.length) {
+      const tier: WindSpeedTier = sel.windCondition?.includes("hard") ? "strong"
+        : sel.windCondition?.includes("medium") ? "moderate"
+        : sel.windCondition?.includes("glassy") ? "light" : "moderate";
+      const rose: WindRoseValue = {};
+      for (const d of sel.windDirection) rose[d as CardinalDirection] = tier;
+      return rose;
+    }
+    return {};
   });
   const [tideLevel, setTideLevel] = useState<string[]>(() => {
     if (sel?.tideLevel?.length) return sel.tideLevel;
@@ -296,10 +302,6 @@ export function ProfileWizard({
   const [swellDirection, setSwellDirection] = useState<CardinalDirection[]>(() => {
     if (sel?.swellDirection?.length) return sel.swellDirection as CardinalDirection[];
     return profile?.targetSwellDirection != null ? [degToCardinal(profile.targetSwellDirection)] : [];
-  });
-  const [windDirection, setWindDirection] = useState<CardinalDirection[]>(() => {
-    if (sel?.windDirection?.length) return sel.windDirection as CardinalDirection[];
-    return profile?.targetWindDirection != null ? [degToCardinal(profile.targetWindDirection)] : [];
   });
   const [tideCurveSegments, setTideCurveSegments] = useState<boolean[]>(() => {
     if (sel?.tideCurve?.segments) return sel.tideCurve.segments;
@@ -356,7 +358,7 @@ export function ProfileWizard({
   const currentStep = steps[stepIndex];
   const isFirst = stepIndex === 0;
   const isLast = stepIndex === steps.length - 1;
-  const isCompassStep = currentStep === "swellDirection" || currentStep === "windDirection"
+  const isCompassStep = currentStep === "swellDirection"
     || currentStep === "exc_swellDirection" || currentStep === "exc_windDirection";
   const isExclusionStep = EXCLUSION_STEPS.has(currentStep);
   const isSkippable = !isLast;
@@ -391,14 +393,12 @@ export function ProfileWizard({
     if (!onDirectionEditStart) return;
     if (step === "swellDirection") {
       onDirectionEditStart({ field: "swellDirection", selected: swellDirection, mode: "target" });
-    } else if (step === "windDirection") {
-      onDirectionEditStart({ field: "windDirection", selected: windDirection, mode: "target" });
     } else if (step === "exc_swellDirection") {
       onDirectionEditStart({ field: "excludeSwellDir", selected: excludeSwellDir, mode: "exclusion" });
     } else if (step === "exc_windDirection") {
       onDirectionEditStart({ field: "excludeWindDir", selected: excludeWindDir, mode: "exclusion" });
     }
-  }, [onDirectionEditStart, swellDirection, windDirection, excludeSwellDir, excludeWindDir]);
+  }, [onDirectionEditStart, swellDirection, excludeSwellDir, excludeWindDir]);
 
   // Activate compass when entering a compass step
   useEffect(() => {
@@ -415,7 +415,6 @@ export function ProfileWizard({
     if (!directionEditState) return;
     const { field, selected } = directionEditState;
     if (field === "swellDirection") setSwellDirection(selected);
-    if (field === "windDirection") setWindDirection(selected);
     if (field === "excludeSwellDir") setExcludeSwellDir(selected);
     if (field === "excludeWindDir") setExcludeWindDir(selected);
   }, [directionEditState]);
@@ -471,8 +470,16 @@ export function ProfileWizard({
       targetSwellHeight: feetToMeters(rangeMidFt),
       targetSwellPeriod: periodMid,
       targetSwellDirection: swellDirection.length > 0 ? avgCardinalDeg(swellDirection) : null,
-      targetWindSpeed: windCondition.length > 0 ? avgMidpoints(windCondition, WIND_SPEED_MIDPOINTS) : null,
-      targetWindDirection: windDirection.length > 0 ? avgCardinalDeg(windDirection) : null,
+      targetWindSpeed: (() => {
+        const tiers = Object.values(windRose) as WindSpeedTier[];
+        return tiers.length > 0
+          ? tiers.reduce((sum, t) => sum + WIND_SPEED_TIER_THRESHOLDS[t], 0) / tiers.length
+          : null;
+      })(),
+      targetWindDirection: (() => {
+        const dirs = Object.keys(windRose) as CardinalDirection[];
+        return dirs.length > 0 ? avgCardinalDeg(dirs) : null;
+      })(),
       targetTideHeight: tideCurveSegments.some(Boolean)
         ? tideCurveToHeight(tideCurveSegments)
         : tideLevel.length > 0 ? avgMidpoints(tideLevel, TIDE_HEIGHT_MIDPOINTS) : null,
@@ -505,8 +512,10 @@ export function ProfileWizard({
               max: swellPeriodRange[1] >= PERIOD_MAX ? null : swellPeriodRange[1],
             },
             swellDirection,
-            windCondition,
-            windDirection,
+            windRose,
+            // Backward-compat: derive old fields from windRose
+            windCondition: Object.keys(windRose).length > 0 ? ["offshore"] : [],
+            windDirection: Object.keys(windRose) as CardinalDirection[],
             tideLevel,
             tideCurve: tideCurveSegments.some(Boolean)
               ? { segments: tideCurveSegments }
@@ -645,40 +654,13 @@ export function ProfileWizard({
           </StepWithImportance>
         );
 
-      case "windSpeed":
+      case "wind":
         return (
           <StepWithImportance
             level={weightToLevel(wWindSpeed)}
-            onLevelChange={(l) => setWWindSpeed(levelToWeight(l))}
+            onLevelChange={(l) => { setWWindSpeed(levelToWeight(l)); setWWindDir(levelToWeight(l)); }}
           >
-            <div className="flex flex-wrap gap-2">
-              {WIND_OPTIONS.map(opt => (
-                <WizardPill key={opt.value} active={windCondition.includes(opt.value)} onClick={() => setWindCondition(togglePill(windCondition, opt.value))}>
-                  {opt.label}
-                </WizardPill>
-              ))}
-            </div>
-          </StepWithImportance>
-        );
-
-      case "windDirection":
-        return (
-          <StepWithImportance
-            level={weightToLevel(wWindDir)}
-            onLevelChange={(l) => setWWindDir(levelToWeight(l))}
-          >
-            <p className="text-xs text-muted-foreground">
-              Tap the compass wedges on the map to select directions
-            </p>
-            {windDirection.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {windDirection.map(d => (
-                  <span key={d} className="px-2 py-0.5 rounded-full text-xs font-medium border border-primary text-primary bg-primary/10">
-                    {d}
-                  </span>
-                ))}
-              </div>
-            )}
+            <WindRose value={windRose} onChange={setWindRose} />
           </StepWithImportance>
         );
 
