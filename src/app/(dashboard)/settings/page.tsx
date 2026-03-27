@@ -49,7 +49,7 @@ export default function SettingsPage() {
   // Admin mode
   const [adminStatus, setAdminStatus] = useState("");
   const [adminLoading, setAdminLoading] = useState<string | null>(null);
-  const isAdminUser = user?.primaryEmailAddress?.emailAddress === ADMIN_EMAIL;
+  const isAdminUser = user?.emailAddresses?.some(e => e.emailAddress === ADMIN_EMAIL) ?? false;
 
   async function handleAdminAction(action: string) {
     setAdminLoading(action);
@@ -416,6 +416,9 @@ export default function SettingsPage() {
           </p>
         </CardContent>
       </Card>
+
+      {/* DEBUG — remove after confirming */}
+      <p className="text-xs text-muted-foreground">email: {user?.emailAddresses?.map(e => e.emailAddress).join(", ") || "loading..."} | admin: {String(isAdminUser)}</p>
 
       {/* Admin Tools */}
       {isAdminUser && (
