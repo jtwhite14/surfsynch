@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUserId } from "@/lib/auth";
-import { db, surfSpots, surfSessions, sessionConditions, spotForecasts, spotAlerts, conditionProfiles } from "@/lib/db";
+import { db, surfSpots, surfSessions, sessionConditions, spotForecasts, spotAlerts, conditionProfiles, loggedFriendSessions } from "@/lib/db";
 import { eq, and, gte, inArray, sql } from "drizzle-orm";
 import { fetchMarineForecast } from "@/lib/api/open-meteo";
 import { fetchTideTimeline } from "@/lib/api/noaa-tides";
@@ -53,7 +53,28 @@ export async function POST(
       return NextResponse.json({ error: "Spot not found" }, { status: 404 });
     }
 
-    const sessionsWithConditions = spot.surfSessions.filter(s => s.conditions && !s.ignored);
+    let sessionsWithConditions = spot.surfSessions.filter(s => s.conditions && !s.ignored);
+
+    // Include logged friend sessions
+    const loggedEntries = await db.query.loggedFriendSessions.findMany({
+      where: eq(loggedFriendSessions.userId, userId),
+      with: {
+        session: {
+          with: {
+            conditions: true,
+            photos: {
+              limit: 1,
+            },
+          },
+        },
+      },
+    });
+
+    const friendSessions = loggedEntries
+      .filter((e) => e.session && e.session.spotId === id && e.session.rating >= 3 && e.session.conditions && !e.session.ignored)
+      .map((e) => e.session!);
+
+    sessionsWithConditions = [...sessionsWithConditions, ...friendSessions];
 
     // Load active profiles
     const activeProfiles = await db.query.conditionProfiles.findMany({

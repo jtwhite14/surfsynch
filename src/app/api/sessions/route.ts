@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUserId } from "@/lib/auth";
-import { db, surfSessions, sessionConditions, surfSpots, sessionPhotos, surfboards, wetsuits, uploadPhotos } from "@/lib/db";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { db, surfSessions, sessionConditions, surfSpots, sessionPhotos, surfboards, wetsuits, uploadPhotos, spotShares, users, loggedFriendSessions } from "@/lib/db";
+import { eq, and, desc, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import { fetchHistoricalConditions, fetchCurrentConditions } from "@/lib/api/open-meteo";
 
@@ -31,8 +31,8 @@ export async function GET(request: NextRequest) {
     const limit = searchParams.get("limit");
 
     if (sessionId) {
-      // Get single session with details
-      const surfSession = await db.query.surfSessions.findFirst({
+      // Get single session with details — own session first
+      let surfSession = await db.query.surfSessions.findFirst({
         where: and(
           eq(surfSessions.id, sessionId),
           eq(surfSessions.userId, userId)
@@ -46,7 +46,52 @@ export async function GET(request: NextRequest) {
         },
       });
 
+      // If not own session, check if it's a friend's session on a shared spot
       if (!surfSession) {
+        const friendSession = await db.query.surfSessions.findFirst({
+          where: eq(surfSessions.id, sessionId),
+          with: {
+            conditions: true,
+            spot: true,
+            photos: true,
+            surfboard: true,
+            wetsuit: true,
+            user: true,
+          },
+        });
+
+        if (friendSession) {
+          // Verify user has an accepted share for this spot
+          const share = await db.query.spotShares.findFirst({
+            where: and(
+              eq(spotShares.spotId, friendSession.spotId),
+              eq(spotShares.status, "accepted"),
+              or(
+                and(eq(spotShares.sharedByUserId, userId), eq(spotShares.sharedWithUserId, friendSession.userId)),
+                and(eq(spotShares.sharedByUserId, friendSession.userId), eq(spotShares.sharedWithUserId, userId))
+              )
+            ),
+          });
+
+          if (share && friendSession.user) {
+            // Check if added to log
+            const logged = await db.query.loggedFriendSessions.findFirst({
+              where: and(
+                eq(loggedFriendSessions.userId, userId),
+                eq(loggedFriendSessions.sessionId, sessionId)
+              ),
+            });
+
+            return NextResponse.json({
+              session: {
+                ...friendSession,
+                friendUser: { id: friendSession.user.id, name: friendSession.user.name, image: friendSession.user.image },
+                addedToLog: !!logged,
+              },
+            });
+          }
+        }
+
         return NextResponse.json({ error: "Session not found" }, { status: 404 });
       }
 
@@ -54,7 +99,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get all sessions for user (optionally filtered by spot)
-    const sessions = await db.query.surfSessions.findMany({
+    const ownSessions = await db.query.surfSessions.findMany({
       where: spotId
         ? and(eq(surfSessions.userId, userId), eq(surfSessions.spotId, spotId))
         : eq(surfSessions.userId, userId),
@@ -66,6 +111,66 @@ export async function GET(request: NextRequest) {
         photos: true,
       },
     });
+
+    // If filtering by spot, also fetch friend sessions from accepted shares
+    let friendSessionsList: typeof ownSessions & { friendUser?: { id: string; name: string | null; image: string | null }; addedToLog?: boolean }[] = [];
+    if (spotId) {
+      // Find accepted shares for this spot involving current user (either direction)
+      const acceptedShares = await db.query.spotShares.findMany({
+        where: and(
+          eq(spotShares.spotId, spotId),
+          eq(spotShares.status, "accepted"),
+          or(
+            eq(spotShares.sharedByUserId, userId),
+            eq(spotShares.sharedWithUserId, userId)
+          )
+        ),
+      });
+
+      // Collect friend user IDs (the other side of each share)
+      const friendUserIds = [...new Set(
+        acceptedShares.flatMap((s) => {
+          const ids: string[] = [];
+          if (s.sharedByUserId !== userId) ids.push(s.sharedByUserId);
+          if (s.sharedWithUserId && s.sharedWithUserId !== userId) ids.push(s.sharedWithUserId);
+          return ids;
+        })
+      )];
+
+      if (friendUserIds.length > 0) {
+        // Fetch friend sessions at this spot
+        const rawFriendSessions = await db.query.surfSessions.findMany({
+          where: and(
+            eq(surfSessions.spotId, spotId),
+            inArray(surfSessions.userId, friendUserIds)
+          ),
+          orderBy: [desc(surfSessions.date)],
+          with: {
+            conditions: true,
+            spot: true,
+            photos: true,
+            user: true,
+          },
+        });
+
+        // Check which friend sessions the current user has added to their log
+        const loggedEntries = await db.query.loggedFriendSessions.findMany({
+          where: eq(loggedFriendSessions.userId, userId),
+        });
+        const loggedSessionIds = new Set(loggedEntries.map((e) => e.sessionId));
+
+        friendSessionsList = rawFriendSessions.map((s) => ({
+          ...s,
+          friendUser: s.user ? { id: s.user.id, name: s.user.name, image: s.user.image } : undefined,
+          addedToLog: loggedSessionIds.has(s.id),
+        }));
+      }
+    }
+
+    // Merge and sort by date (interleaved)
+    const sessions = [...ownSessions, ...friendSessionsList].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
 
     return NextResponse.json({
       sessions,
@@ -90,13 +195,26 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validated = createSessionSchema.parse(body);
 
-    // Verify spot belongs to user
-    const spot = await db.query.surfSpots.findFirst({
+    // Verify spot belongs to user or user has an accepted share
+    let spot = await db.query.surfSpots.findFirst({
       where: and(
         eq(surfSpots.id, validated.spotId),
         eq(surfSpots.userId, userId)
       ),
     });
+
+    if (!spot) {
+      // Check if user has an accepted share for this spot
+      const share = await db.query.spotShares.findFirst({
+        where: and(
+          eq(spotShares.spotId, validated.spotId),
+          eq(spotShares.sharedWithUserId, userId),
+          eq(spotShares.status, "accepted")
+        ),
+        with: { spot: true },
+      });
+      spot = share?.spot ?? undefined;
+    }
 
     if (!spot) {
       return NextResponse.json({ error: "Spot not found" }, { status: 404 });

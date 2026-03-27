@@ -509,6 +509,31 @@ export const waitlist = pgTable("waitlist", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Logged Friend Sessions (opt-in to include a friend's session in matching)
+export const loggedFriendSessions = pgTable("logged_friend_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  sessionId: uuid("session_id")
+    .notNull()
+    .references(() => surfSessions.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("logged_friend_sessions_user_session_idx").on(table.userId, table.sessionId),
+]);
+
+export const loggedFriendSessionsRelations = relations(loggedFriendSessions, ({ one }) => ({
+  user: one(users, {
+    fields: [loggedFriendSessions.userId],
+    references: [users.id],
+  }),
+  session: one(surfSessions, {
+    fields: [loggedFriendSessions.sessionId],
+    references: [surfSessions.id],
+  }),
+}));
+
 // Condition history cache (heatmap scores)
 export const conditionHistoryCache = pgTable("condition_history_cache", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -537,6 +562,8 @@ export type UploadSession = typeof uploadSessions.$inferSelect;
 export type NewUploadSession = typeof uploadSessions.$inferInsert;
 export type UploadPhoto = typeof uploadPhotos.$inferSelect;
 export type NewUploadPhoto = typeof uploadPhotos.$inferInsert;
+export type LoggedFriendSession = typeof loggedFriendSessions.$inferSelect;
+export type NewLoggedFriendSession = typeof loggedFriendSessions.$inferInsert;
 export type SpotAlert = typeof spotAlerts.$inferSelect;
 export type NewSpotAlert = typeof spotAlerts.$inferInsert;
 export type ConditionProfile = typeof conditionProfiles.$inferSelect;

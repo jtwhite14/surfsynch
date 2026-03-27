@@ -11,7 +11,8 @@ import { SessionEditDialog } from "@/components/sessions/SessionEditDialog";
 import { toast } from "sonner";
 import { formatFullDate, formatTime } from "@/lib/utils/date";
 import { MarineConditions, SurfSessionWithConditions } from "@/types";
-import { ArrowLeft, MoreHorizontal } from "lucide-react";
+import { ArrowLeft, BookmarkPlus, BookmarkCheck, MoreHorizontal } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,6 +36,9 @@ export function SpotPaneSessionDetail({
   const [editOpen, setEditOpen] = useState(false);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [togglingLog, setTogglingLog] = useState(false);
+
+  const isFriendSession = !!session.friendUser;
 
   const photoCount = session?.photos?.length || (session?.photoUrl ? 1 : 0);
 
@@ -92,6 +96,25 @@ export function SpotPaneSessionDetail({
     }
   };
 
+  const handleToggleLog = async () => {
+    setTogglingLog(true);
+    try {
+      const method = session.addedToLog ? "DELETE" : "POST";
+      const res = await fetch(`/api/sessions/${session.id}/log`, { method });
+      if (res.ok) {
+        const updated = { ...session, addedToLog: !session.addedToLog };
+        onSessionUpdated(updated);
+        toast.success(session.addedToLog ? "Removed from your log" : "Added to your log");
+      } else {
+        toast.error("Failed to update log");
+      }
+    } catch {
+      toast.error("Failed to update log");
+    } finally {
+      setTogglingLog(false);
+    }
+  };
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const c: any = session.conditions;
   const conditions: MarineConditions | null = c
@@ -140,25 +163,60 @@ export function SpotPaneSessionDetail({
           <ArrowLeft className="size-4" />
           Back
         </button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="rounded-md p-2 hover:bg-accent transition-colors">
-              <MoreHorizontal className="size-4" />
+        {isFriendSession ? (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleToggleLog}
+              disabled={togglingLog}
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                session.addedToLog
+                  ? "bg-primary/10 text-primary hover:bg-primary/20"
+                  : "bg-accent hover:bg-accent/80 text-muted-foreground"
+              }`}
+            >
+              {session.addedToLog ? (
+                <><BookmarkCheck className="size-3.5" /> In your log</>
+              ) : (
+                <><BookmarkPlus className="size-3.5" /> Add to log</>
+              )}
             </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setEditOpen(true)}>
-              Edit session
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleToggleIgnore}>
-              {session.ignored ? "Unignore session" : "Ignore session"}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleDelete} className="text-destructive">
-              Delete session
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          </div>
+        ) : (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="rounded-md p-2 hover:bg-accent transition-colors">
+                <MoreHorizontal className="size-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                Edit session
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleToggleIgnore}>
+                {session.ignored ? "Unignore session" : "Ignore session"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+                Delete session
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
+
+      {/* Friend session banner */}
+      {isFriendSession && (
+        <div className="flex items-center gap-2 mx-3 mb-1 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
+          <Avatar className="size-6">
+            <AvatarImage src={session.friendUser!.image ?? undefined} />
+            <AvatarFallback className="text-[10px]">
+              {session.friendUser!.name?.charAt(0) ?? "?"}
+            </AvatarFallback>
+          </Avatar>
+          <span className="text-sm text-blue-600 dark:text-blue-400">
+            {session.friendUser!.name ?? "Friend"}&apos;s session
+          </span>
+        </div>
+      )}
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 pb-3 space-y-4">

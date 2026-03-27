@@ -44,6 +44,7 @@ import { IncomingInvites } from "@/components/sharing/IncomingInvites";
 import { SharedSpotsList } from "@/components/sharing/SharedSpotsList";
 import { SharedSpotPane } from "@/components/sharing/SharedSpotPane";
 import { SurfboardIcon } from "@/components/icons/SurfboardIcon";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { FiveStarHeatmap } from "@/components/spots/FiveStarHeatmap";
 import { GearModal } from "@/components/gear/GearModal";
 import { ForecastCalendar } from "@/components/forecast-calendar/ForecastCalendar";
@@ -797,18 +798,39 @@ export default function DashboardPage() {
                             className="block w-full text-left rounded-lg border bg-background/60 overflow-hidden hover:bg-accent/50 transition-colors"
                           >
                             {photo && (
-                              <div className="aspect-video w-full overflow-hidden">
+                              <div className="relative aspect-video w-full overflow-hidden">
                                 <img
                                   src={photo}
                                   alt={`Session on ${formatDate(session.date)}`}
                                   className="w-full h-full object-cover"
                                 />
+                                {session.friendUser && (
+                                  <Avatar className="absolute bottom-1.5 left-1.5 size-6 border-2 border-background shadow">
+                                    <AvatarImage src={session.friendUser.image ?? undefined} />
+                                    <AvatarFallback className="text-[10px]">
+                                      {session.friendUser.name?.charAt(0) ?? "?"}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                )}
                               </div>
                             )}
                             <div className="px-3 py-2.5">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-1.5 min-w-0">
+                                  {!photo && session.friendUser && (
+                                    <Avatar className="size-5 shrink-0">
+                                      <AvatarImage src={session.friendUser.image ?? undefined} />
+                                      <AvatarFallback className="text-[8px]">
+                                        {session.friendUser.name?.charAt(0) ?? "?"}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                  )}
                                   <p className="font-medium text-sm">{formatDate(session.date)}</p>
+                                  {session.friendUser && (
+                                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 shrink-0">
+                                      {session.friendUser.name?.split(" ")[0] ?? "Friend"}
+                                    </span>
+                                  )}
                                   {session.ignored && (
                                     <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 shrink-0">
                                       Ignored
@@ -908,17 +930,33 @@ export default function DashboardPage() {
                                 className="block w-full text-left rounded-lg border bg-background/60 overflow-hidden hover:bg-accent/50 transition-colors"
                               >
                                 {photo && (
-                                  <div className="aspect-video w-full overflow-hidden">
+                                  <div className="relative aspect-video w-full overflow-hidden">
                                     <img
                                       src={photo}
                                       alt={`Session on ${formatDate(session.date)}`}
                                       className="w-full h-full object-cover"
                                     />
+                                    {session.friendUser && (
+                                      <Avatar className="absolute bottom-1.5 left-1.5 size-5 border-2 border-background shadow">
+                                        <AvatarImage src={session.friendUser.image ?? undefined} />
+                                        <AvatarFallback className="text-[8px]">
+                                          {session.friendUser.name?.charAt(0) ?? "?"}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                    )}
                                   </div>
                                 )}
                                 <div className="px-3 py-2">
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-1.5 min-w-0">
+                                      {!photo && session.friendUser && (
+                                        <Avatar className="size-4 shrink-0">
+                                          <AvatarImage src={session.friendUser.image ?? undefined} />
+                                          <AvatarFallback className="text-[7px]">
+                                            {session.friendUser.name?.charAt(0) ?? "?"}
+                                          </AvatarFallback>
+                                        </Avatar>
+                                      )}
                                       <p className="font-medium text-sm truncate">{formatDate(session.date)}</p>
                                       {session.ignored && (
                                         <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 shrink-0">

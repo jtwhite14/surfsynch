@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUserId } from "@/lib/auth";
-import { db, surfSpots, surfSessions, sessionConditions, spotAlerts } from "@/lib/db";
+import { db, surfSpots, surfSessions, sessionConditions, spotAlerts, spotShares, users } from "@/lib/db";
 import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 
@@ -51,7 +51,26 @@ export async function GET(request: NextRequest) {
       orderBy: [desc(surfSpots.createdAt)],
     });
 
-    return NextResponse.json({ spots });
+    // Include shared spots if requested (for session form spot picker)
+    const includeShared = searchParams.get("includeShared") === "true";
+    let sharedSpots: Array<typeof spots[number] & { sharedByName: string | null }> = [];
+    if (includeShared) {
+      const acceptedShares = await db.query.spotShares.findMany({
+        where: and(
+          eq(spotShares.sharedWithUserId, userId),
+          eq(spotShares.status, "accepted")
+        ),
+        with: {
+          spot: true,
+          sharedBy: true,
+        },
+      });
+      sharedSpots = acceptedShares
+        .filter((s) => s.spot && !spots.some((own) => own.id === s.spot.id))
+        .map((s) => ({ ...s.spot, sharedByName: s.sharedBy?.name ?? null }));
+    }
+
+    return NextResponse.json({ spots, sharedSpots });
   } catch (error) {
     console.error("Error fetching spots:", error);
     return NextResponse.json(

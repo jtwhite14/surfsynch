@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, surfSpots, surfSessions, sessionConditions, spotForecasts, spotAlerts, users, conditionProfiles } from "@/lib/db";
+import { db, surfSpots, surfSessions, sessionConditions, spotForecasts, spotAlerts, users, conditionProfiles, loggedFriendSessions } from "@/lib/db";
 import { eq, gte, and, inArray, isNull, sql } from "drizzle-orm";
 import { sendAlertSMS } from "@/lib/sms/send-alert-sms";
 import { haversineDistance, getDistancePenalty, getRarityBoost } from "@/lib/utils/geo";
@@ -56,6 +56,27 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // Batch-fetch all logged friend sessions (one query for all users/spots)
+    const allLoggedFriend = await db.query.loggedFriendSessions.findMany({
+      with: {
+        session: {
+          with: {
+            conditions: true,
+            photos: { limit: 1 },
+          },
+        },
+      },
+    });
+
+    // Group by (userId, spotId) for O(1) lookup
+    const loggedByUserSpot = new Map<string, typeof allLoggedFriend>();
+    for (const entry of allLoggedFriend) {
+      if (!entry.session || !entry.session.conditions || entry.session.ignored || entry.session.rating < 3) continue;
+      const key = `${entry.userId}:${entry.session.spotId}`;
+      if (!loggedByUserSpot.has(key)) loggedByUserSpot.set(key, []);
+      loggedByUserSpot.get(key)!.push(entry);
+    }
+
     let totalAlerts = 0;
 
     // Process spots in batches of 3 — each spot makes multiple Open-Meteo
@@ -64,7 +85,11 @@ export async function GET(request: NextRequest) {
     for (let i = 0; i < allSpots.length; i += BATCH_SIZE) {
       const batch = allSpots.slice(i, i + BATCH_SIZE);
       const results = await Promise.allSettled(
-        batch.map(spot => processSpot(spot))
+        batch.map(spot => {
+          const friendEntries = loggedByUserSpot.get(`${spot.userId}:${spot.id}`) || [];
+          const friendSessions = friendEntries.map((e) => e.session!);
+          return processSpot(spot, friendSessions);
+        })
       );
       for (const result of results) {
         if (result.status === 'fulfilled') {
@@ -129,8 +154,11 @@ async function processSpot(spot: {
       waveEnergy: string | null;
     } | null;
   }>;
-}): Promise<number> {
-  const sessionsWithConditions = spot.surfSessions.filter(s => s.conditions && !s.ignored);
+}, friendSessions: Array<typeof spot.surfSessions[number]> = []): Promise<number> {
+  const sessionsWithConditions = [
+    ...spot.surfSessions.filter(s => s.conditions && !s.ignored),
+    ...friendSessions,
+  ];
 
   // Load active profiles for this spot
   const activeProfiles = await db.query.conditionProfiles.findMany({

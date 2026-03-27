@@ -426,4 +426,10 @@ export interface SurfSessionWithConditions {
     latitude: string;
     longitude: string;
   };
+  friendUser?: {
+    id: string;
+    name: string | null;
+    image: string | null;
+  };
+  addedToLog?: boolean;
 }
