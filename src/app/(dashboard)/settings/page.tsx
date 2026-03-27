@@ -9,7 +9,9 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { MapPin, Phone, Search } from "lucide-react";
+import { Copy, Loader2, MapPin, Phone, Search, Shield } from "lucide-react";
+
+const ADMIN_EMAIL = "jtwhite14@gmail.com";
 
 
 const SpotMap = dynamic(() => import("@/components/map/SpotMap"), { ssr: false });
@@ -43,6 +45,34 @@ export default function SettingsPage() {
   const [smsEnabled, setSmsEnabled] = useState(false);
   const [phoneLoading, setPhoneLoading] = useState(true);
   const [phoneSaving, setPhoneSaving] = useState(false);
+
+  // Admin mode
+  const [adminStatus, setAdminStatus] = useState("");
+  const [adminLoading, setAdminLoading] = useState<string | null>(null);
+  const isAdminUser = user?.primaryEmailAddress?.emailAddress === ADMIN_EMAIL;
+
+  async function handleAdminAction(action: string) {
+    setAdminLoading(action);
+    setAdminStatus("");
+    try {
+      const res = await fetch("/api/admin/seed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      setAdminStatus(data.message || "Done");
+      if (data.inviteUrl) {
+        await navigator.clipboard.writeText(data.inviteUrl);
+        setAdminStatus(`${data.message} — copied to clipboard`);
+      }
+    } catch (err) {
+      setAdminStatus(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setAdminLoading(null);
+    }
+  }
 
   // Track saved values to detect changes
   const [savedPhone, setSavedPhone] = useState("");
@@ -386,6 +416,45 @@ export default function SettingsPage() {
           </p>
         </CardContent>
       </Card>
+
+      {/* Admin Tools */}
+      {isAdminUser && (
+        <Card className="border-yellow-500/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="size-5 text-yellow-500" />
+              Admin Tools
+            </CardTitle>
+            <CardDescription>Seed test data for end-to-end testing</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleAdminAction("alerts")}
+                disabled={adminLoading !== null}
+              >
+                {adminLoading === "alerts" ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
+                Compute Alerts
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleAdminAction("share")}
+                disabled={adminLoading !== null}
+              >
+                {adminLoading === "share" ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
+                <Copy className="size-3.5 mr-1.5" />
+                Share Link
+              </Button>
+            </div>
+            {adminStatus && (
+              <p className="text-sm text-muted-foreground">{adminStatus}</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
