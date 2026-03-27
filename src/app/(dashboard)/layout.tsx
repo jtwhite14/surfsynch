@@ -28,8 +28,8 @@ import {
   X,
   Plus,
   MapPin,
-  Shirt,
 } from "lucide-react";
+import { SurfboardIcon } from "@/components/icons/SurfboardIcon";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: Map },
@@ -272,7 +272,7 @@ function SidebarContent({
               className="flex items-center gap-2 cursor-pointer"
               onClick={() => window.dispatchEvent(new CustomEvent("open-gear-modal"))}
             >
-              <Shirt className="size-4" />
+              <SurfboardIcon className="size-4" />
               Add Gear
             </DropdownMenuItem>
           </DropdownMenuContent>

@@ -99,17 +99,13 @@ function flattenDays(apiDays: ApiCalendarDay[]): DisplayDay[] {
 export function ForecastCalendar({ spots, onSpotClick, embedded }: ForecastCalendarProps) {
   const [data, setData] = useState<ForecastCalendarData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedSpotId, setSelectedSpotId] = useState<string>("");
   const [expandedCell, setExpandedCell] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
     const controller = new AbortController();
-    const params = new URLSearchParams();
-    if (selectedSpotId) params.set("spotId", selectedSpotId);
-    const url = `/api/forecast-calendar${params.toString() ? `?${params}` : ""}`;
 
-    fetch(url, { signal: controller.signal })
+    fetch("/api/forecast-calendar", { signal: controller.signal })
       .then((res) => (res.ok ? res.json() : null))
       .then((d) => setData(d))
       .catch((err) => {
@@ -118,33 +114,16 @@ export function ForecastCalendar({ spots, onSpotClick, embedded }: ForecastCalen
       .finally(() => setLoading(false));
 
     return () => controller.abort();
-  }, [selectedSpotId]);
+  }, []);
 
   const days = data ? flattenDays(data.days) : [];
 
   return (
     <div className={embedded ? "overflow-hidden" : "rounded-lg border bg-background/90 backdrop-blur-sm shadow-lg overflow-hidden"}>
-      {/* Header — spot filter only (hidden when embedded with single spot) */}
-      {(!embedded || spots.length > 1) && (
-        <div className={`flex items-center justify-between px-3 py-2 ${embedded ? "" : "border-b"}`}>
-          {!embedded && <h3 className="text-sm font-semibold">Forecast</h3>}
-          {spots.length > 1 && (
-            <select
-              value={selectedSpotId}
-              onChange={(e) => {
-                setSelectedSpotId(e.target.value);
-                setExpandedCell(null);
-              }}
-              className={`text-xs bg-transparent border-0 text-muted-foreground focus:outline-none cursor-pointer pr-4 ${embedded ? "ml-auto" : ""}`}
-            >
-              <option value="">All spots</option>
-              {spots.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          )}
+      {/* Header (non-embedded only) */}
+      {!embedded && (
+        <div className="flex items-center justify-between px-3 py-2 border-b">
+          <h3 className="text-sm font-semibold">Forecast</h3>
         </div>
       )}
 
