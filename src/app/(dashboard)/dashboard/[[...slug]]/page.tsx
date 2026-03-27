@@ -23,6 +23,8 @@ import {
   Bell,
   Target,
   Share2,
+  Waves,
+  Shirt,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -1154,49 +1156,40 @@ export default function DashboardPage() {
           {/* Sessions / Spots panel */}
           {(sessions.length > 0 || spots.length > 0 || surfboards.length > 0 || wetsuits.length > 0) && (
             <div className="rounded-lg border bg-background/90 backdrop-blur-sm shadow-lg overflow-hidden">
-              <div className="flex items-center border-b">
+              <div className="flex border-b">
                 <button
                   onClick={() => { setSessionsTab("sessions"); setSessionsPanelOpen(true); }}
-                  className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
-                    sessionsTab === "sessions" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-colors ${
+                    sessionsTab === "sessions"
+                      ? "text-foreground border-b-2 border-primary -mb-px"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
+                  <Waves className="size-3.5" />
                   Sessions
                 </button>
                 <button
                   onClick={() => { setSessionsTab("spots"); setSessionsPanelOpen(true); }}
-                  className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
-                    sessionsTab === "spots" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-colors ${
+                    sessionsTab === "spots"
+                      ? "text-foreground border-b-2 border-primary -mb-px"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
+                  <MapPin className="size-3.5" />
                   Spots
                 </button>
                 <button
                   onClick={() => { setSessionsTab("equipment"); setSessionsPanelOpen(true); }}
-                  className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
-                    sessionsTab === "equipment" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-colors ${
+                    sessionsTab === "equipment"
+                      ? "text-foreground border-b-2 border-primary -mb-px"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
+                  <Shirt className="size-3.5" />
                   Gear
                 </button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="px-3 py-2.5 hover:bg-accent/50 transition-colors">
-                      <Plus className="size-4" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent side="right" align="start" collisionPadding={16}>
-                    <DropdownMenuItem onClick={() => router.push("/sessions/new")}>
-                      New Session
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleStartAddSpot()}>
-                      New Spot
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setGearModalOpen(true)}>
-                      Manage Gear
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
               </div>
 
               {sessionsPanelOpen && sessionsTab === "sessions" && (
