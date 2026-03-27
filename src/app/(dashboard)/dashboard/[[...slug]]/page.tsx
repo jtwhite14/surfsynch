@@ -353,6 +353,13 @@ export default function DashboardPage() {
     return () => window.removeEventListener("start-add-spot", handler);
   }, []);
 
+  // Listen for "Add Gear" from sidebar
+  useEffect(() => {
+    const handler = () => setGearModalOpen(true);
+    window.addEventListener("open-gear-modal", handler);
+    return () => window.removeEventListener("open-gear-modal", handler);
+  }, []);
+
   // Handle browser back/forward
   useEffect(() => {
     const handlePopState = () => {

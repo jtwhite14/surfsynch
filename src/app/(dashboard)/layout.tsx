@@ -28,6 +28,7 @@ import {
   X,
   Plus,
   MapPin,
+  Shirt,
 } from "lucide-react";
 
 const navigation = [
@@ -266,6 +267,13 @@ function SidebarContent({
             >
               <MapPin className="size-4" />
               Add Spot
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="flex items-center gap-2 cursor-pointer"
+              onClick={() => window.dispatchEvent(new CustomEvent("open-gear-modal"))}
+            >
+              <Shirt className="size-4" />
+              Add Gear
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
