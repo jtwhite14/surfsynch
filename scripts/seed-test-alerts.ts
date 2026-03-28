@@ -17,42 +17,46 @@ function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-/** Build a realistic forecastSnapshot for a coastal location */
-function buildForecastSnapshot(lat: number) {
-  const isNorthern = lat > 0;
-  // March temps: cold in northern latitudes
-  const baseAirTemp = isNorthern ? randomFloat(-2, 12) : randomFloat(15, 25);
+/** Small jitter around a base value */
+function jitter(base: number, range: number): number {
+  return parseFloat((base + randomFloat(-range, range)).toFixed(2));
+}
 
-  const swellHeight = randomFloat(0.6, 2.5);
-  const swellPeriod = randomFloat(7, 16);
+/** Build a forecast snapshot with small variations from a base swell event */
+function buildForecastSnapshot(base: {
+  swellHeight: number; swellPeriod: number; swellDir: number;
+  windSpeed: number; windDir: number; airTemp: number; tideHeight: number;
+}) {
+  const swellHeight = jitter(base.swellHeight, 0.15);
+  const swellPeriod = jitter(base.swellPeriod, 0.8);
   const waveEnergy = 0.5 * 1025 * 9.81 * swellHeight * swellHeight * swellPeriod;
 
   return {
-    waveHeight: parseFloat(randomFloat(0.5, 2.8).toFixed(2)),
-    wavePeriod: parseFloat(randomFloat(6, 14).toFixed(1)),
-    waveDirection: parseFloat(randomFloat(180, 300).toFixed(0)),
-    primarySwellHeight: parseFloat(swellHeight.toFixed(2)),
-    primarySwellPeriod: parseFloat(swellPeriod.toFixed(1)),
-    primarySwellDirection: parseFloat(randomFloat(180, 310).toFixed(0)),
-    secondarySwellHeight: Math.random() > 0.4 ? parseFloat(randomFloat(0.2, 0.8).toFixed(2)) : null,
-    secondarySwellPeriod: Math.random() > 0.4 ? parseFloat(randomFloat(5, 10).toFixed(1)) : null,
-    secondarySwellDirection: Math.random() > 0.4 ? parseFloat(randomFloat(150, 280).toFixed(0)) : null,
-    windWaveHeight: parseFloat(randomFloat(0.1, 0.6).toFixed(2)),
-    windWavePeriod: parseFloat(randomFloat(3, 6).toFixed(1)),
-    windWaveDirection: parseFloat(randomFloat(180, 350).toFixed(0)),
-    windSpeed: parseFloat(randomFloat(2, 25).toFixed(1)),
-    windDirection: parseFloat(randomFloat(0, 360).toFixed(0)),
-    windGust: parseFloat(randomFloat(5, 35).toFixed(1)),
-    airTemp: parseFloat(baseAirTemp.toFixed(1)),
-    seaSurfaceTemp: parseFloat((baseAirTemp + randomFloat(1, 5)).toFixed(1)),
-    humidity: parseFloat(randomFloat(55, 95).toFixed(0)),
-    precipitation: parseFloat((Math.random() > 0.7 ? randomFloat(0.1, 2) : 0).toFixed(1)),
-    pressureMsl: parseFloat(randomFloat(1005, 1030).toFixed(1)),
-    cloudCover: parseFloat(randomFloat(0, 100).toFixed(0)),
-    visibility: parseFloat(randomFloat(10, 50).toFixed(0)),
-    tideHeight: parseFloat(randomFloat(-0.5, 1.5).toFixed(2)),
+    waveHeight: jitter(swellHeight + 0.2, 0.1),
+    wavePeriod: jitter(swellPeriod - 1, 0.5),
+    waveDirection: jitter(base.swellDir, 10),
+    primarySwellHeight: swellHeight,
+    primarySwellPeriod: swellPeriod,
+    primarySwellDirection: jitter(base.swellDir, 8),
+    secondarySwellHeight: jitter(0.4, 0.1),
+    secondarySwellPeriod: jitter(7, 0.5),
+    secondarySwellDirection: jitter(base.swellDir + 40, 10),
+    windWaveHeight: jitter(0.25, 0.1),
+    windWavePeriod: jitter(4, 0.5),
+    windWaveDirection: jitter(base.windDir, 15),
+    windSpeed: jitter(base.windSpeed, 2),
+    windDirection: jitter(base.windDir, 12),
+    windGust: jitter(base.windSpeed + 5, 3),
+    airTemp: jitter(base.airTemp, 1),
+    seaSurfaceTemp: jitter(base.airTemp + 3, 0.5),
+    humidity: jitter(72, 8),
+    precipitation: 0,
+    pressureMsl: jitter(1018, 3),
+    cloudCover: jitter(30, 15),
+    visibility: jitter(35, 5),
+    tideHeight: jitter(base.tideHeight, 0.3),
     waveEnergy: parseFloat(waveEnergy.toFixed(1)),
-    weatherCode: pick([0, 1, 2, 3, 45, 51, 61]),
+    weatherCode: pick([0, 1, 2]),
     isDay: true,
     timestamp: new Date().toISOString(),
   };
@@ -140,84 +144,78 @@ async function main() {
   console.log("Cleared existing test alerts\n");
 
   const now = new Date();
-  const timeWindows = ["dawn", "midday", "afternoon"] as const;
+
+  // Base swell event — all 5 alerts share similar conditions (same swell hitting the coast)
+  const baseConditions = {
+    swellHeight: 1.4,
+    swellPeriod: 12,
+    swellDir: 210,
+    windSpeed: 8,
+    windDir: 340,
+    airTemp: 5,
+    tideHeight: 0.6,
+  };
+
+  // 5 alerts: spread across a few spots, different days/windows
+  const alertDefs = [
+    { daysOut: 0, timeWindow: "dawn"      as const, hour: 6  },
+    { daysOut: 1, timeWindow: "dawn"      as const, hour: 7  },
+    { daysOut: 1, timeWindow: "midday"    as const, hour: 11 },
+    { daysOut: 2, timeWindow: "dawn"      as const, hour: 6  },
+    { daysOut: 3, timeWindow: "afternoon" as const, hour: 15 },
+  ];
+
+  // Distribute alerts across spots (round-robin)
   let alertCount = 0;
 
-  for (const spot of spots) {
-    const lat = parseFloat(spot.latitude);
+  for (let i = 0; i < alertDefs.length; i++) {
+    const def = alertDefs[i];
+    const spot = spots[i % spots.length];
     const spotSessions = sessions.filter(s => s.spotId === spot.id);
 
-    // Generate 3-8 alerts per spot, spread over the next 5 days
-    const numAlerts = randomInt(3, 8);
-    console.log(`${spot.name}: generating ${numAlerts} alerts...`);
+    const forecastDate = new Date(now);
+    forecastDate.setDate(forecastDate.getDate() + def.daysOut);
+    forecastDate.setHours(def.hour, 0, 0, 0);
 
-    // Track used (day, timeWindow) combos for uniqueness
-    const usedCombos = new Set<string>();
+    const matchedSession = spotSessions.length > 0 ? pick(spotSessions) : null;
+    const sessionRating = matchedSession?.rating ?? 4;
 
-    for (let i = 0; i < numAlerts; i++) {
-      const daysOut = randomInt(0, 4);
-      const timeWindow = pick([...timeWindows]);
-      const comboKey = `${daysOut}-${timeWindow}`;
+    const matchScore = randomFloat(78, 94);
+    const forecastConfidence =
+      def.daysOut <= 1 ? 1.0 :
+      def.daysOut <= 2 ? 0.95 :
+      def.daysOut <= 3 ? 0.9 : 0.8;
+    const ratingBoost = sessionRating === 5 ? 1.0 : sessionRating === 4 ? 0.95 : 0.85;
+    const confidenceScore = matchScore * forecastConfidence;
+    const effectiveScore = matchScore * forecastConfidence * ratingBoost;
 
-      if (usedCombos.has(comboKey)) continue;
-      usedCombos.add(comboKey);
+    const forecastSnapshot = buildForecastSnapshot(baseConditions);
+    const matchDetails = buildMatchDetails(effectiveScore, def.daysOut, sessionRating);
 
-      // Build the forecast hour
-      const forecastDate = new Date(now);
-      forecastDate.setDate(forecastDate.getDate() + daysOut);
-      const windowHours = {
-        dawn: randomInt(5, 8),
-        midday: randomInt(9, 13),
-        afternoon: randomInt(14, 19),
-      };
-      forecastDate.setHours(windowHours[timeWindow], 0, 0, 0);
+    await db.insert(schema.spotAlerts).values({
+      spotId: spot.id,
+      userId: testUser.id,
+      forecastHour: forecastDate,
+      timeWindow: def.timeWindow,
+      matchScore: matchScore.toFixed(2),
+      confidenceScore: confidenceScore.toFixed(2),
+      effectiveScore: effectiveScore.toFixed(2),
+      matchedSessionId: matchedSession?.id ?? null,
+      matchedProfileId: null,
+      matchDetails,
+      forecastSnapshot,
+      status: "active",
+      expiresAt: forecastDate,
+    });
 
-      // Pick a matched session from this spot (if available)
-      const matchedSession = spotSessions.length > 0 ? pick(spotSessions) : null;
-      const sessionRating = matchedSession?.rating ?? pick([3, 4, 5]);
-
-      // Generate scores - effective must be >= 70 to be a valid alert
-      const matchScore = randomFloat(75, 97);
-      const forecastConfidence =
-        daysOut <= 1 ? 1.0 :
-        daysOut <= 2 ? 0.95 :
-        daysOut <= 3 ? 0.9 :
-        daysOut <= 4 ? 0.8 : 0.7;
-      const ratingBoost = sessionRating === 5 ? 1.0 : sessionRating === 4 ? 0.95 : 0.85;
-      const confidenceScore = matchScore * forecastConfidence;
-      const effectiveScore = matchScore * forecastConfidence * ratingBoost;
-
-      // Only keep if effective score >= 70
-      if (effectiveScore < 70) continue;
-
-      const forecastSnapshot = buildForecastSnapshot(lat);
-      const matchDetails = buildMatchDetails(effectiveScore, daysOut, sessionRating);
-
-      await db.insert(schema.spotAlerts).values({
-        spotId: spot.id,
-        userId: testUser.id,
-        forecastHour: forecastDate,
-        timeWindow,
-        matchScore: matchScore.toFixed(2),
-        confidenceScore: confidenceScore.toFixed(2),
-        effectiveScore: effectiveScore.toFixed(2),
-        matchedSessionId: matchedSession?.id ?? null,
-        matchedProfileId: null,
-        matchDetails,
-        forecastSnapshot,
-        status: "active",
-        expiresAt: forecastDate,
-      });
-
-      alertCount++;
-      const scoreStr = effectiveScore.toFixed(0);
-      const wave = forecastSnapshot.primarySwellHeight;
-      const wind = forecastSnapshot.windSpeed;
-      console.log(`  +${daysOut}d ${timeWindow.padEnd(9)} → ${scoreStr}% (wave: ${wave}m, wind: ${wind}km/h, rating: ${sessionRating}★)`);
-    }
+    alertCount++;
+    const scoreStr = effectiveScore.toFixed(0);
+    const wave = forecastSnapshot.primarySwellHeight;
+    const wind = forecastSnapshot.windSpeed;
+    console.log(`  ${spot.name} +${def.daysOut}d ${def.timeWindow.padEnd(9)} → ${scoreStr}% (swell: ${wave}m @ ${forecastSnapshot.primarySwellPeriod}s, wind: ${wind}km/h)`);
   }
 
-  console.log(`\nDone: created ${alertCount} alerts across ${spots.length} spots`);
+  console.log(`\nDone: created ${alertCount} alerts`);
   await client.end();
 }
 
