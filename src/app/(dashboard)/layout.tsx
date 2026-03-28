@@ -50,6 +50,7 @@ export default function DashboardLayout({
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [testMode, setTestMode] = useState(false);
+  const [bannerHidden, setBannerHidden] = useState(false);
 
   useEffect(() => {
     fetch("/api/admin/impersonate").then(r => r.json()).then(d => setTestMode(d.active)).catch(() => {});
@@ -173,7 +174,7 @@ export default function DashboardLayout({
             </Link>
           </header>
 
-          {testMode && (
+          {testMode && !bannerHidden && (
             <div className="flex items-center justify-center gap-2 bg-yellow-500/15 border-b border-yellow-500/30 px-4 py-1.5 text-xs font-medium text-yellow-700 dark:text-yellow-400">
               <Shield className="size-3.5" />
               Test Account — data here is separate from your real account
@@ -185,6 +186,13 @@ export default function DashboardLayout({
                 className="ml-2 underline hover:no-underline"
               >
                 Exit
+              </button>
+              <button
+                onClick={() => setBannerHidden(true)}
+                className="ml-1 rounded p-0.5 hover:bg-yellow-500/20"
+                aria-label="Hide banner"
+              >
+                <X className="size-3" />
               </button>
             </div>
           )}
