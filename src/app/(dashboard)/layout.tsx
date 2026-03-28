@@ -188,7 +188,10 @@ export default function DashboardLayout({
                 Exit
               </button>
               <button
-                onClick={() => setBannerHidden(true)}
+                onClick={() => {
+                  setBannerHidden(true);
+                  requestAnimationFrame(() => window.dispatchEvent(new Event("resize")));
+                }}
                 className="ml-1 rounded p-0.5 hover:bg-yellow-500/20"
                 aria-label="Hide banner"
               >
