@@ -66,6 +66,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const params = useParams<{ slug?: string[] }>();
   const searchParams = useSearchParams();
+  const openShareHandled = useRef(false);
   const initialSlug = useRef(params.slug);
   const [spots, setSpots] = useState<SurfSpot[]>([]);
   const [sessions, setSessions] = useState<SurfSessionWithConditions[]>([]);
@@ -506,14 +507,14 @@ export default function DashboardPage() {
 
   // Auto-open shared spot from invite onboarding redirect
   useEffect(() => {
-    if (loading || sharedSpots.length === 0) return;
+    if (loading || sharedSpots.length === 0 || openShareHandled.current) return;
     const openShareId = searchParams.get("openShare");
     if (!openShareId) return;
+    openShareHandled.current = true;
     const match = sharedSpots.find((s) => s.shareId === openShareId);
     if (match) {
       setSelectedSharedSpot(match);
     }
-    // Clean up the URL
     router.replace("/dashboard");
   }, [loading, sharedSpots, searchParams, router]);
 

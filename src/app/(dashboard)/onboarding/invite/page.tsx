@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, MapPin, Phone, Search, Waves } from "lucide-react";
+import { Loader2, MapPin, Phone, Search } from "lucide-react";
 import { toast } from "sonner";
 import { formatPhoneDisplay, toE164 } from "@/lib/utils/phone";
 
@@ -39,20 +39,15 @@ export default function InviteOnboardingPage() {
   const phoneE164 = toE164(phoneDisplay);
   const phoneValid = phoneE164.length === 12;
 
-  // If no shareId in URL, fetch from onboarding check as fallback
+  // If no shareId in URL, fetch most recent accepted share as fallback (e.g. page refresh)
   useEffect(() => {
     if (shareId) return;
-    fetch("/api/onboarding/check")
-      .then((r) => r.json())
+    fetch("/api/shares/spots")
+      .then((r) => (r.ok ? r.json() : { sharedSpots: [] }))
       .then((data) => {
-        if (data.onboardingUrl) {
-          const url = new URL(data.onboardingUrl, window.location.origin);
-          const id = url.searchParams.get("shareId");
-          if (id) {
-            setShareId(id);
-          } else {
-            router.push("/dashboard");
-          }
+        const spots = data.sharedSpots || [];
+        if (spots.length > 0) {
+          setShareId(spots[0].shareId);
         } else {
           router.push("/dashboard");
         }
