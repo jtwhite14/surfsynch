@@ -183,7 +183,7 @@ export function SpotSharePanel({ spotId, spotName, onBack }: SpotSharePanelProps
 }
 
 async function copyShareLink(url: string, spotName: string) {
-  const text = `Check out this surf spot on Wavebook: ${url}`;
+  const text = `You've been invited to ${spotName}: ${url}`;
   try {
     await navigator.clipboard.writeText(text);
     toast.success("Link copied to clipboard!");
