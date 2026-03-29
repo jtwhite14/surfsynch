@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUserId } from "@/lib/auth";
+import { getAuthUserId, getAccessibleSpot } from "@/lib/auth";
 import { db, surfSpots } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { fetchHourlyTimeline } from "@/lib/api/open-meteo";
@@ -16,12 +16,7 @@ export async function GET(
 
     const { id } = await params;
 
-    const spot = await db.query.surfSpots.findFirst({
-      where: and(
-        eq(surfSpots.id, id),
-        eq(surfSpots.userId, userId)
-      ),
-    });
+    const spot = await getAccessibleSpot(id, userId);
 
     if (!spot) {
       return NextResponse.json({ error: "Spot not found" }, { status: 404 });

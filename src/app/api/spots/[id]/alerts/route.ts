@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUserId, isTestMode } from "@/lib/auth";
+import { getAuthUserId, isTestMode, getAccessibleSpot } from "@/lib/auth";
 import { db, surfSpots, spotAlerts, surfSessions, conditionProfiles } from "@/lib/db";
 import { eq, and, desc } from "drizzle-orm";
 import type { SpotAlertResponse } from "@/types";
@@ -16,13 +16,8 @@ export async function GET(
 
     const { id } = await params;
 
-    // Verify spot belongs to user
-    const spot = await db.query.surfSpots.findFirst({
-      where: and(
-        eq(surfSpots.id, id),
-        eq(surfSpots.userId, userId)
-      ),
-    });
+    // Verify spot belongs to user or is shared with them
+    const spot = await getAccessibleSpot(id, userId);
 
     if (!spot) {
       return NextResponse.json({ error: "Spot not found" }, { status: 404 });

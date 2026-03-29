@@ -11,11 +11,18 @@ interface InviteClientProps {
 }
 
 interface SpotInfo {
-  spot: { name: string };
+  spot: { name: string; latitude?: string; longitude?: string };
   sharedBy: { name: string | null };
 }
 
 type InviteState = "loading" | "valid" | "invalid" | "preview" | "claiming" | "accepted" | "declined" | "error";
+
+function buildStaticMapUrl(lat: number, lng: number): string {
+  const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+  // Yellow pin marker (hex EAB308 = yellow-500)
+  const marker = `pin-l+EAB308(${lng},${lat})`;
+  return `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/static/${marker}/${lng},${lat},14,0/800x1200@2x?access_token=${token}`;
+}
 
 export function InviteClient({ code, isAuthenticated }: InviteClientProps) {
   const router = useRouter();
@@ -37,13 +44,13 @@ export function InviteClient({ code, isAuthenticated }: InviteClientProps) {
         return;
       }
 
-      if (isAuthenticated && data.spot) {
-        setSpotInfo({ spot: data.spot, sharedBy: data.sharedBy });
-        setState("preview");
-      } else if (isAuthenticated) {
+      if (data.spot) {
+        setSpotInfo({ spot: data.spot, sharedBy: data.sharedBy || { name: null } });
+      }
+
+      if (isAuthenticated) {
         setState("preview");
       } else {
-        if (data.spot) setSpotInfo({ spot: data.spot, sharedBy: data.sharedBy });
         setState("valid");
       }
     } catch {
@@ -71,11 +78,8 @@ export function InviteClient({ code, isAuthenticated }: InviteClientProps) {
       if (action === "accept") {
         if (data.spot) setSpotInfo({ spot: data.spot, sharedBy: data.sharedBy });
         setState("accepted");
-        if (data.isNewUser && data.shareId) {
-          setTimeout(() => router.push(`/onboarding/invite?shareId=${data.shareId}`), 2000);
-        } else {
-          setTimeout(() => router.push("/dashboard"), 2000);
-        }
+        const shareId = data.shareId;
+        setTimeout(() => router.push(shareId ? `/dashboard?openShare=${shareId}` : "/dashboard"), 2000);
       } else {
         setState("declined");
         setTimeout(() => router.push("/dashboard"), 2000);
@@ -86,7 +90,10 @@ export function InviteClient({ code, isAuthenticated }: InviteClientProps) {
     }
   }
 
-  // Card content based on state
+  const spotLat = spotInfo?.spot?.latitude ? parseFloat(spotInfo.spot.latitude) : null;
+  const spotLng = spotInfo?.spot?.longitude ? parseFloat(spotInfo.spot.longitude) : null;
+  const hasCoords = spotLat !== null && spotLng !== null;
+
   function renderContent() {
     if (state === "loading") {
       return (
@@ -215,11 +222,21 @@ export function InviteClient({ code, isAuthenticated }: InviteClientProps) {
         </div>
       </div>
 
-      {/* Right side — hero image (hidden on mobile) */}
-      <div
-        className="hidden lg:block lg:w-1/2 bg-cover bg-center"
-        style={{ backgroundImage: "url(/hero-bg.jpg)" }}
-      />
+      {/* Right side — satellite map of the spot */}
+      <div className="hidden lg:block lg:w-1/2 relative overflow-hidden">
+        {hasCoords ? (
+          <img
+            src={buildStaticMapUrl(spotLat, spotLng)}
+            alt="Spot location"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: "url(/hero-bg.jpg)" }}
+          />
+        )}
+      </div>
     </div>
   );
 }

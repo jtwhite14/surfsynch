@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { cookies } from "next/headers";
-import { db, users } from "@/lib/db";
-import { eq } from "drizzle-orm";
+import { db, users, surfSpots, spotShares } from "@/lib/db";
+import { eq, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { TEST_MODE_COOKIE, ADMIN_EMAILS } from "@/lib/admin";
 
@@ -100,4 +100,31 @@ export async function getAuthUserId(): Promise<string | null> {
   }
 
   return resolveUser(clerkUserId);
+}
+
+/**
+ * Check if a user can access a spot (owns it OR has an accepted share).
+ * Returns the spot if accessible, null otherwise.
+ */
+export async function getAccessibleSpot(spotId: string, userId: string) {
+  // Check ownership first (fast path)
+  const ownedSpot = await db.query.surfSpots.findFirst({
+    where: and(eq(surfSpots.id, spotId), eq(surfSpots.userId, userId)),
+  });
+  if (ownedSpot) return ownedSpot;
+
+  // Check for accepted share
+  const share = await db.query.spotShares.findFirst({
+    where: and(
+      eq(spotShares.spotId, spotId),
+      eq(spotShares.sharedWithUserId, userId),
+      eq(spotShares.status, "accepted")
+    ),
+  });
+  if (!share) return null;
+
+  // Fetch the spot (owned by someone else)
+  return db.query.surfSpots.findFirst({
+    where: eq(surfSpots.id, spotId),
+  });
 }

@@ -18,7 +18,7 @@ export async function GET(
         isNull(spotShares.sharedWithUserId)
       ),
       with: {
-        spot: { columns: { id: true, name: true } },
+        spot: { columns: { id: true, name: true, latitude: true, longitude: true } },
         sharedBy: { columns: { id: true, name: true } },
       },
     });
@@ -27,7 +27,14 @@ export async function GET(
       return NextResponse.json({ valid: false });
     }
 
-    // Check if user is authenticated — if so, include details
+    // Always include spot location for the map preview (lat/lng is not sensitive)
+    const spotData = {
+      name: share.spot.name,
+      latitude: share.spot.latitude,
+      longitude: share.spot.longitude,
+    };
+
+    // Check if user is authenticated — if so, include sharer details
     let userId: string | null = null;
     try {
       userId = await getAuthUserId();
@@ -38,13 +45,13 @@ export async function GET(
     if (userId) {
       return NextResponse.json({
         valid: true,
-        spot: share.spot,
+        spot: spotData,
         sharedBy: share.sharedBy,
       });
     }
 
-    // Not authenticated — no details leaked
-    return NextResponse.json({ valid: true });
+    // Not authenticated — include spot for map but not sharer identity
+    return NextResponse.json({ valid: true, spot: spotData });
   } catch (error) {
     console.error("Error checking invite:", error);
     return NextResponse.json({ valid: false });

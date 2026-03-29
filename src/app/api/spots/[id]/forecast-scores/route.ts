@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUserId, isTestMode } from "@/lib/auth";
+import { getAuthUserId, isTestMode, getAccessibleSpot } from "@/lib/auth";
 import { db, surfSpots, surfSessions, spotForecasts, conditionProfiles } from "@/lib/db";
 import { eq, and, gte } from "drizzle-orm";
 import { fetchMarineForecast } from "@/lib/api/open-meteo";
@@ -57,8 +57,15 @@ export async function GET(
 
     const { id } = await params;
 
+    // Check access (ownership or accepted share)
+    const accessibleSpot = await getAccessibleSpot(id, userId);
+    if (!accessibleSpot) {
+      return NextResponse.json({ error: "Spot not found" }, { status: 404 });
+    }
+
+    // Fetch spot with relations
     const spot = await db.query.surfSpots.findFirst({
-      where: and(eq(surfSpots.id, id), eq(surfSpots.userId, userId)),
+      where: eq(surfSpots.id, id),
       with: {
         surfSessions: {
           where: gte(surfSessions.rating, 3),
