@@ -14,19 +14,13 @@ export default async function LandingPage() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* Nav */}
-      <nav className="sticky top-0 z-50 border-b border-black/[0.06] bg-white/80 backdrop-blur-sm">
+      <nav className="sticky top-0 z-50 border-b border-black/[0.06] bg-white">
         <div className="max-w-5xl mx-auto px-6 flex items-center justify-between h-14">
           <span className="flex items-center gap-2 text-base font-semibold tracking-tight text-gray-900">
             <BookOpen className="h-5 w-5 text-primary" />
             Wavebook
           </span>
           <div className="flex items-center gap-4">
-            <Link
-              href="/signup"
-              className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
-            >
-              Sign Up
-            </Link>
             <Link
               href="/login"
               className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
@@ -61,7 +55,7 @@ export default async function LandingPage() {
           </div>
 
           {/* App screenshot */}
-          <div className="relative z-10 max-w-5xl mx-auto px-6">
+          <div className="relative z-10 max-w-5xl mx-auto px-6 pb-16 md:pb-24">
             <div className="rounded-xl overflow-hidden shadow-2xl shadow-black/20 border border-black/[0.08]">
               <Image
                 src="/screenshots/app-hero.png"
@@ -76,8 +70,8 @@ export default async function LandingPage() {
 
           {/* Background image */}
           <div
-            className="absolute inset-0 z-0 bg-cover bg-center opacity-40"
-            style={{ backgroundImage: "url(/hero-bg.png)" }}
+            className="absolute inset-0 z-0 bg-[length:100%_auto] bg-top bg-no-repeat opacity-40"
+            style={{ backgroundImage: "url(/hero-bg.jpg)" }}
           />
           <div className="absolute inset-0 z-0 bg-gradient-to-b from-white/70 via-white/50 to-white" />
 
