@@ -14,7 +14,7 @@ export default async function LandingPage() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* Nav */}
-      <nav className="sticky top-0 z-50 border-b border-black/[0.06] bg-white">
+      <nav className="sticky top-0 z-50 border-b border-black/[0.06] bg-white/90 backdrop-blur-sm">
         <div className="max-w-5xl mx-auto px-6 flex items-center justify-between h-14">
           <span className="flex items-center gap-2 text-base font-semibold tracking-tight text-gray-900">
             <BookOpen className="h-5 w-5 text-primary" />
@@ -70,7 +70,7 @@ export default async function LandingPage() {
 
           {/* Background image */}
           <div
-            className="absolute inset-0 z-0 bg-[length:100%_auto] bg-top bg-no-repeat opacity-40"
+            className="absolute inset-0 z-0 bg-cover bg-top bg-no-repeat"
             style={{ backgroundImage: "url(/hero-bg.jpg)" }}
           />
           <div className="absolute inset-0 z-0 bg-gradient-to-b from-white/70 via-white/50 to-white" />
