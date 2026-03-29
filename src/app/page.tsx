@@ -3,7 +3,7 @@ import Image from "next/image";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { WaitlistForm } from "@/components/WaitlistForm";
-import { BookOpen } from "lucide-react";
+import { LandingNav } from "@/components/LandingNav";
 
 export default async function LandingPage() {
   const { userId } = await auth();
@@ -13,29 +13,11 @@ export default async function LandingPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      {/* Nav */}
-      <nav className="fixed top-0 left-0 right-0 z-50 px-4 md:px-6 pt-3 md:pt-4">
-        <div className="mx-auto max-w-6xl flex items-center justify-between h-12 md:h-14 px-5 md:px-8 rounded-full bg-white/30 backdrop-blur-md border border-white/40 shadow-sm">
-          <span className="flex items-center gap-2 text-sm font-semibold tracking-tight text-gray-900">
-            <BookOpen className="h-4 w-4 text-primary" />
-            Wavebook
-          </span>
-          <div className="flex items-center gap-8">
-            <a href="#features" className="hidden md:block text-sm text-gray-700 hover:text-gray-900 transition-colors">Features</a>
-            <a href="#how-it-works" className="hidden md:block text-sm text-gray-700 hover:text-gray-900 transition-colors">How It Works</a>
-          <Link
-            href="/login"
-            className="text-sm font-medium text-gray-900 px-4 py-1.5 rounded-full border border-gray-900/20 hover:bg-white/40 transition-colors"
-          >
-            Log In
-          </Link>
-          </div>
-        </div>
-      </nav>
+      <LandingNav />
 
       <main className="flex-1">
         {/* Hero */}
-        <section className="relative overflow-hidden bg-white">
+        <section id="hero" className="relative overflow-hidden bg-white">
           {/* Copy */}
           <div className="relative z-10 pt-24 md:pt-32 pb-12 md:pb-16">
             <div className="max-w-2xl mx-auto px-6 text-center">
@@ -85,7 +67,7 @@ export default async function LandingPage() {
           {/* Feature 1 — Alerts */}
           <div className="max-w-6xl mx-auto px-6 mb-32 md:mb-40">
             <div className="grid md:grid-cols-2 gap-8 md:gap-16 items-start mb-12 md:mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold tracking-tight leading-tight text-foreground">
+              <h2 className="text-4xl md:text-5xl font-bold tracking-tight leading-tight text-foreground">
                 Never miss
                 <br />
                 another swell
@@ -96,21 +78,15 @@ export default async function LandingPage() {
                 waking up for — dawn patrol or afternoon glass.
               </p>
             </div>
-            <div className="rounded-xl overflow-hidden border border-white/[0.06]">
-              <Image
-                src="/screenshots/dashboard.png"
-                alt="Dashboard showing surf alerts with forecast scores for multiple spots"
-                width={2880}
-                height={1640}
-                className="w-full h-auto"
-              />
+            <div className="rounded-xl overflow-hidden border border-white/[0.06] bg-white/[0.03] aspect-[16/10] flex items-center justify-center">
+              <span className="text-sm text-muted-foreground">2880 x 1800 — Alerts screenshot</span>
             </div>
           </div>
 
           {/* Feature 2 — Sessions */}
           <div className="max-w-6xl mx-auto px-6 mb-32 md:mb-40">
             <div className="grid md:grid-cols-2 gap-8 md:gap-16 items-start mb-12 md:mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold tracking-tight leading-tight text-foreground">
+              <h2 className="text-4xl md:text-5xl font-bold tracking-tight leading-tight text-foreground">
                 Log every
                 <br />
                 session
@@ -121,21 +97,15 @@ export default async function LandingPage() {
                 ridden — searchable, sortable, and entirely yours.
               </p>
             </div>
-            <div className="rounded-xl overflow-hidden border border-white/[0.06]">
-              <Image
-                src="/screenshots/sessions.png"
-                alt="Session log showing a list of surf sessions with photos and ratings"
-                width={2880}
-                height={1640}
-                className="w-full h-auto"
-              />
+            <div className="rounded-xl overflow-hidden border border-white/[0.06] bg-white/[0.03] aspect-[16/10] flex items-center justify-center">
+              <span className="text-sm text-muted-foreground">2880 x 1800 — Sessions screenshot</span>
             </div>
           </div>
 
           {/* Feature 3 — Session Detail */}
           <div className="max-w-6xl mx-auto px-6 mb-32 md:mb-40">
             <div className="grid md:grid-cols-2 gap-8 md:gap-16 items-start mb-12 md:mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold tracking-tight leading-tight text-foreground">
+              <h2 className="text-4xl md:text-5xl font-bold tracking-tight leading-tight text-foreground">
                 Relive the
                 <br />
                 details
@@ -146,21 +116,15 @@ export default async function LandingPage() {
                 you can chase the same conditions again.
               </p>
             </div>
-            <div className="rounded-xl overflow-hidden border border-white/[0.06]">
-              <Image
-                src="/screenshots/session-detail.png"
-                alt="Detailed session view showing conditions, gear, and photos"
-                width={2880}
-                height={1640}
-                className="w-full h-auto"
-              />
+            <div className="rounded-xl overflow-hidden border border-white/[0.06] bg-white/[0.03] aspect-[16/10] flex items-center justify-center">
+              <span className="text-sm text-muted-foreground">2880 x 1800 — Session detail screenshot</span>
             </div>
           </div>
 
           {/* Feature 4 — Privacy */}
           <div className="max-w-6xl mx-auto px-6">
             <div className="grid md:grid-cols-2 gap-8 md:gap-16 items-start mb-12 md:mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold tracking-tight leading-tight text-foreground">
+              <h2 className="text-4xl md:text-5xl font-bold tracking-tight leading-tight text-foreground">
                 Your spots
                 <br />
                 stay secret
@@ -171,14 +135,8 @@ export default async function LandingPage() {
                 track their waves without blowing up their breaks.
               </p>
             </div>
-            <div className="rounded-xl overflow-hidden border border-white/[0.06]">
-              <Image
-                src="/screenshots/app-hero.png"
-                alt="Map view showing private spot tracking with alerts"
-                width={2880}
-                height={1640}
-                className="w-full h-auto"
-              />
+            <div className="rounded-xl overflow-hidden border border-white/[0.06] bg-white/[0.03] aspect-[16/10] flex items-center justify-center">
+              <span className="text-sm text-muted-foreground">2880 x 1800 — Privacy/map screenshot</span>
             </div>
           </div>
         </section>
