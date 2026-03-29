@@ -39,16 +39,16 @@ export default async function LandingPage() {
 
       <main className="flex-1">
         {/* Hero */}
-        <section className="relative overflow-hidden">
+        <section className="relative overflow-hidden bg-white">
           {/* Copy */}
           <div className="relative z-10 pt-24 md:pt-32 pb-12 md:pb-16">
             <div className="max-w-2xl mx-auto px-6 text-center">
-              <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-tight">
+              <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-tight text-gray-900">
                 Your waves. Your data.
                 <br />
                 Keep it that way.
               </h1>
-              <p className="mt-6 text-lg text-muted-foreground leading-relaxed max-w-xl mx-auto">
+              <p className="mt-6 text-lg text-gray-500 leading-relaxed max-w-xl mx-auto">
                 An AI-powered surf tracker that doesn&apos;t ruin the sport we
                 all love. Log sessions, track all of your favorite breaks, and
                 get alerts when it&apos;s going off — without blowing up your
@@ -62,7 +62,7 @@ export default async function LandingPage() {
 
           {/* App screenshot */}
           <div className="relative z-10 max-w-5xl mx-auto px-6">
-            <div className="rounded-xl overflow-hidden shadow-2xl shadow-black/40 border border-white/[0.08]">
+            <div className="rounded-xl overflow-hidden shadow-2xl shadow-black/20 border border-black/[0.08]">
               <Image
                 src="/screenshots/app-hero.png"
                 alt="Wavebook dashboard showing surf alerts, forecast scores, and session history"
@@ -83,7 +83,7 @@ export default async function LandingPage() {
               className="object-cover object-center opacity-40"
               priority
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/50 to-background" />
+            <div className="absolute inset-0 bg-gradient-to-b from-white/70 via-white/50 to-white" />
           </div>
 
           {/* Bottom fade into page */}
