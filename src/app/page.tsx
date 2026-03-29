@@ -20,16 +20,16 @@ export default async function LandingPage() {
             <BookOpen className="h-4 w-4 text-primary" />
             Wavebook
           </span>
-          <div className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-sm text-gray-700 hover:text-gray-900 transition-colors">Features</a>
-            <a href="#how-it-works" className="text-sm text-gray-700 hover:text-gray-900 transition-colors">How It Works</a>
-          </div>
+          <div className="flex items-center gap-8">
+            <a href="#features" className="hidden md:block text-sm text-gray-700 hover:text-gray-900 transition-colors">Features</a>
+            <a href="#how-it-works" className="hidden md:block text-sm text-gray-700 hover:text-gray-900 transition-colors">How It Works</a>
           <Link
             href="/login"
             className="text-sm font-medium text-gray-900 px-4 py-1.5 rounded-full border border-gray-900/20 hover:bg-white/40 transition-colors"
           >
             Log In
           </Link>
+          </div>
         </div>
       </nav>
 
@@ -57,7 +57,7 @@ export default async function LandingPage() {
           </div>
 
           {/* App screenshot */}
-          <div className="relative z-10 max-w-5xl mx-auto px-6 pb-16 md:pb-24">
+          <div className="relative z-10 max-w-6xl mx-auto px-6">
             <div className="rounded-xl overflow-hidden shadow-2xl shadow-black/20 border border-black/[0.08]">
               <Image
                 src="/screenshots/app-hero.png"
@@ -72,12 +72,12 @@ export default async function LandingPage() {
 
           {/* Background image */}
           <div
-            className="absolute inset-0 z-0 bg-cover bg-top bg-no-repeat"
-            style={{ backgroundImage: "url(/hero-bg.jpg)" }}
+            className="absolute inset-0 z-0 bg-top bg-no-repeat"
+            style={{ backgroundImage: "url(/hero-bg.jpg)", backgroundSize: "120% auto" }}
           />
 
-          {/* Bottom fade into page */}
-          <div className="h-32 relative z-10 bg-gradient-to-b from-transparent to-background" />
+          {/* Bottom fade — screenshot bleeds into dark bg */}
+          <div className="relative z-10 h-40 md:h-56 bg-gradient-to-b from-transparent via-background/70 to-background" />
         </section>
       </main>
 
