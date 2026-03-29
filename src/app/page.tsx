@@ -79,6 +79,109 @@ export default async function LandingPage() {
           {/* Bottom fade — screenshot bleeds into dark bg */}
           <div className="relative z-10 h-40 md:h-56 bg-gradient-to-b from-transparent via-background/70 to-background" />
         </section>
+
+        {/* Features */}
+        <section id="features" className="py-24 md:py-32">
+          {/* Feature 1 — Alerts */}
+          <div className="max-w-6xl mx-auto px-6 mb-32 md:mb-40">
+            <div className="grid md:grid-cols-2 gap-8 md:gap-16 items-start mb-12 md:mb-16">
+              <h2 className="text-3xl md:text-4xl font-bold tracking-tight leading-tight text-foreground">
+                Never miss
+                <br />
+                another swell
+              </h2>
+              <p className="text-lg text-muted-foreground leading-relaxed">
+                Get SMS alerts when conditions align at your spots. Wavebook
+                scores every forecast window and texts you the ones worth
+                waking up for — dawn patrol or afternoon glass.
+              </p>
+            </div>
+            <div className="rounded-xl overflow-hidden border border-white/[0.06]">
+              <Image
+                src="/screenshots/dashboard.png"
+                alt="Dashboard showing surf alerts with forecast scores for multiple spots"
+                width={2880}
+                height={1640}
+                className="w-full h-auto"
+              />
+            </div>
+          </div>
+
+          {/* Feature 2 — Sessions */}
+          <div className="max-w-6xl mx-auto px-6 mb-32 md:mb-40">
+            <div className="grid md:grid-cols-2 gap-8 md:gap-16 items-start mb-12 md:mb-16">
+              <h2 className="text-3xl md:text-4xl font-bold tracking-tight leading-tight text-foreground">
+                Log every
+                <br />
+                session
+              </h2>
+              <p className="text-lg text-muted-foreground leading-relaxed">
+                Track your sessions with photos, conditions, ratings, and
+                notes. Build a personal archive of every wave you&apos;ve
+                ridden — searchable, sortable, and entirely yours.
+              </p>
+            </div>
+            <div className="rounded-xl overflow-hidden border border-white/[0.06]">
+              <Image
+                src="/screenshots/sessions.png"
+                alt="Session log showing a list of surf sessions with photos and ratings"
+                width={2880}
+                height={1640}
+                className="w-full h-auto"
+              />
+            </div>
+          </div>
+
+          {/* Feature 3 — Session Detail */}
+          <div className="max-w-6xl mx-auto px-6 mb-32 md:mb-40">
+            <div className="grid md:grid-cols-2 gap-8 md:gap-16 items-start mb-12 md:mb-16">
+              <h2 className="text-3xl md:text-4xl font-bold tracking-tight leading-tight text-foreground">
+                Relive the
+                <br />
+                details
+              </h2>
+              <p className="text-lg text-muted-foreground leading-relaxed">
+                Every session captures the full picture — swell, wind, tide,
+                board, and wetsuit. See exactly what made a session great so
+                you can chase the same conditions again.
+              </p>
+            </div>
+            <div className="rounded-xl overflow-hidden border border-white/[0.06]">
+              <Image
+                src="/screenshots/session-detail.png"
+                alt="Detailed session view showing conditions, gear, and photos"
+                width={2880}
+                height={1640}
+                className="w-full h-auto"
+              />
+            </div>
+          </div>
+
+          {/* Feature 4 — Privacy */}
+          <div className="max-w-6xl mx-auto px-6">
+            <div className="grid md:grid-cols-2 gap-8 md:gap-16 items-start mb-12 md:mb-16">
+              <h2 className="text-3xl md:text-4xl font-bold tracking-tight leading-tight text-foreground">
+                Your spots
+                <br />
+                stay secret
+              </h2>
+              <p className="text-lg text-muted-foreground leading-relaxed">
+                No public feeds. No social features. No sharing your spots
+                with the world. Wavebook is built for surfers who want to
+                track their waves without blowing up their breaks.
+              </p>
+            </div>
+            <div className="rounded-xl overflow-hidden border border-white/[0.06]">
+              <Image
+                src="/screenshots/app-hero.png"
+                alt="Map view showing private spot tracking with alerts"
+                width={2880}
+                height={1640}
+                className="w-full h-auto"
+              />
+            </div>
+          </div>
+        </section>
       </main>
 
       {/* Footer */}
