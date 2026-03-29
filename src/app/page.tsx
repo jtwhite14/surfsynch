@@ -80,10 +80,10 @@ export default async function LandingPage() {
               src="/hero-bg.png"
               alt=""
               fill
-              className="object-cover object-center opacity-20"
+              className="object-cover object-center opacity-40"
               priority
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-background via-background/80 to-background" />
+            <div className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/50 to-background" />
           </div>
 
           {/* Bottom fade into page */}
