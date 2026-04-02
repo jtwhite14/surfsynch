@@ -1244,17 +1244,34 @@ export default function DashboardPage() {
                           }}
                           className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/50 transition-all duration-100 w-full text-left"
                         >
-                          {photo && (
-                            <img
-                              src={photo}
-                              alt=""
-                              className="w-10 h-10 rounded object-cover shrink-0"
-                            />
-                          )}
+                          <div className="relative shrink-0">
+                            {photo && (
+                              <img
+                                src={photo}
+                                alt=""
+                                className="w-10 h-10 rounded object-cover"
+                              />
+                            )}
+                            {session.friendUser && photo && (
+                              <Avatar className="absolute -bottom-1 -left-1 size-5 border-2 border-background shadow">
+                                <AvatarImage src={session.friendUser.image ?? undefined} />
+                                <AvatarFallback className="text-[8px]">
+                                  {session.friendUser.name?.charAt(0) ?? "?"}
+                                </AvatarFallback>
+                              </Avatar>
+                            )}
+                          </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium truncate">
-                              {session.spot?.name || "Unknown Spot"}
-                            </p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-sm font-medium truncate">
+                                {session.spot?.name || "Unknown Spot"}
+                              </p>
+                              {session.friendUser && (
+                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 shrink-0">
+                                  {session.friendUser.name?.split(" ")[0] ?? "Friend"}
+                                </span>
+                              )}
+                            </div>
                             <p className="text-xs text-muted-foreground">{formatDate(session.date)}</p>
                           </div>
                           <div className="flex items-center shrink-0">

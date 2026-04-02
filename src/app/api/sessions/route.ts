@@ -112,65 +112,76 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // If filtering by spot, also fetch friend sessions from accepted shares
+    // Also fetch friend sessions from accepted shares
     let friendSessionsList: typeof ownSessions & { friendUser?: { id: string; name: string | null; image: string | null }; addedToLog?: boolean }[] = [];
-    if (spotId) {
-      // Find accepted shares for this spot involving current user (either direction)
-      const acceptedShares = await db.query.spotShares.findMany({
-        where: and(
-          eq(spotShares.spotId, spotId),
-          eq(spotShares.status, "accepted"),
-          or(
-            eq(spotShares.sharedByUserId, userId),
-            eq(spotShares.sharedWithUserId, userId)
+
+    // Find accepted shares involving current user (optionally filtered by spot)
+    const acceptedShares = await db.query.spotShares.findMany({
+      where: spotId
+        ? and(
+            eq(spotShares.spotId, spotId),
+            eq(spotShares.status, "accepted"),
+            or(
+              eq(spotShares.sharedByUserId, userId),
+              eq(spotShares.sharedWithUserId, userId)
+            )
           )
-        ),
+        : and(
+            eq(spotShares.status, "accepted"),
+            or(
+              eq(spotShares.sharedByUserId, userId),
+              eq(spotShares.sharedWithUserId, userId)
+            )
+          ),
+    });
+
+    // Collect friend user IDs (the other side of each share)
+    const friendUserIds = [...new Set(
+      acceptedShares.flatMap((s) => {
+        const ids: string[] = [];
+        if (s.sharedByUserId !== userId) ids.push(s.sharedByUserId);
+        if (s.sharedWithUserId && s.sharedWithUserId !== userId) ids.push(s.sharedWithUserId);
+        return ids;
+      })
+    )];
+
+    if (friendUserIds.length > 0) {
+      // Fetch friend sessions (optionally filtered by spot)
+      const rawFriendSessions = await db.query.surfSessions.findMany({
+        where: spotId
+          ? and(
+              eq(surfSessions.spotId, spotId),
+              inArray(surfSessions.userId, friendUserIds)
+            )
+          : inArray(surfSessions.userId, friendUserIds),
+        orderBy: [desc(surfSessions.date)],
+        limit: limit ? parseInt(limit) : undefined,
+        with: {
+          conditions: true,
+          spot: true,
+          photos: true,
+          user: true,
+        },
       });
 
-      // Collect friend user IDs (the other side of each share)
-      const friendUserIds = [...new Set(
-        acceptedShares.flatMap((s) => {
-          const ids: string[] = [];
-          if (s.sharedByUserId !== userId) ids.push(s.sharedByUserId);
-          if (s.sharedWithUserId && s.sharedWithUserId !== userId) ids.push(s.sharedWithUserId);
-          return ids;
-        })
-      )];
+      // Check which friend sessions the current user has added to their log
+      const loggedEntries = await db.query.loggedFriendSessions.findMany({
+        where: eq(loggedFriendSessions.userId, userId),
+      });
+      const loggedSessionIds = new Set(loggedEntries.map((e) => e.sessionId));
 
-      if (friendUserIds.length > 0) {
-        // Fetch friend sessions at this spot
-        const rawFriendSessions = await db.query.surfSessions.findMany({
-          where: and(
-            eq(surfSessions.spotId, spotId),
-            inArray(surfSessions.userId, friendUserIds)
-          ),
-          orderBy: [desc(surfSessions.date)],
-          with: {
-            conditions: true,
-            spot: true,
-            photos: true,
-            user: true,
-          },
-        });
-
-        // Check which friend sessions the current user has added to their log
-        const loggedEntries = await db.query.loggedFriendSessions.findMany({
-          where: eq(loggedFriendSessions.userId, userId),
-        });
-        const loggedSessionIds = new Set(loggedEntries.map((e) => e.sessionId));
-
-        friendSessionsList = rawFriendSessions.map((s) => ({
-          ...s,
-          friendUser: s.user ? { id: s.user.id, name: s.user.name, image: s.user.image } : undefined,
-          addedToLog: loggedSessionIds.has(s.id),
-        }));
-      }
+      friendSessionsList = rawFriendSessions.map((s) => ({
+        ...s,
+        friendUser: s.user ? { id: s.user.id, name: s.user.name, image: s.user.image } : undefined,
+        addedToLog: loggedSessionIds.has(s.id),
+      }));
     }
 
-    // Merge and sort by date (interleaved)
-    const sessions = [...ownSessions, ...friendSessionsList].sort(
+    // Merge and sort by date (interleaved), then apply limit
+    const merged = [...ownSessions, ...friendSessionsList].sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
     );
+    const sessions = limit ? merged.slice(0, parseInt(limit)) : merged;
 
     return NextResponse.json({
       sessions,
