@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUserId } from "@/lib/auth";
-import { isAdmin, getOrCreateFakeShareUsers, FAKE_SHARE_USERS } from "@/lib/admin";
+import { auth } from "@clerk/nextjs/server";
+import { resolveUser } from "@/lib/auth";
+import { isAdmin, getOrCreateTestUser, getOrCreateFakeShareUsers, FAKE_SHARE_USERS } from "@/lib/admin";
 import { db, surfSpots, spotShares, surfSessions, sessionConditions } from "@/lib/db";
 import { eq, and, desc } from "drizzle-orm";
 import { generateInviteCode } from "@/lib/sharing/invite-code";
@@ -19,22 +20,29 @@ async function findUserSpot(userId: string, spotId: string | undefined): Promise
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = await getAuthUserId();
-    if (!userId || !(await isAdmin(userId))) {
+    // Verify admin via Clerk directly (bypass test-mode impersonation)
+    const { userId: clerkUserId } = await auth();
+    if (!clerkUserId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const realUserId = await resolveUser(clerkUserId);
+    if (!(await isAdmin(realUserId))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    // Always seed against the test user's data
+    const testUserId = await getOrCreateTestUser();
     const { action, spotId } = await request.json();
 
     if (action === "alerts" || action === "all") {
-      const computed = await computeAlerts(userId, spotId, request);
+      const computed = await computeAlerts(testUserId, spotId, request);
       if (action === "alerts") {
         return NextResponse.json({ message: `Computed alerts for ${computed} spot${computed === 1 ? "" : "s"}` });
       }
     }
 
     if (action === "share" || action === "all") {
-      const result = await createShareLink(userId, spotId, request);
+      const result = await createShareLink(testUserId, spotId, request);
       if (action === "share") {
         return NextResponse.json({ message: "Share link created", inviteUrl: result });
       }
@@ -44,7 +52,7 @@ export async function POST(request: NextRequest) {
     let fakeUserIds: string[] | undefined;
 
     if (action === "accepted-share" || action === "all") {
-      const result = await createAcceptedShares(userId, spotId);
+      const result = await createAcceptedShares(testUserId, spotId);
       fakeUserIds = result.fakeUserIds;
       if (action === "accepted-share") {
         return NextResponse.json({ message: result.message });
@@ -52,7 +60,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "friend-session" || action === "all") {
-      const result = await createFriendSession(userId, spotId, fakeUserIds);
+      const result = await createFriendSession(testUserId, spotId, fakeUserIds);
       if (action === "friend-session") {
         return NextResponse.json({ message: result });
       }
