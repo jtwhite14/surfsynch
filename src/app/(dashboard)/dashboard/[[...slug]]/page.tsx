@@ -1096,7 +1096,7 @@ export default function DashboardPage() {
       {/* Shared spot detail pane */}
       {/* Alerts + Sessions/Spots panels — visible when no spot is selected */}
       {!selectedSpot && addSpotMode === "idle" && (
-        <div className="absolute bottom-4 left-4 right-4 sm:bottom-auto sm:right-auto sm:top-4 z-10 sm:w-80 flex flex-col gap-3">
+        <div className="absolute bottom-4 left-4 right-4 sm:bottom-auto sm:right-auto sm:top-4 z-10 sm:w-80 flex flex-col gap-3 max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-2rem)] overflow-y-auto">
           {loading ? (
             /* Skeleton panels while data loads */
             <>
