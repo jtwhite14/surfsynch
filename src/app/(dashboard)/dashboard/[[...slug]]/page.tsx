@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { formatDate } from "@/lib/utils/date";
+import { formatDate, formatRelative } from "@/lib/utils/date";
 import {
   ArrowLeft,
   CloudSun,
@@ -69,8 +69,6 @@ export default function DashboardPage() {
   const [sessions, setSessions] = useState<SurfSessionWithConditions[]>([]);
   const [loading, setLoading] = useState(true);
   const [alertsForecastTab, setAlertsForecastTab] = useState<"alerts" | "forecast">("alerts");
-  const [sessionsPanelOpen, setSessionsPanelOpen] = useState(true);
-  const [sessionsTab, setSessionsTab] = useState<"sessions" | "spots" | "equipment">("sessions");
   const [surfboards, setSurfboards] = useState<Surfboard[]>([]);
   const [wetsuits, setWetsuits] = useState<Wetsuit[]>([]);
 
@@ -142,6 +140,73 @@ export default function DashboardPage() {
     }
     return items;
   }, [spots, spotProfileCounts, sharedSpotIds]);
+
+  type ActivityItem = {
+    id: string;
+    type: "session" | "spot" | "surfboard" | "wetsuit";
+    action: "added" | "edited";
+    timestamp: Date;
+    data: any;
+  };
+
+  const activityFeed = useMemo<ActivityItem[]>(() => {
+    const items: ActivityItem[] = [];
+
+    for (const session of sessions) {
+      const created = new Date(session.createdAt);
+      const updated = new Date(session.updatedAt);
+      const isEdited = updated.getTime() - created.getTime() > 1000;
+      items.push({
+        id: `session-${session.id}`,
+        type: "session",
+        action: isEdited ? "edited" : "added",
+        timestamp: updated,
+        data: session,
+      });
+    }
+
+    for (const spot of spots) {
+      const created = new Date(spot.createdAt);
+      const updated = new Date(spot.updatedAt);
+      const isEdited = updated.getTime() - created.getTime() > 1000;
+      items.push({
+        id: `spot-${spot.id}`,
+        type: "spot",
+        action: isEdited ? "edited" : "added",
+        timestamp: updated,
+        data: spot,
+      });
+    }
+
+    for (const board of surfboards) {
+      const created = new Date(board.createdAt);
+      const updated = new Date(board.updatedAt);
+      const isEdited = updated.getTime() - created.getTime() > 1000;
+      items.push({
+        id: `surfboard-${board.id}`,
+        type: "surfboard",
+        action: isEdited ? "edited" : "added",
+        timestamp: updated,
+        data: board,
+      });
+    }
+
+    for (const suit of wetsuits) {
+      const created = new Date(suit.createdAt);
+      const updated = new Date(suit.updatedAt);
+      const isEdited = updated.getTime() - created.getTime() > 1000;
+      items.push({
+        id: `wetsuit-${suit.id}`,
+        type: "wetsuit",
+        action: isEdited ? "edited" : "added",
+        timestamp: updated,
+        data: suit,
+      });
+    }
+
+    items.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    return items.slice(0, 15);
+  }, [sessions, spots, surfboards, wetsuits]);
 
   const handleFixLocation = (spot: SurfSpot) => {
     setSelectedSpot(null);
@@ -371,7 +436,7 @@ export default function DashboardPage() {
     Promise.all([
       fetch("/api/spots").then((r) => (r.ok ? r.json() : { spots: [] })),
       fetch("/api/user/location").then((r) => (r.ok ? r.json() : { latitude: null, longitude: null })),
-      fetch("/api/sessions?limit=5").then((r) => (r.ok ? r.json() : { sessions: [] })),
+      fetch("/api/sessions?limit=20").then((r) => (r.ok ? r.json() : { sessions: [] })),
       fetch("/api/surfboards").then((r) => (r.ok ? r.json() : { surfboards: [] })),
       fetch("/api/wetsuits").then((r) => (r.ok ? r.json() : { wetsuits: [] })),
     ])
@@ -1184,208 +1249,145 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Sessions / Spots panel */}
-          {(sessions.length > 0 || spots.length > 0 || surfboards.length > 0 || wetsuits.length > 0) && (
+          {/* Activity feed */}
+          {activityFeed.length > 0 && (
             <div className="rounded-lg border bg-background/90 backdrop-blur-sm shadow-[--shadow-popover] overflow-hidden">
-              <div className="flex border-b">
-                <button
-                  onClick={() => { setSessionsTab("sessions"); setSessionsPanelOpen(true); }}
-                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-all duration-100 ${
-                    sessionsTab === "sessions"
-                      ? "text-foreground border-b-2 border-primary -mb-px"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Waves className="size-3.5" />
-                  Sessions
-                </button>
-                <button
-                  onClick={() => { setSessionsTab("spots"); setSessionsPanelOpen(true); }}
-                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-all duration-100 ${
-                    sessionsTab === "spots"
-                      ? "text-foreground border-b-2 border-primary -mb-px"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <MapPin className="size-3.5" />
-                  Spots
-                </button>
-                <button
-                  onClick={() => { setSessionsTab("equipment"); setSessionsPanelOpen(true); }}
-                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-all duration-100 ${
-                    sessionsTab === "equipment"
-                      ? "text-foreground border-b-2 border-primary -mb-px"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <SurfboardIcon className="size-3.5" />
-                  Gear
-                </button>
+              <div className="flex items-center gap-1.5 px-4 py-2.5 border-b">
+                <Waves className="size-3.5 text-muted-foreground" />
+                <span className="text-sm font-medium">Activity</span>
               </div>
-
-              {sessionsPanelOpen && sessionsTab === "sessions" && (
-                <div className="max-h-80 overflow-y-auto">
-                  {sessions.length === 0 ? (
-                    <div className="px-4 py-6 text-center">
-                      <p className="text-sm text-muted-foreground">No sessions yet</p>
-                    </div>
-                  ) : (
-                    sessions.map((session) => {
-                      const photo = session.photos?.[0]?.photoUrl || session.photoUrl;
-                      return (
-                        <button
-                          key={session.id}
-                          onClick={async () => {
-                            const spot = spots.find((s) => s.id === session.spotId);
-                            if (spot) {
-                              await handleSpotClick(spot);
-                              handleViewSession(session);
-                            }
-                          }}
-                          className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/50 transition-all duration-100 w-full text-left"
-                        >
-                          <div className="relative shrink-0">
-                            {photo && (
-                              <img
-                                src={photo}
-                                alt=""
-                                className="w-10 h-10 rounded object-cover"
-                              />
-                            )}
-                            {session.friendUser && photo && (
-                              <Avatar className="absolute -bottom-1 -left-1 size-5 border-2 border-background shadow">
-                                <AvatarImage src={session.friendUser.image ?? undefined} />
-                                <AvatarFallback className="text-[8px]">
-                                  {session.friendUser.name?.charAt(0) ?? "?"}
-                                </AvatarFallback>
-                              </Avatar>
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5">
-                              <p className="text-sm font-medium truncate">
-                                {session.spot?.name || "Unknown Spot"}
-                              </p>
-                              {session.friendUser && (
-                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 shrink-0">
-                                  {session.friendUser.name?.split(" ")[0] ?? "Friend"}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-muted-foreground">{formatDate(session.date)}</p>
-                          </div>
-                          <div className="flex items-center shrink-0">
-                            {Array.from({ length: 5 }).map((_, i) => (
-                              <svg
-                                key={i}
-                                className={`w-2.5 h-2.5 ${
-                                  i < session.rating ? "text-yellow-400" : "text-muted-foreground/30"
-                                }`}
-                                fill="currentColor"
-                                viewBox="0 0 20 20"
-                              >
-                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                              </svg>
-                            ))}
-                          </div>
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-              )}
-
-              {sessionsPanelOpen && sessionsTab === "equipment" && (
-                <div className="max-h-80 overflow-y-auto">
-                  {surfboards.length === 0 && wetsuits.length === 0 ? (
-                    <div className="px-4 py-6 text-center">
-                      <p className="text-sm text-muted-foreground">No gear yet</p>
-                    </div>
-                  ) : (
-                    [...surfboards.map((b) => ({ ...b, _type: "surfboard" as const })), ...wetsuits.map((w) => ({ ...w, _type: "wetsuit" as const }))]
-                      .sort((a, b) => ((b as any).sessionCount || 0) - ((a as any).sessionCount || 0))
-                      .map((item) => {
-                        const subtitle = item._type === "surfboard"
-                          ? [item.brand, item.model, item.boardType].filter(Boolean).join(" · ")
-                          : [item.brand, (item as Wetsuit).thickness ? `${(item as Wetsuit).thickness}mm` : null, (item as Wetsuit).style].filter(Boolean).join(" · ");
-                        return (
-                          <button
-                            key={item.id}
-                            onClick={() => setGearModalOpen(true)}
-                            className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/50 transition-all duration-100 w-full text-left"
-                          >
-                            {item._type === "surfboard" && (item as Surfboard).photoUrl && (
-                              <img
-                                src={(item as Surfboard).photoUrl!}
-                                alt=""
-                                className="w-10 h-10 rounded object-cover shrink-0"
-                              />
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <p className={`text-sm font-medium truncate ${item.retired ? "opacity-50" : ""}`}>
-                                {item.name}
-                                {item.retired && <span className="ml-1.5 text-xs text-muted-foreground">(retired)</span>}
-                              </p>
-                              {subtitle && (
-                                <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
-                              )}
-                            </div>
-                            <span className="text-xs text-muted-foreground shrink-0">
-                              {(item as any).sessionCount > 0
-                                ? `${(item as any).sessionCount} session${(item as any).sessionCount === 1 ? "" : "s"}`
-                                : item._type === "surfboard" ? "Board" : "Wetsuit"}
-                            </span>
-                          </button>
-                        );
-                      })
-                  )}
-                </div>
-              )}
-
-              {sessionsPanelOpen && sessionsTab === "spots" && (
-                <div className="max-h-80 overflow-y-auto">
-                  {spots.length === 0 ? (
-                    <div className="px-4 py-6 text-center">
-                      <p className="text-sm text-muted-foreground">No spots yet</p>
-                    </div>
-                  ) : (
-                    [...spots]
-                      .sort((a, b) => {
-                        if (!homeLocation) return 0;
-                        const distA = haversineDistance(homeLocation.latitude, homeLocation.longitude, parseFloat(a.latitude), parseFloat(a.longitude));
-                        const distB = haversineDistance(homeLocation.latitude, homeLocation.longitude, parseFloat(b.latitude), parseFloat(b.longitude));
-                        return distA - distB;
-                      })
-                      .map((spot) => {
-                        const distMi = homeLocation
-                          ? haversineDistance(homeLocation.latitude, homeLocation.longitude, parseFloat(spot.latitude), parseFloat(spot.longitude)) * 0.621371
-                          : null;
-                        return (
+              <div className="max-h-80 overflow-y-auto">
+                {activityFeed.map((item) => {
+                  if (item.type === "session") {
+                    const session = item.data;
+                    const photo = session.photos?.[0]?.photoUrl || session.photoUrl;
+                    const friendName = session.friendUser?.name?.split(" ")[0];
+                    const label = item.action === "edited"
+                      ? `Updated session at ${session.spot?.name || "Unknown Spot"}`
+                      : friendName
+                        ? `${friendName} logged a session at ${session.spot?.name || "Unknown Spot"}`
+                        : `Logged a session at ${session.spot?.name || "Unknown Spot"}`;
+                    return (
                       <button
-                        key={spot.id}
+                        key={item.id}
+                        onClick={async () => {
+                          const spot = spots.find((s) => s.id === session.spotId);
+                          if (spot) {
+                            await handleSpotClick(spot);
+                            handleViewSession(session);
+                          }
+                        }}
+                        className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/50 transition-all duration-100 w-full text-left"
+                      >
+                        <div className="relative shrink-0">
+                          {photo ? (
+                            <img src={photo} alt="" className="w-10 h-10 rounded object-cover" />
+                          ) : (
+                            <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+                              <Waves className="size-4 text-muted-foreground" />
+                            </div>
+                          )}
+                          {session.friendUser && (
+                            <Avatar className="absolute -bottom-1 -left-1 size-5 border-2 border-background shadow">
+                              <AvatarImage src={session.friendUser.image ?? undefined} />
+                              <AvatarFallback className="text-[8px]">
+                                {session.friendUser.name?.charAt(0) ?? "?"}
+                              </AvatarFallback>
+                            </Avatar>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-sm font-medium truncate">{label}</p>
+                          </div>
+                          <p className="text-xs text-muted-foreground">{formatRelative(item.timestamp)}</p>
+                        </div>
+                        <div className="flex items-center shrink-0">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <svg
+                              key={i}
+                              className={`w-2.5 h-2.5 ${i < session.rating ? "text-yellow-400" : "text-muted-foreground/30"}`}
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
+                            >
+                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            </svg>
+                          ))}
+                        </div>
+                      </button>
+                    );
+                  }
+
+                  if (item.type === "spot") {
+                    const spot = item.data as SurfSpot;
+                    return (
+                      <button
+                        key={item.id}
                         onClick={() => handleSpotClick(spot)}
                         className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/50 transition-all duration-100 w-full text-left"
                       >
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium truncate">{spot.name}</p>
-                          {spot.description && (
-                            <p className="text-xs text-muted-foreground truncate">{spot.description}</p>
-                          )}
+                        <div className="w-10 h-10 rounded bg-muted flex items-center justify-center shrink-0">
+                          <MapPin className="size-4 text-muted-foreground" />
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {distMi !== null && (
-                            <span className="text-xs text-muted-foreground">{distMi < 1 ? distMi.toFixed(1) : Math.round(distMi)} mi</span>
-                          )}
-                          {alertSpotIds.has(spot.id) && (
-                            <span className="w-2 h-2 rounded-full bg-primary" />
-                          )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">
+                            {item.action === "edited" ? "Updated" : "Added"} {spot.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{formatRelative(item.timestamp)}</p>
                         </div>
                       </button>
-                        );
-                      })
-                  )}
-                </div>
-              )}
+                    );
+                  }
+
+                  if (item.type === "surfboard") {
+                    const board = item.data as Surfboard;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => setGearModalOpen(true)}
+                        className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/50 transition-all duration-100 w-full text-left"
+                      >
+                        {board.photoUrl ? (
+                          <img src={board.photoUrl} alt="" className="w-10 h-10 rounded object-cover shrink-0" />
+                        ) : (
+                          <div className="w-10 h-10 rounded bg-muted flex items-center justify-center shrink-0">
+                            <SurfboardIcon className="size-4 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">
+                            {item.action === "edited" ? "Updated" : "Added"} {board.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{formatRelative(item.timestamp)}</p>
+                        </div>
+                      </button>
+                    );
+                  }
+
+                  if (item.type === "wetsuit") {
+                    const suit = item.data as Wetsuit;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => setGearModalOpen(true)}
+                        className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/50 transition-all duration-100 w-full text-left"
+                      >
+                        <div className="w-10 h-10 rounded bg-muted flex items-center justify-center shrink-0">
+                          <SurfboardIcon className="size-4 text-muted-foreground" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">
+                            {item.action === "edited" ? "Updated" : "Added"} {suit.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{formatRelative(item.timestamp)}</p>
+                        </div>
+                      </button>
+                    );
+                  }
+
+                  return null;
+                })}
+              </div>
             </div>
           )}
             </>
